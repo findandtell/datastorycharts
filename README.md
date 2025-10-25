@@ -2,6 +2,23 @@
 
 A scalable, maintainable React-based data visualization platform for creating professional funnel charts and other visualizations.
 
+## 🚀 Live Demo
+
+**Production URL**: [https://datastorycharts.vercel.app](https://datastorycharts.vercel.app)
+
+## ✨ Latest Features (v2.0)
+
+### Recent Updates
+- **Direct Labels (In-Stage)**: Period labels displayed directly inside bars as default
+- **Traditional Legend**: Optional top legend for period identification
+- **Enhanced Font Options**:
+  - 5 Sans-Serif fonts: Inter, Montserrat, Roboto, Open Sans (default), Lato
+  - 2 Condensed fonts: Roboto Condensed, Open Sans Condensed
+  - 5 Serif fonts: Merriweather, Playfair Display, Lora, PT Serif, Georgia
+- **Improved Layout**: Fixed scrolling behavior - chart stays centered, only control panel scrolls
+- **Smart Label Positioning**: Dynamic label placement in horizontal mode to avoid conflicts with conversion brackets and legends
+- **Responsive UI**: Sticky header and chart area with scrollable configuration panel
+
 ## 🏗️ Architecture Overview
 
 This refactored codebase separates concerns into modular, reusable components following best practices for scalability and maintainability.
@@ -19,6 +36,46 @@ src/
 │   └── data/                   # Sample datasets
 └── contexts/                    # React context providers
 ```
+
+## 🎯 Key Features
+
+### Chart Visualization
+- **Multiple Orientations**: Vertical and horizontal funnel layouts
+- **Dual Emphasis Modes**:
+  - Throughput (conversion through funnel)
+  - Fallout (drop-off visualization)
+- **Flexible Aspect Ratios**: 1:1, 4:3, 16:9, 3:4, 9:16
+- **Comparison Mode**: Track multiple time periods (up to 3) with color-coded bars
+- **Conversion Brackets**: Click two stages to see conversion rate between them
+- **Sparklines**: Trend visualization for each stage (volume or conversion-based)
+
+### Data Management
+- **Interactive Data Editing**: In-place editing with live preview
+- **CSV Import/Export**: Load and save data as CSV files
+- **Sample Datasets**: Pre-configured examples for quick testing
+- **Normalize to 100%**: Option to normalize first stage to 100%
+- **Compact Numbers**: Toggle between full numbers and abbreviated format (K, M, B)
+
+### Styling & Customization
+- **Typography Controls**:
+  - 12 professional fonts (sans-serif, condensed, serif)
+  - Independent font size controls for title, subtitle, labels, metrics, and legend
+  - Direct Labels (in-stage) or Traditional Legend positioning
+- **Color Customization**:
+  - Single color with gradient transition
+  - 5 preset comparison palettes (professional, vibrant, warm, cool, neutral)
+  - Custom color palette with 8 user-defined colors
+  - Intelligent text contrast (white/black based on background)
+- **Layout Options**:
+  - Adjustable chart padding and stage gaps
+  - Stage label positioning (top/bottom for horizontal, left/right for vertical)
+  - Dynamic label positioning to avoid UI conflicts
+
+### Export & Sharing
+- **PNG Export**: High-resolution image export (2x scaling)
+- **SVG Export**: Vector graphics for scalable designs
+- **Copy Settings**: JSON-based settings export/import
+- **Deployed on Vercel**: Live production environment with automatic deployments
 
 ## 📚 Key Design Principles
 
@@ -313,16 +370,69 @@ function App() {
 }
 ```
 
-## 📦 Dependencies
+## 🚀 Getting Started
 
-### Core
-- React 18+
-- D3.js (data visualization)
-- Papa Parse (CSV handling)
+### Prerequisites
+- Node.js 18+ and npm
 
-### UI (Suggested)
-- Tailwind CSS (styling)
-- Lucide React (icons)
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/findandtell/datastorycharts.git
+cd datastorycharts
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The app will be available at `http://localhost:5173`
+
+### Build for Production
+
+```bash
+# Create optimized build
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### Deploy to Vercel
+
+```bash
+# Install Vercel CLI (if not already installed)
+npm install -g vercel
+
+# Deploy to production
+vercel --prod
+```
+
+## 📦 Tech Stack
+
+### Core Dependencies
+- **React 18.2.0** - UI framework
+- **Vite 7.1.12** - Build tool and dev server
+- **D3.js 7.9.0** - Data visualization library
+- **Papa Parse 5.4.1** - CSV parsing and export
+
+### UI & Styling
+- **Tailwind CSS 3.4.0** - Utility-first CSS framework
+- **PostCSS** - CSS processing
+- **Lucide React** - Icon library
+
+### Fonts (Google Fonts)
+- Inter, Montserrat, Roboto, Open Sans, Lato
+- Roboto Condensed, Open Sans Condensed
+- Merriweather, Playfair Display, Lora, PT Serif
+
+### Development Tools
+- ESLint - Code linting
+- Vite plugins for React
+- Fast Refresh for instant HMR
 
 ## 🛠️ Development Workflow
 
@@ -371,6 +481,38 @@ import ChartRenderer from './ChartRenderer';
 - Keep state close to where it's used
 - Lift state up only when necessary
 
+## 📋 Changelog
+
+### v2.0.0 (January 2025)
+**New Features:**
+- Direct Labels (in-stage) as default legend position
+- Traditional legend option with smart positioning
+- Added 2 condensed fonts (Roboto Condensed, Open Sans Condensed)
+- Set Open Sans as default font family
+- 12 total font options organized by category (sans-serif, condensed, serif)
+
+**UI/UX Improvements:**
+- Fixed scrolling behavior: chart stays centered, only control panel scrolls
+- Sticky header and chart area for better navigation
+- Dynamic label positioning in horizontal mode to prevent conflicts
+- Labels automatically adjust when conversion bracket or legend is visible
+- Renamed "In-Stage Labels" to "Direct Labels" for clarity
+
+**Bug Fixes:**
+- Fixed label overlap with conversion brackets in horizontal orientation
+- Fixed label conflicts with traditional legend
+- Improved responsive layout for different screen sizes
+
+### v1.0.0 (Initial Release)
+- Funnel chart visualization with vertical/horizontal orientations
+- Throughput and fallout emphasis modes
+- CSV import/export functionality
+- Multiple comparison periods
+- Conversion rate brackets
+- Color customization and palettes
+- Export to PNG/SVG
+- Sample datasets
+
 ## 🔮 Future Enhancements
 
 ### Planned Features
@@ -380,13 +522,18 @@ import ChartRenderer from './ChartRenderer';
 - Collaboration features
 - Template library
 - Animation controls
-- Accessibility improvements
+- Accessibility improvements (WCAG 2.1 AA compliance)
+- Dark mode support
+- Mobile-responsive touch controls
+- Data annotations and callouts
 
 ### Extension Points
 - Custom renderers
 - Plugin system
 - Theme marketplace
 - Data source adapters
+- API integrations
+- Embedded widget mode
 
 ## 📚 Additional Resources
 
