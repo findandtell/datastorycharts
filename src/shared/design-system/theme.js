@@ -7,10 +7,10 @@ export const theme = {
   // Typography
   typography: {
     families: [
-      "Montserrat",
-      "Inter",
-      "Roboto",
       "Open Sans",
+      "Inter",
+      "Montserrat",
+      "Roboto",
       "Lato",
       "Poppins",
       "Source Sans Pro",

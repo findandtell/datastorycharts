@@ -42,7 +42,7 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [normalizeToHundred, setNormalizeToHundred] = useState(true);
   const [compactNumbers, setCompactNumbers] = useState(false);
   const [showLegend, setShowLegend] = useState(true);
-  const [legendPosition, setLegendPosition] = useState("legend"); // "legend" or "direct"
+  const [legendPosition, setLegendPosition] = useState("direct"); // "legend" or "direct"
   const [inStageLabelFontSize, setInStageLabelFontSize] = useState(13);
   const [showSparklines, setShowSparklines] = useState(false);
   const [sparklineType, setSparklineType] = useState("volume");
@@ -89,7 +89,7 @@ export const useStyleSettings = (initialTheme = theme) => {
     setNormalizeToHundred(true);
     setCompactNumbers(false);
     setShowLegend(true);
-    setLegendPosition("legend");
+    setLegendPosition("direct");
     setInStageLabelFontSize(13);
     setShowSparklines(false);
     setSparklineType("volume");

@@ -614,10 +614,14 @@ function renderHorizontalFunnel(
 
     // Stage label
     if (styleSettings.stageLabelPosition === "top") {
+      // Dynamic positioning: move labels higher when conversion bracket OR traditional legend is visible
+      const hasConversionBracket = selectedStages.length === 2;
+      const hasTraditionalLegend = styleSettings.showLegend && styleSettings.legendPosition === "legend";
+      const labelY = (hasConversionBracket || hasTraditionalLegend) ? -55 : -15;
       svg
         .append("text")
         .attr("x", xPos + barWidth / 2)
-        .attr("y", -15)
+        .attr("y", labelY)
         .attr("text-anchor", "middle")
         .attr("fill", "#374151")
         .attr("font-family", styleSettings.fontFamily)

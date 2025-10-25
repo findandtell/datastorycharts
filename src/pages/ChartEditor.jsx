@@ -150,9 +150,9 @@ export default function ChartEditor() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm z-10">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Top Header - Fixed */}
+      <div className="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0">
         <div className="px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -215,10 +215,10 @@ export default function ChartEditor() {
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Two Column Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chart Display Area - Fixed, Top Aligned */}
-        <div className="flex-1 flex flex-col items-center overflow-hidden p-8">
+        {/* Chart Display Area - Fixed, No Scroll */}
+        <div className="flex-1 flex items-center justify-center overflow-hidden p-8">
           {chartData.hasData ? (
             <div className="flex flex-col items-center gap-4 flex-shrink-0">
               {/* Action Buttons - Fixed above chart */}
@@ -298,11 +298,11 @@ export default function ChartEditor() {
           )}
         </div>
 
-        {/* Right Control Panel */}
+        {/* Right Control Panel - Only this scrolls */}
         {showPanel && (
-          <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg">
-            {/* Tab Navigation - Pinned at top */}
-            <div className="flex border-b border-gray-200">
+          <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg overflow-hidden">
+            {/* Tab Navigation - Fixed at top */}
+            <div className="flex border-b border-gray-200 flex-shrink-0">
               <button
                 onClick={() => setActiveTab('style')}
                 className={`flex-1 px-4 py-3 font-medium transition-colors ${
@@ -468,10 +468,24 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               onChange={(e) => styleSettings.setFontFamily(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
-              <option value="Montserrat">Montserrat</option>
-              <option value="Inter">Inter</option>
-              <option value="Roboto">Roboto</option>
-              <option value="Open Sans">Open Sans</option>
+              <optgroup label="Sans-Serif">
+                <option value="Inter">Inter</option>
+                <option value="Montserrat">Montserrat</option>
+                <option value="Roboto">Roboto</option>
+                <option value="Open Sans">Open Sans</option>
+                <option value="Lato">Lato</option>
+              </optgroup>
+              <optgroup label="Condensed">
+                <option value="Roboto Condensed">Roboto Condensed</option>
+                <option value="Open Sans Condensed">Open Sans Condensed</option>
+              </optgroup>
+              <optgroup label="Serif">
+                <option value="Merriweather">Merriweather</option>
+                <option value="Playfair Display">Playfair Display</option>
+                <option value="Lora">Lora</option>
+                <option value="PT Serif">PT Serif</option>
+                <option value="Georgia">Georgia</option>
+              </optgroup>
             </select>
           </div>
 
@@ -897,7 +911,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
               >
                 <option value="legend">Traditional Legend</option>
-                <option value="direct">Direct Labels (In-Stage)</option>
+                <option value="direct">Direct Labels</option>
               </select>
             </div>
           )}
@@ -905,7 +919,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
           {styleSettings.showLegend && styleSettings.legendPosition === 'direct' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                In-Stage Label Font Size: {styleSettings.inStageLabelFontSize}px
+                Direct Label Font Size: {styleSettings.inStageLabelFontSize}px
               </label>
               <input
                 type="range"
