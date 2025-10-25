@@ -25,13 +25,13 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Funnel Visualization Builder
+                Data Story Charts
               </h1>
             </div>
           </div>
           <p className="text-xl text-gray-600 max-w-3xl">
-            Create stunning, interactive data visualizations with customizable styles and analytics.
-            Build professional funnel charts in minutes.
+            Create clean and clear data visualizations to be used in your data stories.
+            
           </p>
 
           {/* Feature Badges */}
