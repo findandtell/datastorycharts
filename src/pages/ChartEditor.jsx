@@ -1,0 +1,1359 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useChartData } from '../shared/hooks/useChartData';
+import { useStyleSettings } from '../shared/hooks/useStyleSettings';
+import { getChart } from '../charts/registry';
+import { colorPresets, comparisonPalettes } from '../shared/design-system/colorPalettes';
+import { exportAsPNG, exportAsSVG } from '../shared/utils/exportHelpers';
+import FunnelChart from '../charts/FunnelChart/FunnelChart';
+
+/**
+ * Chart Editor Page
+ * Full-featured chart editing interface with control panel
+ */
+export default function ChartEditor() {
+  const navigate = useNavigate();
+  const { chartType } = useParams();
+  const chart = getChart(chartType);
+
+  const [activeTab, setActiveTab] = useState('style');
+  const [showPanel, setShowPanel] = useState(true);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showDataTable, setShowDataTable] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    chartType: true,
+    typography: false,
+    colors: false,
+    background: false,
+    layout: false,
+    displayOptions: false,
+    sparklines: false,
+    watermark: false,
+  });
+
+  const chartData = useChartData();
+  const styleSettings = useStyleSettings();
+  const svgRef = useRef(null);
+  const exportMenuRef = useRef(null);
+
+  // Load default sample data on mount
+  useEffect(() => {
+    if (!chartData.hasData) {
+      chartData.loadSampleData('mobileApp');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (!chart) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Chart Not Found</h1>
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+          >
+            Back to Gallery
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const handleExportPNG = async () => {
+    const svgElement = document.querySelector('svg');
+    if (svgElement) {
+      await exportAsPNG(svgElement, `${styleSettings.title}.png`);
+    }
+    setShowExportMenu(false);
+  };
+
+  const handleExportSVG = () => {
+    const svgElement = document.querySelector('svg');
+    if (svgElement) {
+      exportAsSVG(svgElement, `${styleSettings.title}.svg`);
+    }
+    setShowExportMenu(false);
+  };
+
+  // Create settings object for chart component
+  const chartStyleSettings = {
+    title: styleSettings.title,
+    subtitle: styleSettings.subtitle,
+    fontFamily: styleSettings.fontFamily,
+    titleFontSize: styleSettings.titleFontSize,
+    subtitleFontSize: styleSettings.subtitleFontSize,
+    segmentLabelFontSize: styleSettings.segmentLabelFontSize,
+    metricLabelFontSize: styleSettings.metricLabelFontSize,
+    legendFontSize: styleSettings.legendFontSize,
+    conversionLabelFontSize: styleSettings.conversionLabelFontSize,
+    barColor: styleSettings.barColor,
+    colorTransition: styleSettings.colorTransition,
+    comparisonPalette: styleSettings.comparisonPalette,
+    userCustomColors: styleSettings.userCustomColors,
+    orientation: styleSettings.orientation,
+    aspectRatio: styleSettings.aspectRatio,
+    canvasWidth: styleSettings.canvasWidth,
+    canvasHeight: styleSettings.canvasHeight,
+    chartPadding: styleSettings.chartPadding,
+    stageGap: styleSettings.stageGap,
+    stageLabelPosition: styleSettings.stageLabelPosition,
+    axisLineWidth: styleSettings.axisLineWidth,
+    backgroundOpacity: styleSettings.backgroundOpacity,
+    emphasis: styleSettings.emphasis,
+    metricEmphasis: styleSettings.metricEmphasis,
+    normalizeToHundred: styleSettings.normalizeToHundred,
+    compactNumbers: styleSettings.compactNumbers,
+    showLegend: styleSettings.showLegend,
+    legendPosition: styleSettings.legendPosition,
+    inStageLabelFontSize: styleSettings.inStageLabelFontSize,
+    showSparklines: styleSettings.showSparklines,
+    sparklineType: styleSettings.sparklineType,
+    userTier: styleSettings.userTier,
+  };
+
+  // Render chart component based on type
+  const renderChart = () => {
+    if (!chartData.hasData) return null;
+
+    switch (chartType) {
+      case 'funnel':
+        return (
+          <FunnelChart
+            data={chartData.data}
+            periodNames={chartData.periodNames}
+            isComparisonMode={chartData.isComparisonMode}
+            styleSettings={chartStyleSettings}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Top Header */}
+      <div className="bg-white border-b border-gray-200 shadow-sm z-10">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
+            >
+              ← Back to Gallery
+            </button>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">{chart.name}</h1>
+              <p className="text-sm text-gray-500">{chart.description}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {!showPanel && (
+              <button
+                onClick={() => setShowPanel(true)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Show Controls
+              </button>
+            )}
+
+            {/* Export Menu */}
+            <div className="relative" ref={exportMenuRef}>
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
+              >
+                Export
+                <span className="text-sm">▼</span>
+              </button>
+
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                  <button
+                    onClick={handleExportPNG}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+                  >
+                    <span>📷</span> Export as PNG
+                  </button>
+                  <button
+                    onClick={handleExportSVG}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+                  >
+                    <span>📐</span> Export as SVG
+                  </button>
+                  <div className="border-t border-gray-200 my-1"></div>
+                  <button
+                    disabled
+                    className="w-full px-4 py-2 text-left text-gray-400 cursor-not-allowed flex items-center gap-2"
+                  >
+                    <span>💻</span> Export D3 Code (Soon)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Chart Display Area - Fixed, Top Aligned */}
+        <div className="flex-1 flex flex-col items-center overflow-hidden p-8">
+          {chartData.hasData ? (
+            <div className="flex flex-col items-center gap-4 flex-shrink-0">
+              {/* Action Buttons - Fixed above chart */}
+              <div className="flex justify-center gap-4 flex-shrink-0">
+                <button
+                  onClick={styleSettings.resetToDefaults}
+                  className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
+                >
+                  Reset View
+                </button>
+                <button
+                  onClick={() => setShowDataTable(!showDataTable)}
+                  className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700"
+                >
+                  {showDataTable ? '← Back to Chart' : 'Edit Data'}
+                </button>
+              </div>
+
+              {/* Chart/Data Table Card with Flip Animation */}
+              <div
+                className="relative flex-shrink-0"
+                style={{
+                  width: chartStyleSettings.canvasWidth + chartStyleSettings.chartPadding * 2,
+                  height: chartStyleSettings.canvasHeight + chartStyleSettings.chartPadding * 2,
+                  perspective: '1000px',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    transformStyle: 'preserve-3d',
+                    transform: showDataTable ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                    transition: 'transform 0.6s',
+                  }}
+                >
+                  {/* Front: Chart */}
+                  <div
+                    className="absolute inset-0 bg-white rounded-2xl shadow-lg border border-gray-200"
+                    style={{
+                      backfaceVisibility: 'hidden',
+                      padding: chartStyleSettings.chartPadding + 'px',
+                    }}
+                    ref={svgRef}
+                  >
+                    {renderChart()}
+                  </div>
+
+                  {/* Back: Data Table */}
+                  <div
+                    className="absolute inset-0 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-auto"
+                    style={{
+                      backfaceVisibility: 'hidden',
+                      transform: 'rotateY(180deg)',
+                      padding: '20px',
+                    }}
+                  >
+                    <EditDataTable
+                      chartData={chartData}
+                      onClose={() => setShowDataTable(false)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">📊</div>
+              <h2 className="text-2xl font-bold text-gray-700 mb-2">
+                No Data Loaded
+              </h2>
+              <p className="text-gray-500">
+                Upload a CSV file or select a sample dataset to get started
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right Control Panel */}
+        {showPanel && (
+          <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg">
+            {/* Tab Navigation - Pinned at top */}
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('style')}
+                className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                  activeTab === 'style'
+                    ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                Style
+              </button>
+              <button
+                onClick={() => setActiveTab('data')}
+                className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                  activeTab === 'data'
+                    ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                Data
+              </button>
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {/* Style Tab Content */}
+              {activeTab === 'style' && (
+                <StyleTabContent
+                  styleSettings={styleSettings}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  chartData={chartData}
+                />
+              )}
+
+              {/* Data Tab Content */}
+              {activeTab === 'data' && (
+                <DataTabContent
+                  chartData={chartData}
+                />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Style Tab Component
+ */
+function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData }) {
+  return (
+    <div className="space-y-4">
+      {/* Chart Type Section */}
+      <CollapsibleSection
+        title="Chart Type"
+        isExpanded={expandedSections.chartType}
+        onToggle={() => toggleSection('chartType')}
+      >
+        <div className="space-y-3">
+          {/* Data Mode Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Data Mode
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => chartData.isComparisonMode && chartData.toggleComparisonMode()}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  !chartData.isComparisonMode
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Time Series
+              </button>
+              <button
+                onClick={() => !chartData.isComparisonMode && chartData.toggleComparisonMode()}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  chartData.isComparisonMode
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Comparison
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {chartData.isComparisonMode
+                ? 'Multiple colors for comparing different groups/periods'
+                : 'Monochrome gradient showing progression over time'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Orientation
+            </label>
+            <select
+              value={styleSettings.orientation}
+              onChange={(e) => styleSettings.setOrientation(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="vertical">Vertical</option>
+              <option value="horizontal">Horizontal</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Emphasis Mode
+            </label>
+            <select
+              value={styleSettings.emphasis}
+              onChange={(e) => styleSettings.setEmphasis(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="throughput">Throughput (Volume Flow)</option>
+              <option value="fallout">Fallout (Drop-offs)</option>
+            </select>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* Typography Section */}
+      <CollapsibleSection
+        title="Typography"
+        isExpanded={expandedSections.typography}
+        onToggle={() => toggleSection('typography')}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Title
+            </label>
+            <input
+              type="text"
+              value={styleSettings.title}
+              onChange={(e) => styleSettings.setTitle(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subtitle
+            </label>
+            <input
+              type="text"
+              value={styleSettings.subtitle}
+              onChange={(e) => styleSettings.setSubtitle(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Font Family
+            </label>
+            <select
+              value={styleSettings.fontFamily}
+              onChange={(e) => styleSettings.setFontFamily(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="Montserrat">Montserrat</option>
+              <option value="Inter">Inter</option>
+              <option value="Roboto">Roboto</option>
+              <option value="Open Sans">Open Sans</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Title Font Size: {styleSettings.titleFontSize}px
+            </label>
+            <input
+              type="range"
+              min="16"
+              max="48"
+              value={styleSettings.titleFontSize}
+              onChange={(e) => styleSettings.setTitleFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Subtitle Font Size: {styleSettings.subtitleFontSize}px
+            </label>
+            <input
+              type="range"
+              min="12"
+              max="32"
+              value={styleSettings.subtitleFontSize}
+              onChange={(e) => styleSettings.setSubtitleFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Segment Label Font Size: {styleSettings.segmentLabelFontSize}px
+            </label>
+            <input
+              type="range"
+              min="10"
+              max="24"
+              value={styleSettings.segmentLabelFontSize}
+              onChange={(e) => styleSettings.setSegmentLabelFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Metric Label Font Size: {styleSettings.metricLabelFontSize}px
+            </label>
+            <input
+              type="range"
+              min="8"
+              max="20"
+              value={styleSettings.metricLabelFontSize}
+              onChange={(e) => styleSettings.setMetricLabelFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Legend Font Size: {styleSettings.legendFontSize}px
+            </label>
+            <input
+              type="range"
+              min="8"
+              max="20"
+              value={styleSettings.legendFontSize}
+              onChange={(e) => styleSettings.setLegendFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Conversion Label Font Size: {styleSettings.conversionLabelFontSize}px
+            </label>
+            <input
+              type="range"
+              min="12"
+              max="32"
+              value={styleSettings.conversionLabelFontSize}
+              onChange={(e) => styleSettings.setConversionLabelFontSize(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* Colors Section */}
+      <CollapsibleSection
+        title="Colors"
+        isExpanded={expandedSections.colors}
+        onToggle={() => toggleSection('colors')}
+      >
+        <div className="space-y-4">
+          {chartData.isComparisonMode ? (
+            <>
+              {/* Comparison Mode Colors */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Palette
+                </label>
+                <select
+                  value={styleSettings.comparisonPalette}
+                  onChange={(e) => styleSettings.setComparisonPalette(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  {Object.entries(comparisonPalettes).map(([key, palette]) => (
+                    <option key={key} value={key}>
+                      {palette.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Custom Color Swatches for Comparison */}
+              {styleSettings.comparisonPalette === 'user' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Custom Colors (up to 8)
+                  </label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {styleSettings.userCustomColors.map((color, index) => (
+                      <div key={index} className="flex flex-col gap-1">
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={(e) => {
+                            const newColors = [...styleSettings.userCustomColors];
+                            newColors[index] = e.target.value;
+                            styleSettings.setUserCustomColors(newColors);
+                          }}
+                          className="w-full h-12 rounded-lg cursor-pointer border-2 border-gray-300"
+                        />
+                        <input
+                          type="text"
+                          value={color}
+                          onChange={(e) => {
+                            const newColors = [...styleSettings.userCustomColors];
+                            newColors[index] = e.target.value;
+                            styleSettings.setUserCustomColors(newColors);
+                          }}
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 font-mono"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Colors for Presets */}
+              {styleSettings.comparisonPalette !== 'user' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Palette Preview
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {comparisonPalettes[styleSettings.comparisonPalette].colors.slice(0, 8).map((color, index) => (
+                      <div
+                        key={index}
+                        className="w-10 h-10 rounded border-2 border-gray-300"
+                        style={{ backgroundColor: color }}
+                        title={color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Base Color
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={styleSettings.barColor}
+                    onChange={(e) => styleSettings.setBarColor(e.target.value)}
+                    className="w-16 h-10 rounded-lg cursor-pointer border border-gray-300"
+                  />
+                  <input
+                    type="text"
+                    value={styleSettings.barColor}
+                    onChange={(e) => styleSettings.setBarColor(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Color Presets
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {colorPresets.map((preset) => (
+                    <button
+                      key={preset.name}
+                      onClick={() => styleSettings.setBarColor(preset.color)}
+                      className="group relative"
+                      title={preset.name}
+                    >
+                      <div
+                        className="w-full h-10 rounded border-2 border-gray-300 hover:border-cyan-500 transition-colors"
+                        style={{ backgroundColor: preset.color }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs font-medium text-white bg-black bg-opacity-75 px-2 py-1 rounded">
+                          {preset.name}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Color Transition: {styleSettings.colorTransition}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={styleSettings.colorTransition}
+                  onChange={(e) => styleSettings.setColorTransition(Number(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Controls the gradient intensity from dark to light across periods
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      {/* Background Section */}
+      <CollapsibleSection
+        title="Background"
+        isExpanded={expandedSections.background}
+        onToggle={() => toggleSection('background')}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Background Opacity: {styleSettings.backgroundOpacity}%
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={styleSettings.backgroundOpacity}
+              onChange={(e) => styleSettings.setBackgroundOpacity(Number(e.target.value))}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Controls the grey background fill behind bars
+            </p>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* Layout Section */}
+      <CollapsibleSection
+        title="Layout"
+        isExpanded={expandedSections.layout}
+        onToggle={() => toggleSection('layout')}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Aspect Ratio
+            </label>
+            <select
+              value={styleSettings.aspectRatio}
+              onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="16:9">16:9 (Widescreen)</option>
+              <option value="4:3">4:3 (Standard)</option>
+              <option value="1:1">1:1 (Square)</option>
+              <option value="3:4">3:4 (Portrait)</option>
+              <option value="9:16">9:16 (Mobile)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Canvas Width: {styleSettings.canvasWidth}px
+            </label>
+            <input
+              type="range"
+              min="600"
+              max="2000"
+              value={styleSettings.canvasWidth}
+              onChange={(e) => styleSettings.setCanvasWidth(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Canvas Height: {styleSettings.canvasHeight}px
+            </label>
+            <input
+              type="range"
+              min="400"
+              max="2000"
+              value={styleSettings.canvasHeight}
+              onChange={(e) => styleSettings.setCanvasHeight(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Stage Gap: {styleSettings.stageGap}px
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="50"
+              value={styleSettings.stageGap}
+              onChange={(e) => styleSettings.setStageGap(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Stage Label Position
+            </label>
+            <select
+              value={styleSettings.stageLabelPosition}
+              onChange={(e) => styleSettings.setStageLabelPosition(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Axis Line Width: {styleSettings.axisLineWidth}px
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={styleSettings.axisLineWidth}
+              onChange={(e) => styleSettings.setAxisLineWidth(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* Display Options Section */}
+      <CollapsibleSection
+        title="Display Options"
+        isExpanded={expandedSections.displayOptions}
+        onToggle={() => toggleSection('displayOptions')}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Metric Emphasis
+            </label>
+            <select
+              value={styleSettings.metricEmphasis}
+              onChange={(e) => styleSettings.setMetricEmphasis(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="volume">Volume (show numbers)</option>
+              <option value="percentage">Percentage (show %)</option>
+            </select>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={styleSettings.normalizeToHundred}
+              onChange={(e) => styleSettings.setNormalizeToHundred(e.target.checked)}
+              className="w-4 h-4 text-cyan-600 rounded"
+            />
+            <span className="text-sm text-gray-700">Normalize First Stage to 100%</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={styleSettings.compactNumbers}
+              onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
+              className="w-4 h-4 text-cyan-600 rounded"
+            />
+            <span className="text-sm text-gray-700">Compact Numbers (1K, 1M)</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={styleSettings.showLegend}
+              onChange={(e) => styleSettings.setShowLegend(e.target.checked)}
+              className="w-4 h-4 text-cyan-600 rounded"
+            />
+            <span className="text-sm text-gray-700">Show Legend</span>
+          </label>
+
+          {styleSettings.showLegend && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Legend Position
+              </label>
+              <select
+                value={styleSettings.legendPosition}
+                onChange={(e) => styleSettings.setLegendPosition(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="legend">Traditional Legend</option>
+                <option value="direct">Direct Labels (In-Stage)</option>
+              </select>
+            </div>
+          )}
+
+          {styleSettings.showLegend && styleSettings.legendPosition === 'direct' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                In-Stage Label Font Size: {styleSettings.inStageLabelFontSize}px
+              </label>
+              <input
+                type="range"
+                min="8"
+                max="20"
+                step="1"
+                value={styleSettings.inStageLabelFontSize}
+                onChange={(e) => styleSettings.setInStageLabelFontSize(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      {/* Sparklines Section */}
+      <CollapsibleSection
+        title="Sparklines"
+        isExpanded={expandedSections.sparklines}
+        onToggle={() => toggleSection('sparklines')}
+      >
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={styleSettings.showSparklines}
+              onChange={(e) => styleSettings.setShowSparklines(e.target.checked)}
+              className="w-4 h-4 text-cyan-600 rounded"
+            />
+            <span className="text-sm text-gray-700">Show Sparklines</span>
+          </label>
+
+          {styleSettings.showSparklines && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sparkline Type
+              </label>
+              <select
+                value={styleSettings.sparklineType}
+                onChange={(e) => styleSettings.setSparklineType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="volume">Volume Trend</option>
+                <option value="conversion">Conversion Rate Trend</option>
+              </select>
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+
+      {/* Watermark Section */}
+      <CollapsibleSection
+        title="Watermark"
+        isExpanded={expandedSections.watermark}
+        onToggle={() => toggleSection('watermark')}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              User Tier
+            </label>
+            <select
+              value={styleSettings.userTier}
+              onChange={(e) => styleSettings.setUserTier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="pro">Pro (No Watermark)</option>
+              <option value="free">Free (With Watermark)</option>
+            </select>
+          </div>
+          <p className="text-xs text-gray-500">
+            Free tier shows a "Find&Tell" watermark on the chart
+          </p>
+        </div>
+      </CollapsibleSection>
+
+      {/* Reset Button */}
+      <div className="pt-4 border-t border-gray-200">
+        <button
+          onClick={styleSettings.resetToDefaults}
+          className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
+        >
+          Reset to Defaults
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Data Tab Component
+ */
+function DataTabContent({ chartData }) {
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      await chartData.loadCSVFile(file);
+    }
+  };
+
+  const handleSampleDataSelect = (event) => {
+    const key = event.target.value;
+    if (key) {
+      chartData.loadSampleData(key);
+      event.target.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* File Upload */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Upload CSV Data
+        </label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          onChange={handleFileUpload}
+          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          CSV should have a "Stage" column and one or more period columns
+        </p>
+      </div>
+
+      {/* Sample Data Selector */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Or Load Sample Data
+        </label>
+        <select
+          onChange={handleSampleDataSelect}
+          defaultValue=""
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        >
+          <option value="">Choose a sample...</option>
+          <optgroup label="Time-Based">
+            <option value="generic">Generic 5-Stage Flow</option>
+            <option value="ecommerce">E-commerce Funnel</option>
+            <option value="saas">SaaS Sales Funnel</option>
+            <option value="marketing">Marketing Campaign</option>
+            <option value="content">Content/Media Funnel</option>
+            <option value="mobileApp">Mobile App Funnel</option>
+            <option value="b2bLeads">B2B Lead Generation</option>
+          </optgroup>
+          <optgroup label="Comparison">
+            <option value="ageComparison">Age Group Comparison</option>
+            <option value="abTest">A/B Test Comparison</option>
+            <option value="deviceComparison">Device Comparison</option>
+            <option value="channelComparison">Channel Comparison</option>
+            <option value="timeComparison">Weekday vs Weekend</option>
+          </optgroup>
+        </select>
+      </div>
+
+      {/* Error Display */}
+      {chartData.error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+          {chartData.error}
+        </div>
+      )}
+
+      {/* Data Summary */}
+      {chartData.hasData && (
+        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+          <h3 className="font-medium text-gray-900 mb-3">Data Summary</h3>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Stages:</span>
+            <span className="font-medium">{chartData.stageCount}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Periods:</span>
+            <span className="font-medium">{chartData.periodCount}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Mode:</span>
+            <span className={`font-medium ${chartData.isComparisonMode ? 'text-cyan-600' : 'text-blue-600'}`}>
+              {chartData.isComparisonMode ? 'Comparison' : 'Time-Based'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Data Preview (Read-Only) */}
+      {chartData.hasData && chartData.data && (
+        <div>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-medium text-gray-900">Data Preview</h3>
+            <p className="text-xs text-gray-500">
+              Click "Edit Data" button above the chart to modify data
+            </p>
+          </div>
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto max-h-96">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stage
+                    </th>
+                    {chartData.periodNames.map((period, index) => (
+                      <th
+                        key={index}
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                      >
+                        {period}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {chartData.data.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 whitespace-nowrap font-medium text-gray-900">
+                        {row.Stage}
+                      </td>
+                      {chartData.periodNames.map((period, colIndex) => (
+                        <td key={colIndex} className="px-3 py-2 whitespace-nowrap text-gray-700">
+                          {row[period]?.toLocaleString() || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Edit Data Table Component (for flip card)
+ */
+function EditDataTable({ chartData, onClose }) {
+  const [newPeriodName, setNewPeriodName] = useState('');
+  const [newStageName, setNewStageName] = useState('');
+  const [draggedColumn, setDraggedColumn] = useState(null);
+
+  const handleAddPeriod = () => {
+    if (newPeriodName.trim()) {
+      if (chartData.addPeriod(newPeriodName.trim())) {
+        setNewPeriodName('');
+      }
+    }
+  };
+
+  const handleAddStage = () => {
+    if (newStageName.trim()) {
+      if (chartData.addStage(newStageName.trim())) {
+        setNewStageName('');
+      }
+    }
+  };
+
+  const handleColumnDragStart = (e, index) => {
+    setDraggedColumn(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleColumnDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleColumnDrop = (e, dropIndex) => {
+    e.preventDefault();
+    if (draggedColumn !== null && draggedColumn !== dropIndex) {
+      chartData.reorderPeriods(draggedColumn, dropIndex);
+    }
+    setDraggedColumn(null);
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-900">Edit Data</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              chartData.applyEdits();
+              onClose();
+            }}
+            className="px-4 py-2 bg-cyan-600 text-white text-sm font-semibold rounded-lg hover:bg-cyan-700"
+          >
+            Apply Changes
+          </button>
+          <button
+            onClick={chartData.resetEdits}
+            className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Add Period Input */}
+      <div className="mb-4 flex gap-2">
+        <input
+          type="text"
+          value={newPeriodName}
+          onChange={(e) => setNewPeriodName(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleAddPeriod()}
+          placeholder="New period name..."
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        />
+        <button
+          onClick={handleAddPeriod}
+          className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700"
+        >
+          + Period
+        </button>
+      </div>
+
+      {/* Data Table */}
+      <div className="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-auto h-full">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                  Stage
+                </th>
+                {chartData.periodNames.map((period, idx) => (
+                  <th
+                    key={idx}
+                    draggable
+                    onDragStart={(e) => handleColumnDragStart(e, idx)}
+                    onDragOver={handleColumnDragOver}
+                    onDrop={(e) => handleColumnDrop(e, idx)}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-move hover:bg-gray-100"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        value={period}
+                        onChange={(e) => chartData.updatePeriodName(period, e.target.value)}
+                        className="bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-cyan-500 rounded px-1 flex-1"
+                      />
+                      <button
+                        onClick={() => chartData.removePeriod(period)}
+                        className="text-red-600 hover:text-red-800 font-bold"
+                        title="Delete column"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </th>
+                ))}
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+                  Hide
+                </th>
+                <th className="px-3 py-2 w-16"></th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {chartData.editableData.map((row, rowIndex) => (
+                <tr key={rowIndex} className="hover:bg-gray-50">
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={row.Stage}
+                      onChange={(e) => chartData.updateStageName(rowIndex, e.target.value)}
+                      className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </td>
+                  {chartData.periodNames.map((period, colIndex) => (
+                    <td key={colIndex} className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={row[period] || 0}
+                        onChange={(e) => chartData.updateDataValue(rowIndex, period, parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-center">
+                    <input
+                      type="checkbox"
+                      checked={row.hidden || false}
+                      onChange={(e) => chartData.toggleStageHidden(rowIndex, e.target.checked)}
+                      className="w-4 h-4 text-cyan-600 focus:ring-cyan-500 rounded"
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => chartData.removeStage(rowIndex)}
+                      className="text-red-600 hover:text-red-800 font-bold text-lg"
+                      title="Delete row"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add Stage Input */}
+      <div className="mt-4 flex gap-2">
+        <input
+          type="text"
+          value={newStageName}
+          onChange={(e) => setNewStageName(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleAddStage()}
+          placeholder="New stage name..."
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+        />
+        <button
+          onClick={handleAddStage}
+          className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700"
+        >
+          + Stage
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Collapsible Section Component
+ */
+function CollapsibleSection({ title, isExpanded, onToggle, children }) {
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-medium text-gray-900"
+      >
+        <span>{title}</span>
+        <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {isExpanded && (
+        <div className="px-4 py-4 bg-white">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,3488 @@
+import React, { useState, useEffect, useRef } from "react";
+import Papa from "papaparse";
+import * as d3 from "d3";
+
+export default function FunnelVizRefined() {
+  const [showPanel, setShowPanel] = useState(true);
+  const [activeTab, setActiveTab] = useState("style");
+  const [csvData, setCsvData] = useState(null);
+  const [chartConfig, setChartConfig] = useState(null);
+
+  const [title, setTitle] = useState("Marketing & Acquisition Funnel");
+  const [subtitle, setSubtitle] = useState(
+    "Tracking 3 periods across 5 conversion stages"
+  );
+  const [fontFamily, setFontFamily] = useState("Montserrat");
+  const [titleFontSize, setTitleFontSize] = useState(28);
+  const [subtitleFontSize, setSubtitleFontSize] = useState(20);
+  const [segmentLabelFontSize, setSegmentLabelFontSize] = useState(15);
+  const [metricLabelFontSize, setMetricLabelFontSize] = useState(13);
+  const [legendFontSize, setLegendFontSize] = useState(13);
+  const [conversionLabelFontSize, setConversionLabelFontSize] = useState(19);
+  const [barColor, setBarColor] = useState("#1e40af");
+  const [colorTransition, setColorTransition] = useState(60);
+  const [axisLineWidth, setAxisLineWidth] = useState(3);
+  const [orientation, setOrientation] = useState("vertical");
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [canvasWidth, setCanvasWidth] = useState(900);
+  const [canvasHeight, setCanvasHeight] = useState(900);
+  const [chartPadding, setChartPadding] = useState(25);
+  const [stageGap, setStageGap] = useState(18);
+  const [stageLabelPosition, setStageLabelPosition] = useState("bottom");
+  const [showSparklines, setShowSparklines] = useState(false);
+  const [sparklineType, setSparklineType] = useState("volume");
+  const [backgroundOpacity, setBackgroundOpacity] = useState(100);
+
+  const [emphasis, setEmphasis] = useState("throughput");
+  const [metricEmphasis, setMetricEmphasis] = useState("volume");
+  const [normalizeToHundred, setNormalizeToHundred] = useState(true);
+  const [compactNumbers, setCompactNumbers] = useState(false);
+  const [showLegend, setShowLegend] = useState(true);
+  const [userTier, setUserTier] = useState("pro");
+
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [comparisonPalette, setComparisonPalette] = useState("professional");
+  const [userCustomColors, setUserCustomColors] = useState([
+    "#1e40af", "#0d9488", "#991b1b", "#d97706", "#475569", "#7c3aed", "#059669", "#dc2626"
+  ]);
+
+  const comparisonPalettes = {
+    professional: {
+      name: "Professional",
+      colors: ["#1e40af", "#0d9488", "#991b1b", "#d97706", "#475569", "#64748b", "#0891b2", "#7c2d12"]
+    },
+    vibrant: {
+      name: "Vibrant",
+      colors: ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#dc2626", "#0891b2", "#f59e0b", "#ec4899"]
+    },
+    corporate: {
+      name: "Corporate",
+      colors: ["#1e3a8a", "#0284c7", "#065f46", "#9a3412", "#374151", "#475569", "#0e7490", "#713f12"]
+    },
+    accessible: {
+      name: "Accessible",
+      colors: ["#0066cc", "#ff6600", "#00b8d4", "#d81b60", "#fdd835", "#7b1fa2", "#00897b", "#c62828"]
+    },
+    elegant: {
+      name: "Elegant",
+      colors: ["#4f46e5", "#059669", "#e11d48", "#f59e0b", "#64748b", "#7c3aed", "#0d9488", "#dc2626"]
+    },
+    user: {
+      name: "User Selection",
+      colors: []
+    }
+  };
+
+  const [periodNames, setPeriodNames] = useState([]);
+  const [editableData, setEditableData] = useState([]);
+  const [showDataTable, setShowDataTable] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+  const [draggedColumn, setDraggedColumn] = useState(null);
+  const [editingColumnIndex, setEditingColumnIndex] = useState(null);
+  const [editingColumnName, setEditingColumnName] = useState("");
+
+  const [selectedStages, setSelectedStages] = useState([]);
+  const [selectedPeriod, setSelectedPeriod] = useState(0);
+
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [expandedSections, setExpandedSections] = useState({
+    chartType: false,
+    typography: false,
+    colors: false,
+    background: false,
+    layout: false,
+    displayOptions: false,
+    sparklines: false,
+    watermark: false,
+  });
+  const [isDragging, setIsDragging] = useState(null);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const svgRef = useRef(null);
+  const exportMenuRef = useRef(null);
+
+  const colorPresets = [
+    { name: "Navy", color: "#1e40af" },
+    { name: "Sky Blue", color: "#0284c7" },
+    { name: "Teal", color: "#0d9488" },
+    { name: "Emerald", color: "#059669" },
+    { name: "Amber", color: "#d97706" },
+    { name: "Orange", color: "#ea580c" },
+    { name: "Red", color: "#dc2626" },
+    { name: "Rose", color: "#e11d48" },
+    { name: "Purple", color: "#7c3aed" },
+    { name: "Fuchsia", color: "#c026d3" },
+    { name: "Slate", color: "#475569" },
+    { name: "Indigo", color: "#4f46e5" },
+  ];
+
+  const sampleData = {
+    generic: [
+      {
+        Stage: "Stage 1",
+        "Period 3": 10000,
+        "Period 2": 9500,
+        "Period 1": 9000,
+      },
+      {
+        Stage: "Stage 2",
+        "Period 3": 5000,
+        "Period 2": 4750,
+        "Period 1": 4500,
+      },
+      {
+        Stage: "Stage 3",
+        "Period 3": 2500,
+        "Period 2": 2400,
+        "Period 1": 2250,
+      },
+      { Stage: "Stage 4", "Period 3": 1000, "Period 2": 960, "Period 1": 900 },
+      { Stage: "Stage 5", "Period 3": 500, "Period 2": 480, "Period 1": 450 },
+    ],
+    ecommerce: [
+      {
+        Stage: "Homepage Visit",
+        "Dec 2024": 52400,
+        "Nov 2024": 51200,
+        "Oct 2024": 48900,
+        "Sep 2024": 47100,
+        "Aug 2024": 45800,
+        "Jul 2024": 44300,
+        "Jun 2024": 43200,
+      },
+      {
+        Stage: "Product View",
+        "Dec 2024": 16200,
+        "Nov 2024": 15800,
+        "Oct 2024": 14900,
+        "Sep 2024": 14300,
+        "Aug 2024": 13800,
+        "Jul 2024": 13100,
+        "Jun 2024": 12700,
+      },
+      {
+        Stage: "Add to Cart",
+        "Dec 2024": 4890,
+        "Nov 2024": 4720,
+        "Oct 2024": 4480,
+        "Sep 2024": 4250,
+        "Aug 2024": 4050,
+        "Jul 2024": 3920,
+        "Jun 2024": 3780,
+      },
+      {
+        Stage: "Checkout",
+        "Dec 2024": 1680,
+        "Nov 2024": 1720,
+        "Oct 2024": 1850,
+        "Sep 2024": 2980,
+        "Aug 2024": 2850,
+        "Jul 2024": 2760,
+        "Jun 2024": 2650,
+      },
+      {
+        Stage: "Purchase",
+        "Dec 2024": 1340,
+        "Nov 2024": 1375,
+        "Oct 2024": 1480,
+        "Sep 2024": 2385,
+        "Aug 2024": 2280,
+        "Jul 2024": 2210,
+        "Jun 2024": 2120,
+      },
+    ],
+    saas: [
+      {
+        Stage: "Website Visit",
+        "Q4 2024": 25000,
+        "Q3 2024": 22000,
+        "Q2 2024": 20000,
+      },
+      { Stage: "Sign Up", "Q4 2024": 5000, "Q3 2024": 4400, "Q2 2024": 4000 },
+      {
+        Stage: "Trial Start",
+        "Q4 2024": 3500,
+        "Q3 2024": 3100,
+        "Q2 2024": 2800,
+      },
+      {
+        Stage: "Demo Booked",
+        "Q4 2024": 1400,
+        "Q3 2024": 1200,
+        "Q2 2024": 1000,
+      },
+      {
+        Stage: "Contract Signed",
+        "Q4 2024": 560,
+        "Q3 2024": 480,
+        "Q2 2024": 400,
+      },
+    ],
+    marketing: [
+      {
+        Stage: "Ad Impressions",
+        "Campaign 3": 100000,
+        "Campaign 2": 95000,
+        "Campaign 1": 90000,
+      },
+      {
+        Stage: "Ad Clicks",
+        "Campaign 3": 5000,
+        "Campaign 2": 4500,
+        "Campaign 1": 4200,
+      },
+      {
+        Stage: "Landing Page",
+        "Campaign 3": 4200,
+        "Campaign 2": 3800,
+        "Campaign 1": 3500,
+      },
+      {
+        Stage: "Form Submit",
+        "Campaign 3": 1680,
+        "Campaign 2": 1520,
+        "Campaign 1": 1400,
+      },
+      {
+        Stage: "Lead Qualified",
+        "Campaign 3": 840,
+        "Campaign 2": 760,
+        "Campaign 1": 700,
+      },
+    ],
+    content: [
+      {
+        Stage: "Article Views",
+        "Week 4": 85000,
+        "Week 3": 78000,
+        "Week 2": 72000,
+        "Week 1": 68000,
+      },
+      {
+        Stage: "Video Plays",
+        "Week 4": 34000,
+        "Week 3": 31200,
+        "Week 2": 28800,
+        "Week 1": 27200,
+      },
+      {
+        Stage: "Email Signups",
+        "Week 4": 8500,
+        "Week 3": 7800,
+        "Week 2": 7200,
+        "Week 1": 6800,
+      },
+      {
+        Stage: "Premium Trial",
+        "Week 4": 2550,
+        "Week 3": 2340,
+        "Week 2": 2160,
+        "Week 1": 2040,
+      },
+      {
+        Stage: "Paid Subscribers",
+        "Week 4": 1275,
+        "Week 3": 1170,
+        "Week 2": 1080,
+        "Week 1": 1020,
+      },
+    ],
+    mobileApp: [
+      {
+        Stage: "App Store Views",
+        March: 120000,
+        February: 110000,
+        January: 98000,
+      },
+      { Stage: "App Downloads", March: 24000, February: 22000, January: 19600 },
+      {
+        Stage: "Account Created",
+        March: 12000,
+        February: 11000,
+        January: 9800,
+      },
+      { Stage: "First Action", March: 7200, February: 6600, January: 5880 },
+      { Stage: "Week 1 Retained", March: 3600, February: 3300, January: 2940 },
+    ],
+    b2bLeads: [
+      {
+        Stage: "Webinar Registrations",
+        "Q1 2025": 3500,
+        "Q4 2024": 3200,
+        "Q3 2024": 2800,
+      },
+      {
+        Stage: "Webinar Attendees",
+        "Q1 2025": 1750,
+        "Q4 2024": 1600,
+        "Q3 2024": 1400,
+      },
+      {
+        Stage: "Content Downloads",
+        "Q1 2025": 875,
+        "Q4 2024": 800,
+        "Q3 2024": 700,
+      },
+      {
+        Stage: "Sales Qualified",
+        "Q1 2025": 350,
+        "Q4 2024": 320,
+        "Q3 2024": 280,
+      },
+      { Stage: "Closed Deals", "Q1 2025": 105, "Q4 2024": 96, "Q3 2024": 84 },
+    ],
+    ageComparison: [
+      { Stage: "Awareness", "18-24": 10000, "40-55": 10000 },
+      { Stage: "Interest", "18-24": 8200, "40-55": 6800 },
+      { Stage: "Consideration", "18-24": 5100, "40-55": 3800 },
+      { Stage: "Intent", "18-24": 2800, "40-55": 1600 },
+      { Stage: "Purchase", "18-24": 1150, "40-55": 720 },
+    ],
+    abTest: [
+      { Stage: "Awareness", "Control": 10000, "Test A": 10000 },
+      { Stage: "Interest", "Control": 7500, "Test A": 8100 },
+      { Stage: "Consideration", "Control": 4200, "Test A": 5200 },
+      { Stage: "Intent", "Control": 2100, "Test A": 2950 },
+      { Stage: "Purchase", "Control": 850, "Test A": 1340 },
+    ],
+    deviceComparison: [
+      { Stage: "Awareness", "Mobile": 15000, "Desktop": 8000 },
+      { Stage: "Interest", "Mobile": 10500, "Desktop": 6400 },
+      { Stage: "Consideration", "Mobile": 5250, "Desktop": 4480 },
+      { Stage: "Intent", "Mobile": 1575, "Desktop": 2688 },
+      { Stage: "Purchase", "Mobile": 472, "Desktop": 1478 },
+    ],
+    channelComparison: [
+      { Stage: "Awareness", "Organic Search": 12000, "Paid Social": 18000 },
+      { Stage: "Interest", "Organic Search": 8400, "Paid Social": 12600 },
+      { Stage: "Consideration", "Organic Search": 5880, "Paid Social": 8820 },
+      { Stage: "Intent", "Organic Search": 3528, "Paid Social": 4410 },
+      { Stage: "Purchase", "Organic Search": 1764, "Paid Social": 1323 },
+    ],
+    timeComparison: [
+      { Stage: "Awareness", "Weekday": 22000, "Weekend": 11000 },
+      { Stage: "Interest", "Weekday": 15400, "Weekend": 9350 },
+      { Stage: "Consideration", "Weekday": 10780, "Weekend": 7285 },
+      { Stage: "Intent", "Weekday": 6468, "Weekend": 5102 },
+      { Stage: "Purchase", "Weekday": 2587, "Weekend": 2296 },
+    ],
+  };
+
+  useEffect(() => {
+    loadSampleData("generic");
+  }, []);
+
+  useEffect(() => {
+    const ratios = {
+      "16:9": 16 / 9,
+      "4:3": 4 / 3,
+      "1:1": 1,
+    };
+    const ratio = ratios[aspectRatio];
+    if (ratio) {
+      setCanvasHeight(Math.round(canvasWidth / ratio));
+    }
+  }, [aspectRatio, canvasWidth]);
+
+  const loadSampleData = (type) => {
+    const data = sampleData[type];
+    setCsvData(data);
+    analyzeData(data);
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          setCsvData(results.data);
+          analyzeData(results.data);
+        },
+      });
+    }
+  };
+
+  const handleResetView = () => {
+    setFontFamily("Montserrat");
+    setTitleFontSize(28);
+    setSubtitleFontSize(20);
+    setSegmentLabelFontSize(15);
+    setMetricLabelFontSize(13);
+    setLegendFontSize(13);
+    setConversionLabelFontSize(19);
+    setBarColor("#1e40af");
+    setColorTransition(60);
+    setAxisLineWidth(3);
+    setOrientation("vertical");
+    setAspectRatio("16:9");
+    setCanvasWidth(1280);
+    setCanvasHeight(720);
+    setChartPadding(25);
+    setStageGap(18);
+    setStageLabelPosition("bottom");
+    setShowSparklines(false);
+    setSparklineType("volume");
+    setBackgroundOpacity(100);
+    setEmphasis("throughput");
+    setMetricEmphasis("volume");
+    setNormalizeToHundred(true);
+    setCompactNumbers(false);
+    setShowLegend(true);
+    setUserTier("pro");
+    setComparisonMode(false);
+    setComparisonPalette("professional");
+    setUserCustomColors(["#1e40af", "#0d9488", "#991b1b", "#d97706", "#475569", "#7c3aed", "#059669", "#dc2626"]);
+    setSelectedStages([]);
+    setSelectedPeriod(0);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(event.target)
+      ) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isDragging) return;
+
+      if (isDragging === "width") {
+        const deltaX = e.clientX - dragStart.x;
+        const newWidth = Math.max(600, Math.min(2000, canvasWidth + deltaX));
+        setCanvasWidth(newWidth);
+        setDragStart({ x: e.clientX, y: dragStart.y });
+      } else if (isDragging === "height") {
+        const deltaY = e.clientY - dragStart.y;
+        const newHeight = Math.max(400, Math.min(2000, canvasHeight + deltaY));
+        setCanvasHeight(newHeight);
+        setDragStart({ x: dragStart.x, y: e.clientY });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(null);
+    };
+
+    if (isDragging) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, dragStart, canvasWidth, canvasHeight]);
+
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const analyzeData = (data) => {
+    const columns = Object.keys(data[0]);
+    const labelCol =
+      columns.find((col) => typeof data[0][col] === "string") || columns[0];
+    const valueCols = columns.filter(
+      (col) => typeof data[0][col] === "number" && col !== labelCol
+    );
+    const periods = valueCols.length > 0 ? valueCols : [columns[1]];
+
+    const generatedTitles = generateIntelligentTitle(data, labelCol, periods);
+    setTitle(generatedTitles.title);
+    setSubtitle(generatedTitles.subtitle);
+
+    const processedData = data
+      .filter((row) => row[labelCol])
+      .map((row) => ({
+        label: row[labelCol],
+        periods: periods.map((p) => row[p] || 0),
+        hidden: false,
+      }));
+
+    const maxValues = processedData.map((stage) => Math.max(...stage.periods));
+    const sortedIndices = maxValues
+      .map((val, idx) => ({ val, idx }))
+      .sort((a, b) => b.val - a.val)
+      .map((item) => item.idx);
+
+    const sortedData = sortedIndices.map((idx) => processedData[idx]);
+
+    setChartConfig({
+      data: sortedData,
+      labelCol,
+      periodNames: periods,
+    });
+    setPeriodNames(periods);
+    setEditableData(sortedData.map((d, i) => ({ ...d, id: i })));
+    setSelectedStages([]);
+    setSelectedPeriod(0);
+  };
+
+  const generateIntelligentTitle = (data, labelCol, periods) => {
+    const stageLabels = data.map((row) => row[labelCol]).filter(Boolean);
+    const firstStage = stageLabels[0] || "";
+    const lastStage = stageLabels[stageLabels.length - 1] || "";
+    const allText = stageLabels.join(" ").toLowerCase();
+
+    if (
+      allText.includes("visit") ||
+      allText.includes("click") ||
+      allText.includes("impression")
+    ) {
+      return {
+        title: "Marketing & Acquisition Funnel",
+        subtitle:
+          "Tracking " +
+          periods.length +
+          " period" +
+          (periods.length > 1 ? "s" : "") +
+          " across " +
+          stageLabels.length +
+          " conversion stages",
+      };
+    } else if (
+      allText.includes("cart") ||
+      allText.includes("checkout") ||
+      allText.includes("purchase")
+    ) {
+      return {
+        title: "E-commerce Conversion Funnel",
+        subtitle:
+          "From " +
+          firstStage +
+          " to " +
+          lastStage +
+          " - " +
+          periods.length +
+          " period comparison",
+      };
+    } else if (
+      allText.includes("trial") ||
+      allText.includes("demo") ||
+      allText.includes("contract")
+    ) {
+      return {
+        title: "SaaS Sales Funnel",
+        subtitle:
+          stageLabels.length +
+          "-stage conversion tracking across " +
+          periods.length +
+          " time periods",
+      };
+    } else {
+      return {
+        title: stageLabels.length + "-Stage Conversion Funnel",
+        subtitle:
+          "Performance analysis across " +
+          periods.length +
+          " time period" +
+          (periods.length > 1 ? "s" : ""),
+      };
+    }
+  };
+
+  const analyzeDataInsights = (data, periods) => {
+    if (!data || data.length === 0) return "";
+
+    const insights = [];
+    const recentPeriod = 0;
+    const recentValues = data.map((d) => d.periods[recentPeriod]);
+    const overallConversion = (
+      (recentValues[recentValues.length - 1] / recentValues[0]) *
+      100
+    ).toFixed(2);
+
+    insights.push(
+      "📊 Overall Performance: " +
+        overallConversion +
+        "% conversion rate from " +
+        data[0].label +
+        " to " +
+        data[data.length - 1].label +
+        "."
+    );
+
+    let biggestDrop = { from: "", to: "", rate: 0, periodIdx: 0 };
+    for (let periodIdx = 0; periodIdx < periods.length; periodIdx++) {
+      for (let i = 0; i < data.length - 1; i++) {
+        const current = data[i].periods[periodIdx];
+        const next = data[i + 1].periods[periodIdx];
+        const dropRate = ((current - next) / current) * 100;
+
+        if (dropRate > biggestDrop.rate) {
+          biggestDrop = {
+            from: data[i].label,
+            to: data[i + 1].label,
+            rate: dropRate,
+            periodIdx,
+          };
+        }
+      }
+    }
+
+    if (biggestDrop.rate > 50) {
+      insights.push(
+        "\n⚠️ Critical Drop-off: " +
+          biggestDrop.rate.toFixed(1) +
+          '% between "' +
+          biggestDrop.from +
+          '" and "' +
+          biggestDrop.to +
+          '" in ' +
+          periods[biggestDrop.periodIdx] +
+          ". This represents a major conversion barrier requiring immediate attention."
+      );
+    }
+
+    if (periods.length > 1) {
+      const firstTotal = data.reduce(
+        (sum, d) => sum + d.periods[periods.length - 1],
+        0
+      );
+      const lastTotal = data.reduce((sum, d) => sum + d.periods[0], 0);
+      const trend = ((lastTotal - firstTotal) / firstTotal) * 100;
+
+      if (trend > 10) {
+        insights.push(
+          "\n📈 Growth: Volume increased " +
+            trend.toFixed(1) +
+            "% from " +
+            periods[periods.length - 1] +
+            " to " +
+            periods[0] +
+            "."
+        );
+      } else if (trend < -10) {
+        insights.push(
+          "\n📉 Decline: Volume decreased " +
+            Math.abs(trend).toFixed(1) +
+            "% from " +
+            periods[periods.length - 1] +
+            " to " +
+            periods[0] +
+            "."
+        );
+      }
+    }
+
+    insights.push(
+      "\n\n💡 Recommendations:\n• Compare against industry benchmarks\n• Segment data by user demographics or traffic source\n• A/B test stages with highest drop-offs"
+    );
+
+    return insights.join("\n");
+  };
+
+  const generateColorShades = (baseColor, count) => {
+    if (comparisonMode) {
+      const palette = comparisonPalettes[comparisonPalette];
+      const colors = comparisonPalette === "user" ? userCustomColors : palette.colors;
+      return colors.slice(0, count);
+    }
+    
+    if (count === 1) return [baseColor];
+    const color = d3.color(baseColor);
+    const hsl = d3.hsl(color);
+    const shades = [];
+    const transitionFactor = colorTransition / 100;
+
+    for (let i = 0; i < count; i++) {
+      const lightnessFactor = i / (count - 1);
+      const newLightness =
+        hsl.l + lightnessFactor * (0.75 - hsl.l) * transitionFactor;
+      const newSaturation =
+        hsl.s * (1 - lightnessFactor * 0.4 * transitionFactor);
+      const shade = d3.hsl(hsl.h, newSaturation, newLightness);
+      shades.push(shade.formatHex());
+    }
+    return shades;
+  };
+
+  const generateGreyShades = (count, opacity) => {
+    if (opacity === 0) {
+      return Array(count).fill("rgb(255,255,255)");
+    }
+
+    const opacityFactor = Math.pow(opacity / 100, 1.5);
+    const minGrey = Math.round(255 - 35 * opacityFactor);
+    const maxGrey = Math.round(255 - 135 * opacityFactor);
+
+    if (count === 1) {
+      return ["rgb(" + maxGrey + "," + maxGrey + "," + maxGrey + ")"];
+    }
+
+    const shades = [];
+    for (let i = 0; i < count; i++) {
+      const lightnessFactor = (count - 1 - i) / (count - 1);
+      const easedFactor = Math.pow(lightnessFactor, 0.7);
+      const greyValue = Math.round(minGrey - (minGrey - maxGrey) * easedFactor);
+      shades.push("rgb(" + greyValue + "," + greyValue + "," + greyValue + ")");
+    }
+    return shades;
+  };
+
+  const getTextColorForBackground = (bgColor) => {
+    const color = d3.color(bgColor);
+    if (!color) return "#111827";
+    const r = color.r / 255;
+    const g = color.g / 255;
+    const b = color.b / 255;
+    const rLinear =
+      r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+    const gLinear =
+      g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+    const bLinear =
+      b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+    const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+    return luminance > 0.5 ? "#111827" : "white";
+  };
+
+  const abbreviateNumber = (num) => {
+    if (!compactNumbers) return num.toLocaleString();
+    const absNum = Math.abs(num);
+    if (absNum >= 1000000)
+      return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+    if (absNum >= 1000)
+      return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    return num.toLocaleString();
+  };
+
+  const handleBarClick = (stageIndex, periodIndex) => {
+    const isSamePeriod = selectedPeriod === periodIndex;
+    const isStageSelected = selectedStages.includes(stageIndex);
+
+    if (isSamePeriod && isStageSelected) {
+      setSelectedPeriod(0);
+      setSelectedStages([]);
+      return;
+    }
+
+    setSelectedPeriod(periodIndex);
+    setSelectedStages((prev) => {
+      if (prev.length === 0) {
+        return [stageIndex];
+      } else if (prev.length === 1) {
+        if (prev[0] !== stageIndex) {
+          return [prev[0], stageIndex];
+        }
+        return prev;
+      } else {
+        return [stageIndex];
+      }
+    });
+  };
+
+  const handleDataEdit = (rowIndex, field, value) => {
+    const newData = [...editableData];
+    if (field === "label") {
+      newData[rowIndex].label = value;
+    } else if (field === "hidden") {
+      newData[rowIndex].hidden = value;
+    } else {
+      const periodIndex = parseInt(field);
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        newData[rowIndex].periods[periodIndex] = numValue;
+      }
+    }
+    setEditableData(newData);
+  };
+
+  const handleSaveData = () => {
+    const maxValues = editableData.map((stage) => Math.max(...stage.periods));
+    const sortedIndices = maxValues
+      .map((val, idx) => ({ val, idx }))
+      .sort((a, b) => b.val - a.val)
+      .map((item) => item.idx);
+
+    const sortedData = sortedIndices.map((idx) => editableData[idx]);
+
+    setChartConfig({
+      ...chartConfig,
+      data: sortedData,
+      periodNames: periodNames,
+    });
+    setEditableData(sortedData.map((d, i) => ({ ...d, id: i })));
+    setSelectedStages([]);
+
+    setShowDataTable(false);
+  };
+
+  const handleAddRow = () => {
+    const newRow = {
+      id: editableData.length,
+      label: "Stage " + (editableData.length + 1),
+      periods: periodNames.map(() => 0),
+      hidden: false,
+    };
+    setEditableData([...editableData, newRow]);
+  };
+
+  const handleDeleteRow = (index) => {
+    if (editableData.length <= 1) {
+      alert("Cannot delete the last row!");
+      return;
+    }
+    const newData = editableData.filter((_, i) => i !== index);
+    setEditableData(newData.map((d, i) => ({ ...d, id: i })));
+  };
+
+  const handleAddColumn = () => {
+    if (!newColumnName.trim()) {
+      alert("Please enter a column name!");
+      return;
+    }
+
+    const newPeriods = [...periodNames, newColumnName.trim()];
+    setPeriodNames(newPeriods);
+
+    const newData = editableData.map((row) => ({
+      ...row,
+      periods: [...row.periods, 0],
+    }));
+    setEditableData(newData);
+    setNewColumnName("");
+  };
+
+  const handleDeleteColumn = (columnIndex) => {
+    if (periodNames.length <= 1) {
+      alert("Cannot delete the last column!");
+      return;
+    }
+
+    const newPeriods = periodNames.filter((_, i) => i !== columnIndex);
+    setPeriodNames(newPeriods);
+
+    const newData = editableData.map((row) => ({
+      ...row,
+      periods: row.periods.filter((_, i) => i !== columnIndex),
+    }));
+    setEditableData(newData);
+
+    if (selectedPeriod >= newPeriods.length) {
+      setSelectedPeriod(newPeriods.length - 1);
+    }
+  };
+
+  const handleColumnNameEdit = (index, newName) => {
+    const newPeriods = [...periodNames];
+    newPeriods[index] = newName;
+    setPeriodNames(newPeriods);
+    setEditingColumnIndex(null);
+    setEditingColumnName("");
+  };
+
+  const handleColumnDragStart = (e, index) => {
+    setDraggedColumn(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleColumnDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleColumnDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedColumn === null || draggedColumn === targetIndex) return;
+
+    const newPeriods = [...periodNames];
+    const movedPeriod = newPeriods.splice(draggedColumn, 1)[0];
+    newPeriods.splice(targetIndex, 0, movedPeriod);
+    setPeriodNames(newPeriods);
+
+    const newData = editableData.map((row) => {
+      const newPeriodValues = [...row.periods];
+      const movedValue = newPeriodValues.splice(draggedColumn, 1)[0];
+      newPeriodValues.splice(targetIndex, 0, movedValue);
+      return { ...row, periods: newPeriodValues };
+    });
+    setEditableData(newData);
+
+    setDraggedColumn(null);
+  };
+
+  useEffect(() => {
+    if (chartConfig && svgRef.current) {
+      const data = chartConfig.data;
+      const periods = chartConfig.periodNames;
+      if (!data || data.length === 0) return;
+
+      const visibleData = data.filter((d) => !d.hidden);
+      if (visibleData.length === 0) return;
+
+      const svgElement = d3.select(svgRef.current);
+      svgElement.selectAll("*").remove();
+
+      const tempSvg = svgElement.append("g");
+      let maxLabelWidth = 0;
+      
+      visibleData.forEach((d) => {
+        const tempText = tempSvg
+          .append("text")
+          .attr("font-family", fontFamily)
+          .attr("font-size", segmentLabelFontSize + "px")
+          .attr("font-weight", "500")
+          .text(d.label);
+        
+        const bbox = tempText.node().getBBox();
+        maxLabelWidth = Math.max(maxLabelWidth, bbox.width);
+        tempText.remove();
+      });
+      
+      tempSvg.remove();
+      
+      const requiredLeftMargin = Math.max(120, maxLabelWidth + 20);
+
+      // Calculate header heights
+      const titleHeight = titleFontSize;
+      const subtitleHeight = subtitle ? subtitleFontSize : 0;
+      const legendHeight = showLegend && periods.length > 1 ? 10 : 0; // Circle radius * 2
+      
+      // Calculate total header section height - use smaller gap for title/subtitle
+      const titleToSubtitleGap = subtitle ? 5 : 0;
+      const subtitleToLegendGap = showLegend && periods.length > 1 ? 24 : 0;
+      const legendToChartGap = showLegend && periods.length > 1 ? 20 : 15;
+      
+      const headerHeight = 
+        titleHeight + 
+        titleToSubtitleGap + 
+        subtitleHeight + 
+        subtitleToLegendGap + 
+        legendHeight + 
+        legendToChartGap;
+
+      const sparklineHeight = showSparklines ? 50 : 0;
+      const bracketHeight = selectedStages.length === 2 ? 40 : 0;
+
+      const verticalRightMargin = showSparklines
+        ? selectedStages.length === 2
+          ? 280
+          : 200
+        : selectedStages.length === 2
+        ? 180
+        : 120;
+
+      const margin =
+        orientation === "vertical"
+          ? { 
+              top: 40 + headerHeight, 
+              right: verticalRightMargin, 
+              bottom: 100, 
+              left: requiredLeftMargin 
+            }
+          : {
+              top: 40 + headerHeight + sparklineHeight + (sparklineHeight > 0 ? 15 : 0) + bracketHeight + (bracketHeight > 0 ? 10 : 0),
+              right: 80,
+              bottom: Math.max(100, maxLabelWidth + 40),
+              left: 120,
+            };
+      const width = canvasWidth - margin.left - margin.right;
+      const height = canvasHeight - margin.top - margin.bottom;
+
+      const svg = svgElement
+        .attr("width", canvasWidth)
+        .attr("height", canvasHeight)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      const firstStageValues =
+        normalizeToHundred && visibleData.length > 0
+          ? visibleData[0].periods
+          : null;
+      const actualMaxValue = Math.max(...visibleData.flatMap((d) => d.periods));
+      const maxValue = actualMaxValue;
+      const colorShades = generateColorShades(barColor, periods.length);
+      const greyShades = generateGreyShades(periods.length, backgroundOpacity);
+
+      const visibleIndices = data
+        .map((d, i) => (d.hidden ? -1 : i))
+        .filter((i) => i !== -1);
+      const mapOriginalToVisible = new Map();
+      let visibleCount = 0;
+      data.forEach((d, i) => {
+        if (!d.hidden) {
+          mapOriginalToVisible.set(i, visibleCount);
+          visibleCount++;
+        }
+      });
+
+      if (orientation === "vertical") {
+        const xScale = d3.scaleLinear().domain([0, maxValue]).range([0, width]);
+        const barHeight =
+          (height - (visibleData.length - 1) * stageGap) / visibleData.length;
+        const periodBarHeight = barHeight / periods.length;
+
+        visibleData.forEach((d, visibleIdx) => {
+          const originalIdx = visibleIndices[visibleIdx];
+          const yPos = visibleIdx * (barHeight + stageGap);
+
+          const barWidths = d.periods.map((value, periodIdx) => {
+            const displayValue =
+              normalizeToHundred && visibleIdx === 0 ? maxValue : value;
+            return xScale(displayValue);
+          });
+          const minBarWidth = Math.min(...barWidths);
+          const allLabelsInside = emphasis === "throughput" && minBarWidth > 100;
+
+          d.periods.forEach((value, periodIdx) => {
+            const periodY =
+              yPos + (periods.length - 1 - periodIdx) * periodBarHeight;
+            const isSelected =
+              selectedStages.length === 0 ||
+              selectedStages.includes(originalIdx);
+            const isPeriodSelected = periodIdx === selectedPeriod;
+            const opacity =
+              isSelected && isPeriodSelected ? 1 : isSelected ? 0.5 : 0.25;
+
+            if (emphasis === "throughput") {
+              if (backgroundOpacity > 0) {
+                svg
+                  .append("rect")
+                  .attr("x", 0)
+                  .attr("y", periodY)
+                  .attr("width", width)
+                  .attr("height", periodBarHeight)
+                  .attr("fill", greyShades[periodIdx])
+                  .attr("opacity", opacity * (backgroundOpacity / 100))
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+              }
+
+              const displayValue =
+                normalizeToHundred && visibleIdx === 0 ? maxValue : value;
+              const barWidth = xScale(displayValue);
+
+              svg
+                .append("rect")
+                .attr("x", 0)
+                .attr("y", periodY)
+                .attr("width", barWidth)
+                .attr("height", periodBarHeight)
+                .attr("fill", colorShades[periodIdx])
+                .attr("opacity", opacity)
+                .style("cursor", "pointer")
+                .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+              let percent;
+              if (visibleIdx === 0) {
+                percent = 100;
+              } else {
+                const prevStageData = visibleData[visibleIdx - 1];
+                const prevValue = prevStageData.periods[periodIdx];
+                percent =
+                  prevValue > 0 ? Math.round((value / prevValue) * 100) : 0;
+              }
+
+              const primaryText =
+                metricEmphasis === "volume"
+                  ? abbreviateNumber(value)
+                  : percent + "%";
+              const secondaryText =
+                metricEmphasis === "volume"
+                  ? "(" + percent + "%)"
+                  : "(" + abbreviateNumber(value) + ")";
+
+              if (allLabelsInside) {
+                const textColor = getTextColorForBackground(colorShades[periodIdx]);
+
+                const textGroup = svg
+                  .append("text")
+                  .attr("x", barWidth - 12)
+                  .attr("y", periodY + periodBarHeight / 2)
+                  .attr("dy", "0.35em")
+                  .attr("text-anchor", "end")
+                  .attr("opacity", opacity);
+
+                textGroup
+                  .append("tspan")
+                  .attr("fill", textColor)
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize + "px")
+                  .attr("font-weight", "700")
+                  .text(primaryText);
+
+                textGroup
+                  .append("tspan")
+                  .attr("fill", textColor)
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize - 1 + "px")
+                  .attr("font-weight", "400")
+                  .attr("opacity", 0.8)
+                  .text(" " + secondaryText);
+              } else {
+                const textGroup = svg
+                  .append("text")
+                  .attr("x", barWidth + 8)
+                  .attr("y", periodY + periodBarHeight / 2)
+                  .attr("dy", "0.35em")
+                  .attr("text-anchor", "start")
+                  .attr("opacity", opacity);
+
+                textGroup
+                  .append("tspan")
+                  .attr("fill", "#374151")
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize + "px")
+                  .attr("font-weight", "700")
+                  .text(primaryText);
+
+                textGroup
+                  .append("tspan")
+                  .attr("fill", "#6b7280")
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize - 1 + "px")
+                  .attr("font-weight", "400")
+                  .text(" " + secondaryText);
+              }
+            } else {
+              if (visibleIdx === 0) {
+                svg
+                  .append("rect")
+                  .attr("x", 0)
+                  .attr("y", periodY)
+                  .attr("width", width)
+                  .attr("height", periodBarHeight)
+                  .attr("fill", colorShades[periodIdx])
+                  .attr("opacity", opacity)
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+                const percent = 100;
+                const primaryText =
+                  metricEmphasis === "volume"
+                    ? abbreviateNumber(value)
+                    : percent + "%";
+                const secondaryText =
+                  metricEmphasis === "volume"
+                    ? "(" + percent + "%)"
+                    : "(" + abbreviateNumber(value) + ")";
+
+                const textColor = getTextColorForBackground(colorShades[periodIdx]);
+                const textGroup = svg
+                  .append("text")
+                  .attr("x", width - 12)
+                  .attr("y", periodY + periodBarHeight / 2)
+                  .attr("dy", "0.35em")
+                  .attr("text-anchor", "end")
+                  .attr("opacity", opacity);
+
+                textGroup
+                  .append("tspan")
+                  .attr("fill", textColor)
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize + "px")
+                  .attr("font-weight", "700")
+                  .text(primaryText);
+
+                textGroup
+                  .append("tspan")
+                  .attr("fill", textColor)
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize - 1 + "px")
+                  .attr("font-weight", "400")
+                  .attr("opacity", 0.8)
+                  .text(" " + secondaryText);
+              } else {
+                const prevStageData = visibleData[visibleIdx - 1];
+                const prevValue = prevStageData.periods[periodIdx];
+                
+                const throughputPercent = prevValue > 0 ? value / prevValue : 0;
+                const falloutPercent = 1 - throughputPercent;
+                
+                const throughputWidth = width * throughputPercent;
+                const falloutWidth = width * falloutPercent;
+                
+                const throughputOpacity = opacity * (backgroundOpacity / 100);
+                
+                svg
+                  .append("rect")
+                  .attr("x", 0)
+                  .attr("y", periodY)
+                  .attr("width", throughputWidth)
+                  .attr("height", periodBarHeight)
+                  .attr("fill", greyShades[periodIdx])
+                  .attr("opacity", throughputOpacity)
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+                svg
+                  .append("rect")
+                  .attr("x", throughputWidth)
+                  .attr("y", periodY)
+                  .attr("width", falloutWidth)
+                  .attr("height", periodBarHeight)
+                  .attr("fill", colorShades[periodIdx])
+                  .attr("opacity", opacity)
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+                const falloutValue = prevValue - value;
+                const falloutPercentLabel = Math.round(falloutPercent * 100);
+                
+                const primaryText =
+                  metricEmphasis === "volume"
+                    ? abbreviateNumber(falloutValue)
+                    : falloutPercentLabel + "%";
+                const secondaryText =
+                  metricEmphasis === "volume"
+                    ? "(" + falloutPercentLabel + "%)"
+                    : "(" + abbreviateNumber(falloutValue) + ")";
+
+                const textColor = getTextColorForBackground(colorShades[periodIdx]);
+                
+                if (falloutWidth > 100) {
+                  const textGroup = svg
+                    .append("text")
+                    .attr("x", width - 12)
+                    .attr("y", periodY + periodBarHeight / 2)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", "end")
+                    .attr("opacity", opacity);
+
+                  textGroup
+                    .append("tspan")
+                    .attr("fill", textColor)
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize + "px")
+                    .attr("font-weight", "700")
+                    .text(primaryText);
+
+                  textGroup
+                    .append("tspan")
+                    .attr("fill", textColor)
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize - 1 + "px")
+                    .attr("font-weight", "400")
+                    .attr("opacity", 0.8)
+                    .text(" " + secondaryText);
+                } else {
+                  const textGroup = svg
+                    .append("text")
+                    .attr("x", width + 8)
+                    .attr("y", periodY + periodBarHeight / 2)
+                    .attr("dy", "0.35em")
+                    .attr("text-anchor", "start")
+                    .attr("opacity", opacity);
+
+                  textGroup
+                    .append("tspan")
+                    .attr("fill", "#374151")
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize + "px")
+                    .attr("font-weight", "700")
+                    .text(primaryText);
+
+                  textGroup
+                    .append("tspan")
+                    .attr("fill", "#6b7280")
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize - 1 + "px")
+                    .attr("font-weight", "400")
+                    .text(" " + secondaryText);
+                }
+              }
+            }
+          });
+
+          svg
+            .append("text")
+            .attr("x", -15)
+            .attr("y", yPos + barHeight / 2)
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "end")
+            .attr("fill", "#374151")
+            .attr("font-family", fontFamily)
+            .attr("font-size", segmentLabelFontSize + "px")
+            .attr("font-weight", "500")
+            .text(d.label);
+        });
+
+        if (showSparklines) {
+          const sparkWidth = 90;
+          const sparkHeight = 45;
+          const sparkX = width + 30 + (selectedStages.length === 2 ? 80 : 0);
+
+          visibleData.forEach((d, visibleIdx) => {
+            if (visibleIdx === 0) return;
+
+            const yPos = visibleIdx * (barHeight + stageGap);
+            const sparkY = yPos + (barHeight - sparkHeight) / 2;
+
+            let sparklineData;
+            if (sparklineType === "volume") {
+              sparklineData = d.periods.map((value, idx) => ({
+                period: idx,
+                value,
+              }));
+            } else {
+              const prevStageData = data[visibleIndices[visibleIdx - 1]];
+              sparklineData = d.periods.map((value, idx) => {
+                const prevValue = prevStageData.periods[idx];
+                const conversionRate =
+                  prevValue > 0 ? (value / prevValue) * 100 : 0;
+                return { period: idx, value: conversionRate };
+              });
+            }
+
+            sparklineData = sparklineData.slice().reverse();
+
+            const sparkXScale = d3
+              .scaleLinear()
+              .domain([0, sparklineData.length - 1])
+              .range([0, sparkWidth]);
+
+            const sparkYScale = d3
+              .scaleLinear()
+              .domain([0, d3.max(sparklineData, (d) => d.value)])
+              .range([sparkHeight, 0]);
+
+            const line = d3
+              .line()
+              .x((d, i) => sparkXScale(i))
+              .y((d) => sparkYScale(d.value))
+              .curve(d3.curveMonotoneX);
+
+            const gradientId = "sparkline-gradient-" + visibleIdx;
+            const gradient = svg
+              .append("defs")
+              .append("linearGradient")
+              .attr("id", gradientId)
+              .attr("x1", "0%")
+              .attr("x2", "100%");
+
+            colorShades
+              .slice()
+              .reverse()
+              .forEach((color, idx) => {
+                const offset = (idx / (colorShades.length - 1)) * 100;
+                gradient
+                  .append("stop")
+                  .attr("offset", offset + "%")
+                  .attr("stop-color", color);
+              });
+
+            const sparkGroup = svg
+              .append("g")
+              .attr("transform", "translate(" + sparkX + "," + sparkY + ")");
+
+            sparkGroup
+              .append("path")
+              .datum(sparklineData)
+              .attr("fill", "none")
+              .attr("stroke", "url(#" + gradientId + ")")
+              .attr("stroke-width", 2)
+              .attr("d", line);
+
+            sparklineData.forEach((point, idx) => {
+              sparkGroup
+                .append("circle")
+                .attr("cx", sparkXScale(idx))
+                .attr("cy", sparkYScale(point.value))
+                .attr("r", 3)
+                .attr("fill", colorShades[colorShades.length - 1 - idx])
+                .attr("stroke", "white")
+                .attr("stroke-width", 1);
+            });
+          });
+
+          const stage1YPos = 0 * (barHeight + stageGap);
+          svg
+            .append("text")
+            .attr("x", sparkX + sparkWidth / 2)
+            .attr("y", stage1YPos + barHeight / 2)
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "middle")
+            .attr("font-family", fontFamily)
+            .attr("font-size", "10px")
+            .attr("fill", "#6b7280")
+            .text(
+              sparklineType === "volume" ? "Volume Trend" : "Conversion Trend"
+            );
+        }
+
+        if (selectedStages.length === 2) {
+          const visibleSelectedStages = selectedStages.filter(
+            (idx) => !data[idx].hidden
+          );
+          if (visibleSelectedStages.length === 2) {
+            const sortedStages = visibleSelectedStages.sort((a, b) => a - b);
+            const idx1 = sortedStages[0];
+            const idx2 = sortedStages[1];
+            const visIdx1 = mapOriginalToVisible.get(idx1);
+            const visIdx2 = mapOriginalToVisible.get(idx2);
+
+            const reversePeriodIdx = periods.length - 1 - selectedPeriod;
+            const y1 =
+              visIdx1 * (barHeight + stageGap) +
+              reversePeriodIdx * periodBarHeight +
+              periodBarHeight / 2;
+            const y2 =
+              visIdx2 * (barHeight + stageGap) +
+              reversePeriodIdx * periodBarHeight +
+              periodBarHeight / 2;
+            const bracketX = width + 20;
+
+            svg
+              .append("line")
+              .attr("x1", bracketX)
+              .attr("y1", y1)
+              .attr("x2", bracketX)
+              .attr("y2", y2)
+              .attr("stroke", "#000000")
+              .attr("stroke-width", 2);
+
+            svg
+              .append("line")
+              .attr("x1", bracketX)
+              .attr("y1", y1)
+              .attr("x2", bracketX - 15)
+              .attr("y2", y1)
+              .attr("stroke", "#000000")
+              .attr("stroke-width", 2);
+
+            svg
+              .append("line")
+              .attr("x1", bracketX)
+              .attr("y1", y2)
+              .attr("x2", bracketX - 15)
+              .attr("y2", y2)
+              .attr("stroke", "#000000")
+              .attr("stroke-width", 2);
+
+            const val1 = data[idx1].periods[selectedPeriod];
+            const val2 = data[idx2].periods[selectedPeriod];
+            
+            let conversionRate;
+            if (emphasis === "throughput") {
+              conversionRate = ((val2 / val1) * 100).toFixed(2);
+            } else {
+              conversionRate = (((val1 - val2) / val1) * 100).toFixed(2);
+            }
+
+            svg
+              .append("text")
+              .attr("x", bracketX + 10)
+              .attr("y", (y1 + y2) / 2)
+              .attr("text-anchor", "start")
+              .attr("dy", "0.35em")
+              .attr("font-family", fontFamily)
+              .attr("font-size", conversionLabelFontSize + "px")
+              .attr("font-weight", "700")
+              .attr("fill", "#000000")
+              .text(conversionRate + "%");
+          }
+        }
+
+        svg
+          .append("line")
+          .attr("x1", emphasis === "throughput" ? 0 : width)
+          .attr("y1", 0)
+          .attr("x2", emphasis === "throughput" ? 0 : width)
+          .attr("y2", height + 20)
+          .attr("stroke", "#000000")
+          .attr("stroke-width", axisLineWidth);
+
+        const arrowSize = Math.max(6, axisLineWidth * 2);
+        if (emphasis === "throughput") {
+          svg
+            .append("polygon")
+            .attr(
+              "points",
+              -arrowSize +
+                "," +
+                (height + 20) +
+                " 0," +
+                (height + 20 + arrowSize * 1.5) +
+                " " +
+                arrowSize +
+                "," +
+                (height + 20)
+            )
+            .attr("fill", "#000000");
+        } else {
+          svg
+            .append("polygon")
+            .attr(
+              "points",
+              (width - arrowSize) +
+                "," +
+                (height + 20) +
+                " " +
+                width +
+                "," +
+                (height + 20 + arrowSize * 1.5) +
+                " " +
+                (width + arrowSize) +
+                "," +
+                (height + 20)
+            )
+            .attr("fill", "#000000");
+        }
+      } else {
+        const yScale = d3
+          .scaleLinear()
+          .domain([0, maxValue])
+          .range([height, 0]);
+        const barWidth =
+          (width - (visibleData.length - 1) * stageGap) / visibleData.length;
+        const periodBarWidth = barWidth / periods.length;
+
+        visibleData.forEach((d, visibleIdx) => {
+          const originalIdx = visibleIndices[visibleIdx];
+          const xPos = visibleIdx * (barWidth + stageGap);
+
+          const barHeights = d.periods.map((value, periodIdx) => {
+            const displayValue =
+              normalizeToHundred && visibleIdx === 0 ? maxValue : value;
+            return height - yScale(displayValue);
+          });
+          const minBarHeight = Math.min(...barHeights);
+          const allLabelsInside = emphasis === "throughput" && periodBarWidth > 30 && minBarHeight > 70;
+
+          d.periods.forEach((value, periodIdx) => {
+            const periodX =
+              xPos + (periods.length - 1 - periodIdx) * periodBarWidth;
+            const isSelected =
+              selectedStages.length === 0 ||
+              selectedStages.includes(originalIdx);
+            const isPeriodSelected = periodIdx === selectedPeriod;
+            const opacity =
+              isSelected && isPeriodSelected ? 1 : isSelected ? 0.5 : 0.25;
+
+            if (emphasis === "throughput") {
+              if (backgroundOpacity > 0) {
+                svg
+                  .append("rect")
+                  .attr("x", periodX)
+                  .attr("y", 0)
+                  .attr("width", periodBarWidth)
+                  .attr("height", height)
+                  .attr("fill", greyShades[periodIdx])
+                  .attr("opacity", opacity * (backgroundOpacity / 100))
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+              }
+
+              const displayValue =
+                normalizeToHundred && visibleIdx === 0 ? maxValue : value;
+              const barHeight = height - yScale(displayValue);
+              const barY = yScale(displayValue);
+
+              svg
+                .append("rect")
+                .attr("x", periodX)
+                .attr("y", barY)
+                .attr("width", periodBarWidth)
+                .attr("height", barHeight)
+                .attr("fill", colorShades[periodIdx])
+                .attr("opacity", opacity)
+                .style("cursor", "pointer")
+                .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+              let percent;
+              if (visibleIdx === 0) {
+                percent = 100;
+              } else {
+                const prevStageData = visibleData[visibleIdx - 1];
+                const prevValue = prevStageData.periods[periodIdx];
+                percent =
+                  prevValue > 0 ? Math.round((value / prevValue) * 100) : 0;
+              }
+
+              const primaryText =
+                metricEmphasis === "volume"
+                  ? abbreviateNumber(value)
+                  : percent + "%";
+              const secondaryText =
+                metricEmphasis === "volume"
+                  ? "(" + percent + "%)"
+                  : "(" + abbreviateNumber(value) + ")";
+
+              if (allLabelsInside) {
+                const textColor = getTextColorForBackground(colorShades[periodIdx]);
+                const primaryY = barY + 18;
+                const secondaryY = barY + 36;
+
+                svg
+                  .append("text")
+                  .attr("x", periodX + periodBarWidth / 2)
+                  .attr("y", primaryY)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", textColor)
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize + "px")
+                  .attr("font-weight", "700")
+                  .attr("opacity", opacity)
+                  .text(primaryText);
+
+                svg
+                  .append("text")
+                  .attr("x", periodX + periodBarWidth / 2)
+                  .attr("y", secondaryY)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", textColor)
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize - 1 + "px")
+                  .attr("font-weight", "400")
+                  .attr("opacity", opacity * 0.9)
+                  .text(secondaryText);
+              } else {
+                const labelY = barY - 8;
+
+                svg
+                  .append("text")
+                  .attr("x", periodX + periodBarWidth / 2)
+                  .attr("y", labelY)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", "#374151")
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize + "px")
+                  .attr("font-weight", "700")
+                  .attr("opacity", opacity)
+                  .text(primaryText);
+
+                svg
+                  .append("text")
+                  .attr("x", periodX + periodBarWidth / 2)
+                  .attr("y", labelY - 16)
+                  .attr("text-anchor", "middle")
+                  .attr("fill", "#6b7280")
+                  .attr("font-family", fontFamily)
+                  .attr("font-size", metricLabelFontSize - 1 + "px")
+                  .attr("font-weight", "400")
+                  .attr("opacity", opacity)
+                  .text(secondaryText);
+              }
+            } else {
+              if (visibleIdx === 0) {
+                svg
+                  .append("rect")
+                  .attr("x", periodX)
+                  .attr("y", 0)
+                  .attr("width", periodBarWidth)
+                  .attr("height", height)
+                  .attr("fill", colorShades[periodIdx])
+                  .attr("opacity", opacity)
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+                const percent = 100;
+                const primaryText =
+                  metricEmphasis === "volume"
+                    ? abbreviateNumber(value)
+                    : percent + "%";
+                const secondaryText =
+                  metricEmphasis === "volume"
+                    ? "(" + percent + "%)"
+                    : "(" + abbreviateNumber(value) + ")";
+
+                const textColor = getTextColorForBackground(colorShades[periodIdx]);
+                
+                if (periodBarWidth > 30 && height > 70) {
+                  const primaryY = 18;
+                  const secondaryY = 36;
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", primaryY)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", textColor)
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize + "px")
+                    .attr("font-weight", "700")
+                    .attr("opacity", opacity)
+                    .text(primaryText);
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", secondaryY)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", textColor)
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize - 1 + "px")
+                    .attr("font-weight", "400")
+                    .attr("opacity", opacity * 0.9)
+                    .text(secondaryText);
+                } else {
+                  const labelY = -8;
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", labelY)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#374151")
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize + "px")
+                    .attr("font-weight", "700")
+                    .attr("opacity", opacity)
+                    .text(primaryText);
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", labelY - 16)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#6b7280")
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize - 1 + "px")
+                    .attr("font-weight", "400")
+                    .attr("opacity", opacity)
+                    .text(secondaryText);
+                }
+              } else {
+                const prevStageData = visibleData[visibleIdx - 1];
+                const prevValue = prevStageData.periods[periodIdx];
+                
+                const throughputPercent = prevValue > 0 ? value / prevValue : 0;
+                const falloutPercent = 1 - throughputPercent;
+                
+                const throughputHeight = height * throughputPercent;
+                const falloutHeight = height * falloutPercent;
+                
+                const throughputOpacity = opacity * (backgroundOpacity / 100);
+                
+                svg
+                  .append("rect")
+                  .attr("x", periodX)
+                  .attr("y", height - throughputHeight)
+                  .attr("width", periodBarWidth)
+                  .attr("height", throughputHeight)
+                  .attr("fill", greyShades[periodIdx])
+                  .attr("opacity", throughputOpacity)
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+                svg
+                  .append("rect")
+                  .attr("x", periodX)
+                  .attr("y", 0)
+                  .attr("width", periodBarWidth)
+                  .attr("height", falloutHeight)
+                  .attr("fill", colorShades[periodIdx])
+                  .attr("opacity", opacity)
+                  .style("cursor", "pointer")
+                  .on("click", () => handleBarClick(originalIdx, periodIdx));
+
+                const falloutValue = prevValue - value;
+                const falloutPercentLabel = Math.round(falloutPercent * 100);
+                
+                const primaryText =
+                  metricEmphasis === "volume"
+                    ? abbreviateNumber(falloutValue)
+                    : falloutPercentLabel + "%";
+                const secondaryText =
+                  metricEmphasis === "volume"
+                    ? "(" + falloutPercentLabel + "%)"
+                    : "(" + abbreviateNumber(falloutValue) + ")";
+
+                const textColor = getTextColorForBackground(colorShades[periodIdx]);
+                
+                if (periodBarWidth > 30 && falloutHeight > 70) {
+                  const primaryY = 18;
+                  const secondaryY = 36;
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", primaryY)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", textColor)
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize + "px")
+                    .attr("font-weight", "700")
+                    .attr("opacity", opacity)
+                    .text(primaryText);
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", secondaryY)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", textColor)
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize - 1 + "px")
+                    .attr("font-weight", "400")
+                    .attr("opacity", opacity * 0.9)
+                    .text(secondaryText);
+                } else {
+                  const labelY = -8;
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", labelY)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#374151")
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize + "px")
+                    .attr("font-weight", "700")
+                    .attr("opacity", opacity)
+                    .text(primaryText);
+
+                  svg
+                    .append("text")
+                    .attr("x", periodX + periodBarWidth / 2)
+                    .attr("y", labelY - 16)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#6b7280")
+                    .attr("font-family", fontFamily)
+                    .attr("font-size", metricLabelFontSize - 1 + "px")
+                    .attr("font-weight", "400")
+                    .attr("opacity", opacity)
+                    .text(secondaryText);
+                }
+              }
+            }
+          });
+
+          if (stageLabelPosition === "top") {
+            svg
+              .append("text")
+              .attr("x", xPos + barWidth / 2)
+              .attr("y", -15)
+              .attr("text-anchor", "middle")
+              .attr("fill", "#374151")
+              .attr("font-family", fontFamily)
+              .attr("font-size", segmentLabelFontSize + "px")
+              .attr("font-weight", "500")
+              .text(d.label);
+          } else {
+            svg
+              .append("text")
+              .attr("x", xPos + barWidth / 2)
+              .attr("y", height + 25)
+              .attr("text-anchor", "middle")
+              .attr("fill", "#374151")
+              .attr("font-family", fontFamily)
+              .attr("font-size", segmentLabelFontSize + "px")
+              .attr("font-weight", "500")
+              .text(d.label);
+          }
+        });
+
+        if (showSparklines) {
+          const sparkWidth = 90;
+          const sparkHeight = 40;
+          const sparkY = -margin.top + 40 + headerHeight + 15;
+
+          visibleData.forEach((d, visibleIdx) => {
+            if (visibleIdx === 0) return;
+
+            const xPos = visibleIdx * (barWidth + stageGap);
+            const sparkX = xPos + (barWidth - sparkWidth) / 2;
+
+            let sparklineData;
+            if (sparklineType === "volume") {
+              sparklineData = d.periods.map((value, idx) => ({
+                period: idx,
+                value,
+              }));
+            } else {
+              const prevStageData = data[visibleIndices[visibleIdx - 1]];
+              sparklineData = d.periods.map((value, idx) => {
+                const prevValue = prevStageData.periods[idx];
+                const conversionRate =
+                  prevValue > 0 ? (value / prevValue) * 100 : 0;
+                return { period: idx, value: conversionRate };
+              });
+            }
+
+            sparklineData = sparklineData.slice().reverse();
+
+            const sparkXScale = d3
+              .scaleLinear()
+              .domain([0, sparklineData.length - 1])
+              .range([0, sparkWidth]);
+
+            const sparkYScale = d3
+              .scaleLinear()
+              .domain([0, d3.max(sparklineData, (d) => d.value)])
+              .range([sparkHeight, 0]);
+
+            const line = d3
+              .line()
+              .x((d, i) => sparkXScale(i))
+              .y((d) => sparkYScale(d.value))
+              .curve(d3.curveMonotoneX);
+
+            const gradientId = "sparkline-gradient-h-" + visibleIdx;
+            const gradient = svg
+              .append("defs")
+              .append("linearGradient")
+              .attr("id", gradientId)
+              .attr("x1", "0%")
+              .attr("x2", "100%");
+
+            colorShades
+              .slice()
+              .reverse()
+              .forEach((color, idx) => {
+                const offset = (idx / (colorShades.length - 1)) * 100;
+                gradient
+                  .append("stop")
+                  .attr("offset", offset + "%")
+                  .attr("stop-color", color);
+              });
+
+            const sparkGroup = svg
+              .append("g")
+              .attr("transform", "translate(" + sparkX + "," + sparkY + ")");
+
+            sparkGroup
+              .append("path")
+              .datum(sparklineData)
+              .attr("fill", "none")
+              .attr("stroke", "url(#" + gradientId + ")")
+              .attr("stroke-width", 2)
+              .attr("d", line);
+
+            sparklineData.forEach((point, idx) => {
+              sparkGroup
+                .append("circle")
+                .attr("cx", sparkXScale(idx))
+                .attr("cy", sparkYScale(point.value))
+                .attr("r", 3)
+                .attr("fill", colorShades[colorShades.length - 1 - idx])
+                .attr("stroke", "white")
+                .attr("stroke-width", 1);
+            });
+          });
+
+          const stage1XPos = 0 * (barWidth + stageGap);
+          svg
+            .append("text")
+            .attr("x", stage1XPos + barWidth / 2)
+            .attr("y", sparkY + sparkHeight / 2)
+            .attr("dy", "0.35em")
+            .attr("text-anchor", "middle")
+            .attr("font-family", fontFamily)
+            .attr("font-size", "11px")
+            .attr("fill", "#6b7280")
+            .text(
+              sparklineType === "volume" ? "Volume Trend" : "Conversion Trend"
+            );
+        }
+
+        if (selectedStages.length === 2) {
+          const visibleSelectedStages = selectedStages.filter(
+            (idx) => !data[idx].hidden
+          );
+          if (visibleSelectedStages.length === 2) {
+            const sortedStages = visibleSelectedStages.sort((a, b) => a - b);
+            const idx1 = sortedStages[0];
+            const idx2 = sortedStages[1];
+            const visIdx1 = mapOriginalToVisible.get(idx1);
+            const visIdx2 = mapOriginalToVisible.get(idx2);
+
+            const reversePeriodIdx = periods.length - 1 - selectedPeriod;
+            const x1 =
+              visIdx1 * (barWidth + stageGap) +
+              reversePeriodIdx * periodBarWidth +
+              periodBarWidth / 2;
+            const x2 =
+              visIdx2 * (barWidth + stageGap) +
+              reversePeriodIdx * periodBarWidth +
+              periodBarWidth / 2;
+            const bracketY = -15;
+
+            svg
+              .append("line")
+              .attr("x1", x1)
+              .attr("y1", bracketY)
+              .attr("x2", x2)
+              .attr("y2", bracketY)
+              .attr("stroke", "#000000")
+              .attr("stroke-width", 2);
+
+            svg
+              .append("line")
+              .attr("x1", x1)
+              .attr("y1", bracketY)
+              .attr("x2", x1)
+              .attr("y2", bracketY + 12)
+              .attr("stroke", "#000000")
+              .attr("stroke-width", 2);
+
+            svg
+              .append("line")
+              .attr("x1", x2)
+              .attr("y1", bracketY)
+              .attr("x2", x2)
+              .attr("y2", bracketY + 12)
+              .attr("stroke", "#000000")
+              .attr("stroke-width", 2);
+
+            const val1 = data[idx1].periods[selectedPeriod];
+            const val2 = data[idx2].periods[selectedPeriod];
+            
+            let conversionRate;
+            if (emphasis === "throughput") {
+              conversionRate = ((val2 / val1) * 100).toFixed(2);
+            } else {
+              conversionRate = (((val1 - val2) / val1) * 100).toFixed(2);
+            }
+
+            svg
+              .append("text")
+              .attr("x", (x1 + x2) / 2)
+              .attr("y", bracketY - 8)
+              .attr("text-anchor", "middle")
+              .attr("font-family", fontFamily)
+              .attr("font-size", conversionLabelFontSize + "px")
+              .attr("font-weight", "700")
+              .attr("fill", "#000000")
+              .text(conversionRate + "%");
+          }
+        }
+
+        svg
+          .append("line")
+          .attr("x1", 0)
+          .attr("y1", height)
+          .attr("x2", width + 20)
+          .attr("y2", height)
+          .attr("stroke", "#000000")
+          .attr("stroke-width", axisLineWidth);
+
+        const arrowSize = Math.max(6, axisLineWidth * 2);
+        svg
+          .append("polygon")
+          .attr(
+            "points",
+            width +
+              20 +
+              "," +
+              (height - arrowSize) +
+              " " +
+              (width + 20 + arrowSize * 1.5) +
+              "," +
+              height +
+              " " +
+              (width + 20) +
+              "," +
+              (height + arrowSize)
+          )
+          .attr("fill", "#000000");
+      }
+
+      // Render header elements (title, subtitle, legend) with consistent positioning
+      const headerStartY = -margin.top + 40;
+      
+      // Title
+      svg
+        .append("text")
+        .attr("x", 0)
+        .attr("y", headerStartY)
+        .attr("font-family", fontFamily)
+        .attr("font-size", titleFontSize + "px")
+        .attr("font-weight", "700")
+        .attr("fill", "#111827")
+        .text(title);
+
+      let currentY = headerStartY + titleHeight;
+
+      // Subtitle
+      if (subtitle) {
+        currentY += 5; // Gap between title and subtitle (tight spacing)
+        svg
+          .append("text")
+          .attr("x", 0)
+          .attr("y", currentY)
+          .attr("font-family", fontFamily)
+          .attr("font-size", subtitleFontSize + "px")
+          .attr("font-weight", "400")
+          .attr("fill", "#6b7280")
+          .text(subtitle);
+        currentY += subtitleHeight;
+      }
+
+      // Legend
+      if (showLegend && periods.length > 1) {
+        currentY += 24; // Gap between subtitle and legend
+        let legendX = 0;
+        periods.forEach((period, idx) => {
+          svg
+            .append("circle")
+            .attr("cx", legendX + 5)
+            .attr("cy", currentY)
+            .attr("r", 5)
+            .attr("fill", colorShades[idx]);
+
+          const text = svg
+            .append("text")
+            .attr("x", legendX + 15)
+            .attr("y", currentY)
+            .attr("dy", "0.35em")
+            .attr("font-family", fontFamily)
+            .attr("font-size", legendFontSize + "px")
+            .attr("fill", "#4b5563")
+            .text(period);
+
+          legendX += 15 + text.node().getBBox().width + 20;
+        });
+      }
+
+      if (userTier === "free") {
+        svg
+          .append("text")
+          .attr("x", width / 2)
+          .attr("y", height / 2)
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "middle")
+          .attr("font-family", fontFamily)
+          .attr("font-size", "80px")
+          .attr("font-weight", "700")
+          .attr("fill", "#9ca3af")
+          .attr("opacity", 0.1)
+          .text("Find&Tell");
+      }
+    }
+  }, [
+    chartConfig,
+    title,
+    subtitle,
+    fontFamily,
+    titleFontSize,
+    subtitleFontSize,
+    segmentLabelFontSize,
+    metricLabelFontSize,
+    legendFontSize,
+    conversionLabelFontSize,
+    barColor,
+    colorTransition,
+    axisLineWidth,
+    orientation,
+    canvasWidth,
+    canvasHeight,
+    stageGap,
+    stageLabelPosition,
+    emphasis,
+    metricEmphasis,
+    normalizeToHundred,
+    compactNumbers,
+    showLegend,
+    userTier,
+    selectedStages,
+    selectedPeriod,
+    showSparklines,
+    sparklineType,
+    backgroundOpacity,
+    aspectRatio,
+    comparisonMode,
+    comparisonPalette,
+    chartPadding,
+    userCustomColors,
+  ]);
+
+  const downloadSVG = () => {
+    if (!svgRef.current) return;
+    const svgElement = svgRef.current;
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(svgElement);
+
+    if (!svgString.includes('xmlns="http://www.w3.org/2000/svg"')) {
+      svgString = svgString.replace(
+        "<svg",
+        '<svg xmlns="http://www.w3.org/2000/svg"'
+      );
+    }
+
+    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = title.toLowerCase().replace(/\s+/g, "-") + ".svg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  const downloadPNG = () => {
+    if (!svgRef.current) return;
+    const svgElement = svgRef.current;
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(svgElement);
+
+    svgString = svgString.replace(
+      /font-family="[^"]*"/g,
+      'font-family="Helvetica, Arial, sans-serif"'
+    );
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+
+    const padding = 40;
+
+    img.onload = () => {
+      canvas.width = (img.width + padding * 2) * 2;
+      canvas.height = (img.height + padding * 2) * 2;
+      ctx.scale(2, 2);
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, img.width + padding * 2, img.height + padding * 2);
+      ctx.drawImage(img, padding, padding);
+
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = title.toLowerCase().replace(/\s+/g, "-") + ".png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    };
+
+    img.src =
+      "data:image/svg+xml;base64," +
+      btoa(unescape(encodeURIComponent(svgString)));
+    setShowExportMenu(false);
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-slate-50">
+      <link
+        href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Lato:wght@400;700&family=Montserrat:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap"
+        rel="stylesheet"
+      />
+
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="text-xl font-bold text-cyan-600">FindAndTell</div>
+          <div className="h-6 w-px bg-gray-300"></div>
+          <button
+            onClick={() => loadSampleData("generic")}
+            className="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded hover:bg-gray-100"
+          >
+            New
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowPanel(!showPanel)}
+            className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+          >
+            {showPanel ? "← Hide Panel" : "Show Panel →"}
+          </button>
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="px-4 py-2 text-sm font-semibold text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 shadow-sm flex items-center gap-2"
+            >
+              Export
+              <span className="text-xs">{showExportMenu ? "▲" : "▼"}</span>
+            </button>
+
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50">
+                <button
+                  onClick={downloadSVG}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                >
+                  <span className="text-lg">📄</span>
+                  <div>
+                    <div className="font-medium">Download SVG</div>
+                    <div className="text-xs text-gray-500">Vector format</div>
+                  </div>
+                </button>
+                <button
+                  onClick={downloadPNG}
+                  className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                >
+                  <span className="text-lg">🖼️</span>
+                  <div>
+                    <div className="font-medium">Download PNG</div>
+                    <div className="text-xs text-gray-500">High-res image</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-auto">
+          {chartConfig ? (
+            <div className="w-full max-w-5xl space-y-6">
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => setShowDataTable(true)}
+                  className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
+                >
+                  Edit Data
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  onClick={handleResetView}
+                  className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
+                >
+                  Reset View
+                </button>
+              </div>
+
+              <div
+                className="relative mx-auto"
+                style={{
+                  perspective: "1500px",
+                  width: canvasWidth + chartPadding * 2,
+                  height: canvasHeight + chartPadding * 2,
+                }}
+              >
+                <div
+                  className="relative transition-all duration-700 bg-white rounded-2xl shadow-lg border border-gray-200"
+                  style={{
+                    transformStyle: "preserve-3d",
+                    transform: showDataTable
+                      ? "rotateY(180deg)"
+                      : "rotateY(0deg)",
+                    width: canvasWidth + chartPadding * 2,
+                    height: canvasHeight + chartPadding * 2,
+                    padding: chartPadding + "px",
+                  }}
+                >
+                  <div
+                    style={{
+                      backfaceVisibility: "hidden",
+                      WebkitBackfaceVisibility: "hidden",
+                      height: "100%",
+                      overflow: "hidden",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <svg ref={svgRef}></svg>
+                  </div>
+
+                  <div
+                    className="absolute inset-0 rounded-2xl overflow-auto"
+                    style={{
+                      backfaceVisibility: "hidden",
+                      WebkitBackfaceVisibility: "hidden",
+                      transform: "rotateY(180deg)",
+                      height: canvasHeight + chartPadding * 2,
+                      padding: chartPadding + "px",
+                    }}
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        📊 Edit Data Table
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleAddRow}
+                          className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
+                        >
+                          + Row
+                        </button>
+                        <button
+                          onClick={handleSaveData}
+                          className="px-4 py-1 bg-cyan-600 text-white text-sm rounded hover:bg-cyan-700 font-semibold"
+                        >
+                          Save & View Chart
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Add Time Period Column
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newColumnName}
+                          onChange={(e) => setNewColumnName(e.target.value)}
+                          placeholder="e.g., January 2026"
+                          className="flex-1 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        />
+                        <button
+                          onClick={handleAddColumn}
+                          className="px-4 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-gray-100">
+                            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border">
+                              Stage
+                            </th>
+                            {periodNames.map((period, idx) => (
+                              <th
+                                key={idx}
+                                className="px-4 py-2 text-left text-sm font-semibold text-gray-700 border"
+                                draggable
+                                onDragStart={(e) => handleColumnDragStart(e, idx)}
+                                onDragOver={handleColumnDragOver}
+                                onDrop={(e) => handleColumnDrop(e, idx)}
+                                style={{ cursor: 'move' }}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 select-none">
+                                      ⋮⋮
+                                    </span>
+                                    {editingColumnIndex === idx ? (
+                                      <input
+                                        type="text"
+                                        value={editingColumnName}
+                                        onChange={(e) =>
+                                          setEditingColumnName(e.target.value)
+                                        }
+                                        onBlur={() =>
+                                          handleColumnNameEdit(
+                                            idx,
+                                            editingColumnName
+                                          )
+                                        }
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter")
+                                            handleColumnNameEdit(
+                                              idx,
+                                              editingColumnName
+                                            );
+                                          if (e.key === "Escape") {
+                                            setEditingColumnIndex(null);
+                                            setEditingColumnName("");
+                                          }
+                                        }}
+                                        autoFocus
+                                        className="px-2 py-1 border border-cyan-500 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    ) : (
+                                      <span
+                                        className="cursor-pointer hover:text-cyan-600"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingColumnIndex(idx);
+                                          setEditingColumnName(period);
+                                        }}
+                                      >
+                                        {period}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteColumn(idx);
+                                    }}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </th>
+                            ))}
+                            <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 border">
+                              Hide
+                            </th>
+                            <th className="px-4 py-2 text-center text-sm font-semibold text-gray-700 border">
+                              Del
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editableData.map((row, rowIndex) => (
+                            <tr
+                              key={row.id}
+                              className={
+                                "hover:bg-gray-50 " +
+                                (row.hidden ? "bg-gray-100" : "")
+                              }
+                            >
+                              <td className="px-4 py-2 border">
+                                <input
+                                  type="text"
+                                  value={row.label}
+                                  onChange={(e) =>
+                                    handleDataEdit(
+                                      rowIndex,
+                                      "label",
+                                      e.target.value
+                                    )
+                                  }
+                                  className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                />
+                              </td>
+                              {row.periods.map((value, periodIdx) => (
+                                <td
+                                  key={periodIdx}
+                                  className="px-4 py-2 border"
+                                >
+                                  <input
+                                    type="number"
+                                    value={value}
+                                    onChange={(e) =>
+                                      handleDataEdit(
+                                        rowIndex,
+                                        periodIdx.toString(),
+                                        e.target.value
+                                      )
+                                    }
+                                    min="0"
+                                    className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                  />
+                                </td>
+                              ))}
+                              <td className="px-4 py-2 border text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={row.hidden || false}
+                                  onChange={(e) =>
+                                    handleDataEdit(
+                                      rowIndex,
+                                      "hidden",
+                                      e.target.checked
+                                    )
+                                  }
+                                  className="w-4 h-4 text-gray-600 rounded"
+                                />
+                              </td>
+                              <td className="px-4 py-2 border text-center">
+                                <button
+                                  onClick={() => handleDeleteRow(rowIndex)}
+                                  className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+                                >
+                                  🗑️
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => setShowDataTable(false)}
+                        className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
+                      >
+                        View Chart
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {!showDataTable && (
+                  <>
+                    <div
+                      className="absolute top-0 right-0 w-2 cursor-ew-resize hover:bg-cyan-500 transition-colors"
+                      style={{
+                        transform: "translateX(50%)",
+                        height: canvasHeight + chartPadding * 2,
+                      }}
+                      onMouseDown={(e) => {
+                        setIsDragging("width");
+                        setDragStart({ x: e.clientX, y: e.clientY });
+                      }}
+                    />
+                    <div
+                      className="absolute left-0 w-full h-2 cursor-ns-resize hover:bg-cyan-500 transition-colors"
+                      style={{ transform: "translateY(50%)", bottom: 0 }}
+                      onMouseDown={(e) => {
+                        setIsDragging("height");
+                        setDragStart({ x: e.clientX, y: e.clientY });
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center max-w-md">
+              <div className="text-6xl mb-6">📊</div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Start Creating
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Upload your data or choose a sample to begin
+              </p>
+            </div>
+          )}
+        </div>
+
+        {showPanel && (
+          <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+            <div className="flex border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab("style")}
+                className={
+                  "flex-1 px-4 py-3 text-sm font-medium transition-colors " +
+                  (activeTab === "style"
+                    ? "text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")
+                }
+              >
+                🎨 Style
+              </button>
+              <button
+                onClick={() => setActiveTab("data")}
+                className={
+                  "flex-1 px-4 py-3 text-sm font-medium transition-colors " +
+                  (activeTab === "data"
+                    ? "text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50")
+                }
+              >
+                📊 Data
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6">
+              {activeTab === "style" && (
+                <div className="space-y-4">
+                  {/* Chart Type Section */}
+                  <div>
+                    <button
+                      onClick={() => toggleSection("chartType")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Chart Type</span>
+                      <span>{expandedSections.chartType ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.chartType && (
+                      <div className="mt-3 space-y-4">
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={comparisonMode}
+                            onChange={(e) => setComparisonMode(e.target.checked)}
+                            className="mt-0.5 w-4 h-4 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-cyan-600">
+                              Comparison Mode
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              Use distinct colors for each segment/period
+                            </div>
+                          </div>
+                        </label>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Emphasis
+                          </label>
+                          <select
+                            value={emphasis}
+                            onChange={(e) => setEmphasis(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="throughput">Throughput (successful conversions)</option>
+                            <option value="fallout">Fallout (drop-offs)</option>
+                          </select>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {emphasis === "throughput" 
+                              ? "Shows users who continued through each stage"
+                              : "Shows users who dropped off at each stage"
+                            }
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Orientation
+                          </label>
+                          <select
+                            value={orientation}
+                            onChange={(e) => setOrientation(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="vertical">Vertical</option>
+                            <option value="horizontal">Horizontal</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Metric Priority
+                          </label>
+                          <select
+                            value={metricEmphasis}
+                            onChange={(e) => setMetricEmphasis(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="volume">Volume Primary</option>
+                            <option value="conversion">Conversion Primary</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Typography Section */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("typography")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Typography</span>
+                      <span>{expandedSections.typography ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.typography && (
+                      <div className="mt-3 space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Title
+                          </label>
+                          <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Subtitle
+                          </label>
+                          <input
+                            type="text"
+                            value={subtitle}
+                            onChange={(e) => setSubtitle(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Font Family
+                          </label>
+                          <select
+                            value={fontFamily}
+                            onChange={(e) => setFontFamily(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="Montserrat">Montserrat</option>
+                            <option value="Open Sans">Open Sans</option>
+                            <option value="Roboto">Roboto</option>
+                            <option value="Lato">Lato</option>
+                            <option value="Poppins">Poppins</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Title Size: {titleFontSize}px
+                          </label>
+                          <input
+                            type="range"
+                            min="16"
+                            max="48"
+                            value={titleFontSize}
+                            onChange={(e) =>
+                              setTitleFontSize(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Subtitle Size: {subtitleFontSize}px
+                          </label>
+                          <input
+                            type="range"
+                            min="12"
+                            max="32"
+                            value={subtitleFontSize}
+                            onChange={(e) =>
+                              setSubtitleFontSize(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Stage Labels: {segmentLabelFontSize}px
+                          </label>
+                          <input
+                            type="range"
+                            min="10"
+                            max="32"
+                            value={segmentLabelFontSize}
+                            onChange={(e) =>
+                              setSegmentLabelFontSize(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Metric Labels: {metricLabelFontSize}px
+                          </label>
+                          <input
+                            type="range"
+                            min="10"
+                            max="24"
+                            value={metricLabelFontSize}
+                            onChange={(e) =>
+                              setMetricLabelFontSize(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Legend: {legendFontSize}px
+                          </label>
+                          <input
+                            type="range"
+                            min="10"
+                            max="24"
+                            value={legendFontSize}
+                            onChange={(e) =>
+                              setLegendFontSize(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Conversion Label: {conversionLabelFontSize}px
+                          </label>
+                          <input
+                            type="range"
+                            min="14"
+                            max="32"
+                            value={conversionLabelFontSize}
+                            onChange={(e) =>
+                              setConversionLabelFontSize(
+                                parseInt(e.target.value)
+                              )
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("colors")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Colors</span>
+                      <span>{expandedSections.colors ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.colors && (
+                      <div className="mt-3">
+                        {comparisonMode ? (
+                          // Comparison Mode: Show palette selector
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Color Palette
+                            </label>
+                            <select
+                              value={comparisonPalette}
+                              onChange={(e) => setComparisonPalette(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mb-3"
+                            >
+                              {Object.keys(comparisonPalettes).map((key) => (
+                                <option key={key} value={key}>
+                                  {comparisonPalettes[key].name}
+                                </option>
+                              ))}
+                            </select>
+                            
+                            {comparisonPalette === "user" ? (
+                              <div>
+                                <div className="grid grid-cols-5 gap-1.5 mb-4">
+                                  {userCustomColors.map((color, idx) => (
+                                    <button
+                                      key={idx}
+                                      onClick={() => {
+                                        document.getElementById(`user-color-picker-${idx}`).click();
+                                      }}
+                                      className="aspect-square rounded border-2 border-gray-300 transition-all hover:scale-110 hover:border-gray-900 flex items-center justify-center"
+                                      style={{
+                                        backgroundColor: color,
+                                        width: "45px",
+                                        height: "45px",
+                                      }}
+                                      title={`Period ${idx + 1}`}
+                                    >
+                                      <span className="text-white text-xs drop-shadow-lg">✓</span>
+                                    </button>
+                                  ))}
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  {userCustomColors.map((color, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center">
+                                      <input
+                                        id={`user-color-picker-${idx}`}
+                                        type="color"
+                                        value={color}
+                                        onChange={(e) => {
+                                          const newColors = [...userCustomColors];
+                                          newColors[idx] = e.target.value;
+                                          setUserCustomColors(newColors);
+                                        }}
+                                        className="h-8 w-12 border border-gray-300 rounded cursor-pointer"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={color}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          if (value.match(/^#[0-9A-Fa-f]{0,6}$/)) {
+                                            const newColors = [...userCustomColors];
+                                            newColors[idx] = value;
+                                            setUserCustomColors(newColors);
+                                          }
+                                        }}
+                                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono"
+                                        placeholder="#000000"
+                                      />
+                                      <span className="text-xs text-gray-500 w-12">P{idx + 1}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-3">
+                                  Click squares or type hex values to customize colors
+                                </p>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex gap-2 p-3 bg-gray-50 rounded-lg">
+                                  {(comparisonPalette === "user" 
+                                    ? userCustomColors 
+                                    : comparisonPalettes[comparisonPalette].colors
+                                  ).map((color, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex-1 h-12 rounded border-2 border-gray-300"
+                                      style={{ backgroundColor: color }}
+                                      title={`Period ${idx + 1}`}
+                                    />
+                                  ))}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                  Each time period will use a distinct color from this palette
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-6 gap-1.5 mb-4">
+                              {colorPresets.map((preset) => (
+                                <button
+                                  key={preset.name}
+                                  onClick={() => setBarColor(preset.color)}
+                                  className={
+                                    "aspect-square rounded border-2 transition-all hover:scale-110 " +
+                                    (barColor === preset.color
+                                      ? "border-gray-900 shadow-md"
+                                      : "border-gray-300")
+                                  }
+                                  style={{
+                                    backgroundColor: preset.color,
+                                    width: "30px",
+                                    height: "30px",
+                                  }}
+                                  title={preset.name}
+                                >
+                                  {barColor === preset.color && (
+                                    <span className="text-white text-xs">✓</span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 mb-4">
+                              <input
+                                type="color"
+                                value={barColor}
+                                onChange={(e) => setBarColor(e.target.value)}
+                                className="h-10 w-16 border border-gray-300 rounded-lg cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={barColor}
+                                onChange={(e) => setBarColor(e.target.value)}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Period Color Transition: {colorTransition}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={colorTransition}
+                                onChange={(e) =>
+                                  setColorTransition(parseInt(e.target.value))
+                                }
+                                className="w-full"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Lower = smoother transition between periods
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("background")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>{emphasis === "throughput" ? "Background Fill" : "Throughput Visibility"}</span>
+                      <span>{expandedSections.background ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.background && (
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {emphasis === "throughput" ? "Background" : "Throughput Bar"} Opacity: {backgroundOpacity}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={backgroundOpacity}
+                          onChange={(e) =>
+                            setBackgroundOpacity(parseInt(e.target.value))
+                          }
+                          className="w-full"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {emphasis === "throughput" 
+                            ? "Adjust background grey bar visibility"
+                            : "Adjust grey throughput bar visibility"
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("layout")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Layout</span>
+                      <span>{expandedSections.layout ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.layout && (
+                      <div className="mt-3 space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Orientation
+                          </label>
+                          <select
+                            value={orientation}
+                            onChange={(e) => setOrientation(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="vertical">Vertical</option>
+                            <option value="horizontal">Horizontal</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Aspect Ratio
+                          </label>
+                          <select
+                            value={aspectRatio}
+                            onChange={(e) => setAspectRatio(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="16:9">16:9 (Widescreen)</option>
+                            <option value="4:3">4:3 (Standard)</option>
+                            <option value="1:1">1:1 (Square)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Chart Padding: {chartPadding}px
+                          </label>
+                          <input
+                            type="range"
+                            min="25"
+                            max="100"
+                            value={chartPadding}
+                            onChange={(e) =>
+                              setChartPadding(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            White space around the chart
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Canvas Width
+                          </label>
+                          <input
+                            type="number"
+                            min="600"
+                            max="2000"
+                            value={canvasWidth}
+                            onChange={(e) =>
+                              setCanvasWidth(
+                                Math.max(
+                                  600,
+                                  Math.min(
+                                    2000,
+                                    parseInt(e.target.value) || 1280
+                                  )
+                                )
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Canvas Height
+                          </label>
+                          <input
+                            type="number"
+                            min="400"
+                            max="2000"
+                            value={canvasHeight}
+                            onChange={(e) =>
+                              setCanvasHeight(
+                                Math.max(
+                                  400,
+                                  Math.min(
+                                    2000,
+                                    parseInt(e.target.value) || 720
+                                  )
+                                )
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          />
+                        </div>
+                        {orientation === "horizontal" && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Stage Labels
+                            </label>
+                            <select
+                              value={stageLabelPosition}
+                              onChange={(e) =>
+                                setStageLabelPosition(e.target.value)
+                              }
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            >
+                              <option value="bottom">Bottom</option>
+                              <option value="top">Top</option>
+                            </select>
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Stage Gap: {stageGap}px
+                          </label>
+                          <input
+                            type="range"
+                            min="5"
+                            max="30"
+                            value={stageGap}
+                            onChange={(e) =>
+                              setStageGap(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Axis Line Thickness: {axisLineWidth}px
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={axisLineWidth}
+                            onChange={(e) =>
+                              setAxisLineWidth(parseInt(e.target.value))
+                            }
+                            className="w-full"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Arrow size adjusts automatically
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("sparklines")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Sparklines</span>
+                      <span>{expandedSections.sparklines ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.sparklines && (
+                      <div className="mt-3">
+                        <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={showSparklines}
+                            onChange={(e) =>
+                              setShowSparklines(e.target.checked)
+                            }
+                            className="w-4 h-4 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700">
+                            Show Sparklines
+                          </span>
+                        </label>
+                        {showSparklines && (
+                          <div className="ml-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Type
+                            </label>
+                            <select
+                              value={sparklineType}
+                              onChange={(e) => setSparklineType(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            >
+                              <option value="volume">Volume</option>
+                              <option value="conversion">
+                                Step Conversion Rate
+                              </option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Display Options Section */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("displayOptions")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Display Options</span>
+                      <span>{expandedSections.displayOptions ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.displayOptions && (
+                      <div className="mt-3 space-y-3">
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={normalizeToHundred}
+                            onChange={(e) =>
+                              setNormalizeToHundred(e.target.checked)
+                            }
+                            className="mt-0.5 w-4 h-4 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-cyan-600">
+                              Normalize to 100%
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              Scale first stage to 100%
+                            </div>
+                          </div>
+                        </label>
+
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={compactNumbers}
+                            onChange={(e) => setCompactNumbers(e.target.checked)}
+                            className="mt-0.5 w-4 h-4 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-cyan-600">
+                              Compact Numbers
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              Use K/M abbreviations
+                            </div>
+                          </div>
+                        </label>
+
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={showLegend}
+                            onChange={(e) => setShowLegend(e.target.checked)}
+                            className="mt-0.5 w-4 h-4 text-cyan-600 rounded focus:ring-2 focus:ring-cyan-500"
+                          />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-cyan-600">
+                              Show Legend
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              Display period labels
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Watermark Section */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSection("watermark")}
+                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-700 uppercase tracking-wide hover:text-cyan-600 transition-colors"
+                    >
+                      <span>Watermark</span>
+                      <span>{expandedSections.watermark ? "▼" : "▶"}</span>
+                    </button>
+                    {expandedSections.watermark && (
+                      <div className="mt-3">
+                        <select
+                          value={userTier}
+                          onChange={(e) => setUserTier(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        >
+                          <option value="free">Free (with watermark)</option>
+                          <option value="pro">Pro (no watermark)</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "data" && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                      Data Source
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-cyan-400 transition-colors">
+                        <input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="csv-upload"
+                        />
+                        <label htmlFor="csv-upload" className="cursor-pointer">
+                          <div className="text-3xl mb-2">📄</div>
+                          <div className="text-sm font-medium text-gray-700">
+                            Upload CSV
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Click to browse
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-white px-2 text-gray-500">
+                            Or
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Sample Data
+                        </label>
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              loadSampleData(e.target.value);
+                              e.target.value = "";
+                            }
+                          }}
+                          value=""
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        >
+                          <option value="">Choose a sample...</option>
+                          <option value="generic">Generic 5-Stage Flow</option>
+                          <option value="ecommerce">E-commerce Funnel</option>
+                          <option value="saas">SaaS Sales Funnel</option>
+                          <option value="marketing">Marketing Campaign</option>
+                          <option value="content">Content/Media Funnel</option>
+                          <option value="mobileApp">Mobile App Funnel</option>
+                          <option value="b2bLeads">B2B Lead Generation</option>
+                          <option value="" disabled>─────────────────</option>
+                          <option value="ageComparison">Age Group Comparison</option>
+                          <option value="abTest">A/B Test Comparison</option>
+                          <option value="deviceComparison">Device Comparison</option>
+                          <option value="channelComparison">Channel Comparison</option>
+                          <option value="timeComparison">Weekday vs Weekend</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {chartConfig && (
+                    <>
+                      <div className="pt-6 border-t border-gray-200">
+                        <h3 className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">
+                          Current Data
+                        </h3>
+                        <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Stages:</span>
+                            <span className="font-medium">
+                              {chartConfig.data.length}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Time Periods:</span>
+                            <span className="font-medium">
+                              {periodNames.length}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowDataTable(true)}
+                          className="w-full mt-3 px-4 py-2 bg-cyan-600 text-white text-sm font-semibold rounded-lg hover:bg-cyan-700 transition-colors"
+                        >
+                          Edit Data
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
