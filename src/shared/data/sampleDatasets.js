@@ -477,6 +477,115 @@ export const sampleDatasets = {
       },
     ],
   },
+
+  // Slope Chart datasets
+  slopeDefault: {
+    name: "Market Share Change",
+    description: "Year-over-year market share change",
+    data: [
+      { Stage: "A", "2015": 20, "2016": 20 },
+      { Stage: "B", "2015": 18, "2016": 19 },
+      { Stage: "C", "2015": 17, "2016": 18 },
+      { Stage: "D", "2015": 17, "2016": 17 },
+      { Stage: "E", "2015": 14, "2016": 13 },
+      { Stage: "F", "2015": 13, "2016": 12 },
+      { Stage: "G", "2015": 12, "2016": 11 },
+      { Stage: "H", "2015": 11, "2016": 8 },
+      { Stage: "I", "2015": 10, "2016": 4 },
+      { Stage: "J", "2015": 7, "2016": 9 },
+    ],
+  },
+
+  slopeRevenue: {
+    name: "Revenue by Product Line",
+    description: "Annual revenue comparison across product categories",
+    data: [
+      { Stage: "Cloud Services", "2023": 45, "2024": 62 },
+      { Stage: "Software Licenses", "2023": 38, "2024": 35 },
+      { Stage: "Consulting", "2023": 28, "2024": 31 },
+      { Stage: "Support & Maintenance", "2023": 22, "2024": 25 },
+      { Stage: "Training", "2023": 15, "2024": 18 },
+      { Stage: "Hardware", "2023": 12, "2024": 9 },
+    ],
+  },
+
+  slopeCustomerSatisfaction: {
+    name: "Customer Satisfaction Scores",
+    description: "NPS scores before and after product improvements",
+    data: [
+      { Stage: "Product Quality", "Before": 72, "After": 85 },
+      { Stage: "Customer Service", "Before": 68, "After": 79 },
+      { Stage: "Ease of Use", "Before": 65, "After": 82 },
+      { Stage: "Value for Money", "Before": 61, "After": 74 },
+      { Stage: "Speed/Performance", "Before": 58, "After": 76 },
+      { Stage: "Documentation", "Before": 52, "After": 68 },
+      { Stage: "Onboarding", "Before": 48, "After": 71 },
+    ],
+  },
+
+  slopeEmployeeMetrics: {
+    name: "Employee Engagement",
+    description: "Engagement scores Q1 vs Q4",
+    data: [
+      { Stage: "Arizona", "Q1": 87, "Q4": 89 },
+      { Stage: "Washington", "Q1": 82, "Q4": 88 },
+      { Stage: "Texas", "Q1": 79, "Q4": 85 },
+      { Stage: "Delaware", "Q1": 78, "Q4": 78 },
+      { Stage: "Nevada", "Q1": 74, "Q4": 71 },
+      { Stage: "Florida", "Q1": 71, "Q4": 68 },
+      { Stage: "Ohio", "Q1": 68, "Q4": 64 },
+    ],
+  },
+
+  slopeWebsiteMetrics: {
+    name: "Website Performance",
+    description: "Key metrics before and after redesign",
+    data: [
+      { Stage: "Page Load Time (s)", "Old Site": 4.2, "New Site": 1.8 },
+      { Stage: "Bounce Rate (%)", "Old Site": 62, "New Site": 38 },
+      { Stage: "Avg Session (min)", "Old Site": 2.4, "New Site": 4.7 },
+      { Stage: "Pages per Session", "Old Site": 3.1, "New Site": 5.8 },
+      { Stage: "Conversion Rate (%)", "Old Site": 2.3, "New Site": 4.9 },
+      { Stage: "Mobile Traffic (%)", "Old Site": 42, "New Site": 68 },
+    ],
+  },
+
+  slopeMarketShare: {
+    name: "Smartphone Market Share",
+    description: "Global market share changes year over year",
+    data: [
+      { Stage: "Apple", "2023": 28, "2024": 26 },
+      { Stage: "Samsung", "2023": 24, "2024": 25 },
+      { Stage: "Xiaomi", "2023": 14, "2024": 16 },
+      { Stage: "OPPO", "2023": 11, "2024": 12 },
+      { Stage: "Vivo", "2023": 9, "2024": 10 },
+      { Stage: "Others", "2023": 14, "2024": 11 },
+    ],
+  },
+
+  slopeEducation: {
+    name: "Student Performance",
+    description: "Test scores before and after intervention program",
+    data: [
+      { Stage: "Mathematics", "Pre-Test": 68, "Post-Test": 82 },
+      { Stage: "Reading", "Pre-Test": 74, "Post-Test": 84 },
+      { Stage: "Writing", "Pre-Test": 71, "Post-Test": 79 },
+      { Stage: "Science", "Pre-Test": 65, "Post-Test": 77 },
+      { Stage: "Social Studies", "Pre-Test": 72, "Post-Test": 78 },
+    ],
+  },
+
+  slopeHealthcare: {
+    name: "Patient Health Outcomes",
+    description: "Health indicators before and after treatment",
+    data: [
+      { Stage: "Blood Pressure", "Baseline": 145, "3 Months": 128 },
+      { Stage: "Cholesterol", "Baseline": 240, "3 Months": 195 },
+      { Stage: "Weight (kg)", "Baseline": 92, "3 Months": 84 },
+      { Stage: "Blood Sugar", "Baseline": 156, "3 Months": 118 },
+      { Stage: "Exercise (min/week)", "Baseline": 45, "3 Months": 180 },
+    ],
+  },
 };
 
 /**

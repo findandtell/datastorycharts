@@ -28,112 +28,162 @@ export const comparisonPalettes = {
     name: "Professional",
     description: "Classic business colors",
     colors: [
-      "#1e40af",
-      "#0d9488",
-      "#991b1b",
-      "#d97706",
-      "#475569",
-      "#64748b",
-      "#0891b2",
-      "#7c2d12",
+      "#1e40af", // Navy blue
+      "#0d9488", // Teal
+      "#991b1b", // Dark red
+      "#d97706", // Amber
+      "#475569", // Slate
+      "#64748b", // Light slate
+      "#0891b2", // Cyan
+      "#7c2d12", // Brown
+      "#7c3aed", // Purple
+      "#059669", // Emerald
+      "#dc2626", // Red
+      "#4f46e5", // Indigo
     ],
   },
   vibrant: {
     name: "Vibrant",
     description: "Bold and energetic colors",
     colors: [
-      "#2563eb",
-      "#ea580c",
-      "#16a34a",
-      "#9333ea",
-      "#dc2626",
-      "#0891b2",
-      "#f59e0b",
-      "#ec4899",
+      "#2563eb", // Blue
+      "#ea580c", // Orange
+      "#16a34a", // Green
+      "#9333ea", // Purple
+      "#dc2626", // Red
+      "#0891b2", // Cyan
+      "#f59e0b", // Amber
+      "#ec4899", // Pink
+      "#14b8a6", // Teal
+      "#8b5cf6", // Violet
+      "#f97316", // Dark orange
+      "#10b981", // Emerald
     ],
   },
   corporate: {
     name: "Corporate",
     description: "Conservative corporate palette",
     colors: [
-      "#1e3a8a",
-      "#0284c7",
-      "#065f46",
-      "#9a3412",
-      "#374151",
-      "#475569",
-      "#0e7490",
-      "#713f12",
+      "#1e3a8a", // Dark blue
+      "#0284c7", // Sky blue
+      "#065f46", // Dark green
+      "#9a3412", // Dark orange
+      "#374151", // Gray
+      "#475569", // Slate
+      "#0e7490", // Cyan
+      "#713f12", // Brown
+      "#1e40af", // Navy
+      "#047857", // Emerald
+      "#92400e", // Amber
+      "#6b7280", // Medium gray
     ],
   },
   accessible: {
     name: "Accessible",
     description: "High contrast, colorblind-friendly",
     colors: [
-      "#0066cc",
-      "#ff6600",
-      "#00b8d4",
-      "#d81b60",
-      "#fdd835",
-      "#7b1fa2",
-      "#00897b",
-      "#c62828",
+      "#0066cc", // Blue
+      "#ff6600", // Orange
+      "#00b8d4", // Cyan
+      "#d81b60", // Pink
+      "#fdd835", // Yellow
+      "#7b1fa2", // Purple
+      "#00897b", // Teal
+      "#c62828", // Red
+      "#5e35b1", // Deep purple
+      "#00acc1", // Light cyan
+      "#ff8f00", // Amber
+      "#e53935", // Bright red
     ],
   },
   elegant: {
     name: "Elegant",
     description: "Sophisticated and refined",
     colors: [
-      "#4f46e5",
-      "#059669",
-      "#e11d48",
-      "#f59e0b",
-      "#64748b",
-      "#7c3aed",
-      "#0d9488",
-      "#dc2626",
+      "#4f46e5", // Indigo
+      "#059669", // Emerald
+      "#e11d48", // Rose
+      "#f59e0b", // Amber
+      "#64748b", // Slate
+      "#7c3aed", // Violet
+      "#0d9488", // Teal
+      "#dc2626", // Red
+      "#8b5cf6", // Purple
+      "#10b981", // Green
+      "#f43f5e", // Pink
+      "#475569", // Dark slate
     ],
   },
   pastel: {
     name: "Pastel",
     description: "Soft and gentle tones",
     colors: [
-      "#93c5fd",
-      "#fbbf24",
-      "#86efac",
-      "#c084fc",
-      "#fca5a5",
-      "#67e8f9",
-      "#fdba74",
-      "#f9a8d4",
+      "#93c5fd", // Light blue
+      "#fbbf24", // Yellow
+      "#86efac", // Light green
+      "#c084fc", // Light purple
+      "#fca5a5", // Light red
+      "#67e8f9", // Light cyan
+      "#fdba74", // Light orange
+      "#f9a8d4", // Light pink
+      "#a5b4fc", // Light indigo
+      "#bef264", // Lime
+      "#fcd34d", // Light amber
+      "#d8b4fe", // Light violet
     ],
   },
   earth: {
     name: "Earth",
     description: "Natural, organic tones",
     colors: [
-      "#78716c",
-      "#a16207",
-      "#15803d",
-      "#be123c",
-      "#92400e",
-      "#166534",
-      "#b45309",
-      "#831843",
+      "#78716c", // Stone
+      "#a16207", // Yellow
+      "#15803d", // Green
+      "#be123c", // Rose
+      "#92400e", // Amber
+      "#166534", // Dark green
+      "#b45309", // Orange
+      "#831843", // Pink
+      "#6b7280", // Gray
+      "#ca8a04", // Yellow
+      "#14532d", // Forest green
+      "#9f1239", // Dark rose
     ],
   },
   ocean: {
     name: "Ocean",
     description: "Cool blues and teals",
     colors: [
-      "#0369a1",
-      "#0891b2",
-      "#0e7490",
-      "#155e75",
-      "#1e40af",
-      "#0284c7",
-      "#0c4a6e",
-      "#164e63",
+      "#0369a1", // Blue
+      "#0891b2", // Cyan
+      "#0e7490", // Teal
+      "#155e75", // Dark cyan
+      "#1e40af", // Navy
+      "#0284c7", // Sky
+      "#0c4a6e", // Dark blue
+      "#164e63", // Dark teal
+      "#075985", // Medium blue
+      "#06b6d4", // Bright cyan
+      "#1e3a8a", // Deep blue
+      "#0d9488", // Teal green
+    ],
+  },
+  monochrome: {
+    name: "Monochrome Grey",
+    description: "Shades of grey from light to dark",
+    colors: [
+      "#e5e7eb", // Very light gray
+      "#d1d5db", // Light gray
+      "#c4c4c4", // Light-medium gray
+      "#9ca3af", // Medium-light gray
+      "#6b7280", // Medium gray
+      "#52525b", // Medium-dark gray
+      "#4b5563", // Dark gray
+      "#374151", // Darker gray
+      "#404040", // Very dark gray
+      "#2d2d2d", // Near black
+      "#1f2937", // Almost black
+      "#111827", // Black
     ],
   },
   user: {
@@ -153,7 +203,7 @@ export const getColorFromPalette = (paletteKey, index, userColors = []) => {
 
   const palette = comparisonPalettes[paletteKey];
   if (!palette || !palette.colors.length) {
-    return comparisonPalettes.professional.colors[index % 8];
+    return comparisonPalettes.professional.colors[index % 12];
   }
 
   return palette.colors[index % palette.colors.length];
@@ -191,4 +241,8 @@ export const defaultUserColors = [
   "#7c3aed",
   "#059669",
   "#dc2626",
+  "#0891b2",
+  "#f59e0b",
+  "#64748b",
+  "#4f46e5",
 ];

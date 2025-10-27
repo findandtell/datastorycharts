@@ -7,13 +7,15 @@ import { defaultUserColors } from "../design-system/colorPalettes";
  */
 export const useStyleSettings = (initialTheme = theme) => {
   // Typography
-  const [title, setTitle] = useState("Marketing & Acquisition Funnel");
-  const [subtitle, setSubtitle] = useState("Tracking 3 periods across 5 conversion stages");
+  const [title, setTitle] = useState("Revenue by Product Line");
+  const [subtitle, setSubtitle] = useState("Annual revenue comparison across product categories (2023 vs 2024)");
+  const [titleAlignment, setTitleAlignment] = useState("left"); // 'left' or 'center'
   const [fontFamily, setFontFamily] = useState(initialTheme.typography.families[0]);
   const [titleFontSize, setTitleFontSize] = useState(initialTheme.typography.sizes.title);
   const [subtitleFontSize, setSubtitleFontSize] = useState(initialTheme.typography.sizes.subtitle);
-  const [segmentLabelFontSize, setSegmentLabelFontSize] = useState(initialTheme.typography.sizes.segmentLabel);
-  const [metricLabelFontSize, setMetricLabelFontSize] = useState(initialTheme.typography.sizes.metricLabel);
+  const [segmentLabelFontSize, setSegmentLabelFontSize] = useState(22);
+  const [metricLabelFontSize, setMetricLabelFontSize] = useState(19);
+  const [periodLabelFontSize, setPeriodLabelFontSize] = useState(24); // Period label font size for Slope Chart
   const [legendFontSize, setLegendFontSize] = useState(initialTheme.typography.sizes.legend);
   const [conversionLabelFontSize, setConversionLabelFontSize] = useState(initialTheme.typography.sizes.conversionLabel);
 
@@ -47,6 +49,34 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [showSparklines, setShowSparklines] = useState(false);
   const [sparklineType, setSparklineType] = useState("volume");
   const [userTier, setUserTier] = useState("pro");
+
+  // Theme settings
+  const [darkMode, setDarkMode] = useState(false); // Light/Dark mode toggle
+
+  // Slope Chart specific settings
+  const [colorMode, setColorMode] = useState("category"); // 'category', 'trend', 'custom', 'gradient'
+  const [lineThickness, setLineThickness] = useState(3);
+  const [lineOpacity, setLineOpacity] = useState(1.0);
+  const [lineSaturation, setLineSaturation] = useState(100); // 0-100%, where 100% = full color, 0% = grey
+  const [endpointSize, setEndpointSize] = useState(6);
+  const [endpointStyle, setEndpointStyle] = useState("filled"); // 'filled' or 'outlined'
+  const [labelPosition, setLabelPosition] = useState("left"); // 'left' or 'right'
+  const [showCategoryLabels, setShowCategoryLabels] = useState(true);
+  const [showValueLabels, setShowValueLabels] = useState(true);
+  const [labelFormat, setLabelFormat] = useState("value"); // 'value', 'percentage', 'both'
+  const [emphasizedLines, setEmphasizedLines] = useState([]);
+  const [increaseColor, setIncreaseColor] = useState("#10b981");
+  const [decreaseColor, setDecreaseColor] = useState("#ef4444");
+  const [noChangeColor, setNoChangeColor] = useState("#6b7280");
+  const [startColor, setStartColor] = useState("#1e40af");
+  const [endColor, setEndColor] = useState("#10b981");
+  const [periodSpacing, setPeriodSpacing] = useState(400);
+  const [periodHeight, setPeriodHeight] = useState(700); // Controls vertical spacing of chart content
+  const [periodLabelPosition, setPeriodLabelPosition] = useState("below"); // 'above' or 'below'
+  const [slopeAxisLineColor, setSlopeAxisLineColor] = useState("#ababab");
+  const [slopeAxisLineWidth, setSlopeAxisLineWidth] = useState(1);
+  const [slopeAxisLineStyle, setSlopeAxisLineStyle] = useState("solid"); // 'solid', 'dashed', 'dotted'
+  const [axisEnds, setAxisEnds] = useState("none"); // 'none', 't-end'
 
   /**
    * Update canvas dimensions based on aspect ratio
@@ -97,20 +127,25 @@ export const useStyleSettings = (initialTheme = theme) => {
   }, [initialTheme]);
 
   /**
-   * Export settings as JSON
+   * Export settings as JSON (complete structure for cross-chart compatibility)
    */
   const exportSettings = useCallback(() => {
     return {
+      styleVersion: "1.0",
+      appVersion: "2.0.0",
       typography: {
         title,
         subtitle,
+        titleAlignment,
         fontFamily,
         titleFontSize,
         subtitleFontSize,
         segmentLabelFontSize,
         metricLabelFontSize,
+        periodLabelFontSize,
         legendFontSize,
         conversionLabelFontSize,
+        inStageLabelFontSize,
       },
       colors: {
         barColor,
@@ -130,6 +165,7 @@ export const useStyleSettings = (initialTheme = theme) => {
       visual: {
         axisLineWidth,
         backgroundOpacity,
+        darkMode,
       },
       display: {
         emphasis,
@@ -137,42 +173,88 @@ export const useStyleSettings = (initialTheme = theme) => {
         normalizeToHundred,
         compactNumbers,
         showLegend,
+        legendPosition,
         showSparklines,
         sparklineType,
         userTier,
       },
+      chartSpecific: {
+        slope: {
+          colorMode,
+          lineThickness,
+          lineOpacity,
+          lineSaturation,
+          endpointSize,
+          endpointStyle,
+          labelPosition,
+          showCategoryLabels,
+          showValueLabels,
+          labelFormat,
+          increaseColor,
+          decreaseColor,
+          noChangeColor,
+          startColor,
+          endColor,
+          periodSpacing,
+          periodHeight,
+          periodLabelPosition,
+          slopeAxisLineColor,
+          slopeAxisLineWidth,
+          slopeAxisLineStyle,
+          axisEnds,
+        },
+        funnel: {
+          // Funnel-specific settings will be here
+        },
+      },
     };
   }, [
-    title, subtitle, fontFamily, titleFontSize, subtitleFontSize,
-    segmentLabelFontSize, metricLabelFontSize, legendFontSize, conversionLabelFontSize,
+    title, subtitle, titleAlignment, fontFamily, titleFontSize, subtitleFontSize,
+    segmentLabelFontSize, metricLabelFontSize, periodLabelFontSize, legendFontSize,
+    conversionLabelFontSize, inStageLabelFontSize,
     barColor, colorTransition, comparisonPalette, userCustomColors,
     orientation, aspectRatio, canvasWidth, canvasHeight, chartPadding, stageGap, stageLabelPosition,
-    axisLineWidth, backgroundOpacity,
-    emphasis, metricEmphasis, normalizeToHundred, compactNumbers, showLegend,
+    axisLineWidth, backgroundOpacity, darkMode,
+    emphasis, metricEmphasis, normalizeToHundred, compactNumbers, showLegend, legendPosition,
     showSparklines, sparklineType, userTier,
+    colorMode, lineThickness, lineOpacity, lineSaturation, endpointSize, endpointStyle,
+    labelPosition, showCategoryLabels, showValueLabels, labelFormat,
+    increaseColor, decreaseColor, noChangeColor, startColor, endColor,
+    periodSpacing, periodHeight, periodLabelPosition,
+    slopeAxisLineColor, slopeAxisLineWidth, slopeAxisLineStyle, axisEnds,
   ]);
 
   /**
-   * Import settings from JSON
+   * Import settings from JSON with smart cross-chart compatibility
+   * @param {Object} settings - The imported settings object
+   * @param {string} currentChartType - Current chart type ('slope' or 'funnel')
    */
-  const importSettings = useCallback((settings) => {
+  const importSettings = useCallback((settings, currentChartType = 'slope') => {
+    // Typography (universal - applies to all charts)
     if (settings.typography) {
       if (settings.typography.title !== undefined) setTitle(settings.typography.title);
       if (settings.typography.subtitle !== undefined) setSubtitle(settings.typography.subtitle);
+      if (settings.typography.titleAlignment !== undefined) setTitleAlignment(settings.typography.titleAlignment);
       if (settings.typography.fontFamily !== undefined) setFontFamily(settings.typography.fontFamily);
       if (settings.typography.titleFontSize !== undefined) setTitleFontSize(settings.typography.titleFontSize);
       if (settings.typography.subtitleFontSize !== undefined) setSubtitleFontSize(settings.typography.subtitleFontSize);
       if (settings.typography.segmentLabelFontSize !== undefined) setSegmentLabelFontSize(settings.typography.segmentLabelFontSize);
       if (settings.typography.metricLabelFontSize !== undefined) setMetricLabelFontSize(settings.typography.metricLabelFontSize);
+      if (settings.typography.periodLabelFontSize !== undefined) setPeriodLabelFontSize(settings.typography.periodLabelFontSize);
       if (settings.typography.legendFontSize !== undefined) setLegendFontSize(settings.typography.legendFontSize);
       if (settings.typography.conversionLabelFontSize !== undefined) setConversionLabelFontSize(settings.typography.conversionLabelFontSize);
+      if (settings.typography.inStageLabelFontSize !== undefined) setInStageLabelFontSize(settings.typography.inStageLabelFontSize);
     }
+
+    // Colors (universal - applies to all charts)
     if (settings.colors) {
       if (settings.colors.barColor !== undefined) setBarColor(settings.colors.barColor);
       if (settings.colors.colorTransition !== undefined) setColorTransition(settings.colors.colorTransition);
       if (settings.colors.comparisonPalette !== undefined) setComparisonPalette(settings.colors.comparisonPalette);
       if (settings.colors.userCustomColors !== undefined) setUserCustomColors(settings.colors.userCustomColors);
     }
+
+    // Layout (universal - applies to all charts)
     if (settings.layout) {
       if (settings.layout.orientation !== undefined) setOrientation(settings.layout.orientation);
       if (settings.layout.aspectRatio !== undefined) setAspectRatio(settings.layout.aspectRatio);
@@ -182,19 +264,57 @@ export const useStyleSettings = (initialTheme = theme) => {
       if (settings.layout.stageGap !== undefined) setStageGap(settings.layout.stageGap);
       if (settings.layout.stageLabelPosition !== undefined) setStageLabelPosition(settings.layout.stageLabelPosition);
     }
+
+    // Visual (universal - applies to all charts)
     if (settings.visual) {
       if (settings.visual.axisLineWidth !== undefined) setAxisLineWidth(settings.visual.axisLineWidth);
       if (settings.visual.backgroundOpacity !== undefined) setBackgroundOpacity(settings.visual.backgroundOpacity);
+      if (settings.visual.darkMode !== undefined) setDarkMode(settings.visual.darkMode);
     }
+
+    // Display (universal - applies to all charts)
     if (settings.display) {
       if (settings.display.emphasis !== undefined) setEmphasis(settings.display.emphasis);
       if (settings.display.metricEmphasis !== undefined) setMetricEmphasis(settings.display.metricEmphasis);
       if (settings.display.normalizeToHundred !== undefined) setNormalizeToHundred(settings.display.normalizeToHundred);
       if (settings.display.compactNumbers !== undefined) setCompactNumbers(settings.display.compactNumbers);
       if (settings.display.showLegend !== undefined) setShowLegend(settings.display.showLegend);
+      if (settings.display.legendPosition !== undefined) setLegendPosition(settings.display.legendPosition);
       if (settings.display.showSparklines !== undefined) setShowSparklines(settings.display.showSparklines);
       if (settings.display.sparklineType !== undefined) setSparklineType(settings.display.sparklineType);
       if (settings.display.userTier !== undefined) setUserTier(settings.display.userTier);
+    }
+
+    // Chart-specific settings (smart import based on current chart type)
+    if (settings.chartSpecific) {
+      if (currentChartType === 'slope' && settings.chartSpecific.slope) {
+        const slopeSettings = settings.chartSpecific.slope;
+        if (slopeSettings.colorMode !== undefined) setColorMode(slopeSettings.colorMode);
+        if (slopeSettings.lineThickness !== undefined) setLineThickness(slopeSettings.lineThickness);
+        if (slopeSettings.lineOpacity !== undefined) setLineOpacity(slopeSettings.lineOpacity);
+        if (slopeSettings.lineSaturation !== undefined) setLineSaturation(slopeSettings.lineSaturation);
+        if (slopeSettings.endpointSize !== undefined) setEndpointSize(slopeSettings.endpointSize);
+        if (slopeSettings.endpointStyle !== undefined) setEndpointStyle(slopeSettings.endpointStyle);
+        if (slopeSettings.labelPosition !== undefined) setLabelPosition(slopeSettings.labelPosition);
+        if (slopeSettings.showCategoryLabels !== undefined) setShowCategoryLabels(slopeSettings.showCategoryLabels);
+        if (slopeSettings.showValueLabels !== undefined) setShowValueLabels(slopeSettings.showValueLabels);
+        if (slopeSettings.labelFormat !== undefined) setLabelFormat(slopeSettings.labelFormat);
+        if (slopeSettings.increaseColor !== undefined) setIncreaseColor(slopeSettings.increaseColor);
+        if (slopeSettings.decreaseColor !== undefined) setDecreaseColor(slopeSettings.decreaseColor);
+        if (slopeSettings.noChangeColor !== undefined) setNoChangeColor(slopeSettings.noChangeColor);
+        if (slopeSettings.startColor !== undefined) setStartColor(slopeSettings.startColor);
+        if (slopeSettings.endColor !== undefined) setEndColor(slopeSettings.endColor);
+        if (slopeSettings.periodSpacing !== undefined) setPeriodSpacing(slopeSettings.periodSpacing);
+        if (slopeSettings.periodHeight !== undefined) setPeriodHeight(slopeSettings.periodHeight);
+        if (slopeSettings.periodLabelPosition !== undefined) setPeriodLabelPosition(slopeSettings.periodLabelPosition);
+        if (slopeSettings.slopeAxisLineColor !== undefined) setSlopeAxisLineColor(slopeSettings.slopeAxisLineColor);
+        if (slopeSettings.slopeAxisLineWidth !== undefined) setSlopeAxisLineWidth(slopeSettings.slopeAxisLineWidth);
+        if (slopeSettings.slopeAxisLineStyle !== undefined) setSlopeAxisLineStyle(slopeSettings.slopeAxisLineStyle);
+        if (slopeSettings.axisEnds !== undefined) setAxisEnds(slopeSettings.axisEnds);
+      } else if (currentChartType === 'funnel' && settings.chartSpecific.funnel) {
+        // Apply funnel-specific settings when importing to a funnel chart
+        // This will be populated when funnel chart settings are defined
+      }
     }
   }, []);
 
@@ -204,6 +324,8 @@ export const useStyleSettings = (initialTheme = theme) => {
     setTitle,
     subtitle,
     setSubtitle,
+    titleAlignment,
+    setTitleAlignment,
     fontFamily,
     setFontFamily,
     titleFontSize,
@@ -214,6 +336,8 @@ export const useStyleSettings = (initialTheme = theme) => {
     setSegmentLabelFontSize,
     metricLabelFontSize,
     setMetricLabelFontSize,
+    periodLabelFontSize,
+    setPeriodLabelFontSize,
     legendFontSize,
     setLegendFontSize,
     conversionLabelFontSize,
@@ -272,6 +396,58 @@ export const useStyleSettings = (initialTheme = theme) => {
     setSparklineType,
     userTier,
     setUserTier,
+
+    // Theme
+    darkMode,
+    setDarkMode,
+
+    // Slope Chart specific
+    colorMode,
+    setColorMode,
+    lineThickness,
+    setLineThickness,
+    lineOpacity,
+    setLineOpacity,
+    lineSaturation,
+    setLineSaturation,
+    endpointSize,
+    setEndpointSize,
+    endpointStyle,
+    setEndpointStyle,
+    labelPosition,
+    setLabelPosition,
+    showCategoryLabels,
+    setShowCategoryLabels,
+    showValueLabels,
+    setShowValueLabels,
+    labelFormat,
+    setLabelFormat,
+    emphasizedLines,
+    setEmphasizedLines,
+    increaseColor,
+    setIncreaseColor,
+    decreaseColor,
+    setDecreaseColor,
+    noChangeColor,
+    setNoChangeColor,
+    startColor,
+    setStartColor,
+    endColor,
+    setEndColor,
+    periodSpacing,
+    setPeriodSpacing,
+    periodHeight,
+    setPeriodHeight,
+    periodLabelPosition,
+    setPeriodLabelPosition,
+    slopeAxisLineColor,
+    setSlopeAxisLineColor,
+    slopeAxisLineWidth,
+    setSlopeAxisLineWidth,
+    slopeAxisLineStyle,
+    setSlopeAxisLineStyle,
+    axisEnds,
+    setAxisEnds,
 
     // Actions
     updateAspectRatio,

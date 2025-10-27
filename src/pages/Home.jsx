@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChartKeys, getChart } from '../charts/registry';
+import FindTellLogo from '../shared/FindTellLogo';
 
 /**
  * Home Page - Chart Gallery
@@ -19,36 +20,20 @@ export default function Home() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-8 py-12">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center">
-              <span className="text-2xl">📊</span>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-                Data Story Charts
-              </h1>
-            </div>
+          <div className="flex flex-col items-center mb-6">
+            <img
+              src="/findandtell_logo.png"
+              alt="Find&Tell"
+              className="h-20 mb-4"
+            />
+            <h1 className="text-4xl font-bold text-gray-900">
+              Data Story Charts
+            </h1>
           </div>
-          <p className="text-xl text-gray-600 max-w-3xl">
+          <p className="text-xl text-findtell-gray max-w-3xl mx-auto text-center">
             Create clean and clear data visualizations to be used in your data stories.
-            
-          </p>
 
-          {/* Feature Badges */}
-          <div className="flex flex-wrap gap-3 mt-6">
-            <div className="px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-sm font-medium text-green-700">
-              ✓ Export PNG & SVG
-            </div>
-            <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-700">
-              ✓ Comparison Mode
-            </div>
-            <div className="px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg text-sm font-medium text-purple-700">
-              ✓ Real-time Preview
-            </div>
-            <div className="px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg text-sm font-medium text-orange-700">
-              ✓ Custom Styling
-            </div>
-          </div>
+          </p>
         </div>
       </div>
 
@@ -70,7 +55,7 @@ export default function Home() {
               <div
                 key={chartKey}
                 onClick={() => handleChartSelect(chartKey)}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer border-2 border-gray-100 hover:border-cyan-400 overflow-hidden group transform hover:-translate-y-1"
+                className="findtell-card cursor-pointer overflow-hidden group transform hover:-translate-y-1 border-2 hover:border-findtell-blue"
               >
                 {/* Chart Preview/Thumbnail */}
                 <div className="h-56 bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50 flex items-center justify-center border-b-2 border-gray-100 group-hover:from-cyan-100 group-hover:via-blue-100 group-hover:to-indigo-100 transition-all duration-300 relative overflow-hidden">
@@ -85,7 +70,7 @@ export default function Home() {
 
                 {/* Chart Info */}
                 <div className="p-7">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-cyan-600 transition-colors">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-findtell-blue transition-colors">
                     {chart.name}
                   </h3>
                   <p className="text-gray-600 text-base mb-5 leading-relaxed">
@@ -108,7 +93,7 @@ export default function Home() {
                   </div>
 
                   {/* CTA Button */}
-                  <button className="w-full px-5 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold rounded-xl hover:from-cyan-700 hover:to-blue-700 transition-all duration-300 group-hover:shadow-lg transform group-hover:scale-[1.02]">
+                  <button className="w-full findtell-btn-primary">
                     Create Chart →
                   </button>
                 </div>

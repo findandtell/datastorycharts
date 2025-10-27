@@ -4,6 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Find&Tell Brand Variables */
+:root {
+  --findtell-navy: #1e3a8a;
+  --findtell-blue: #0ea5e9;
+  --findtell-purple: #a855f7;
+  --findtell-gray: #6b7280;
+  --findtell-light-gray: #f3f4f6;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -20,4 +29,34 @@ code {
 
 * {
   box-sizing: border-box;
+}
+
+/* Find&Tell Brand Utility Classes */
+@layer components {
+  .findtell-gradient {
+    background: linear-gradient(135deg, var(--findtell-navy) 0%, var(--findtell-blue) 50%, var(--findtell-purple) 100%);
+  }
+
+  .findtell-gradient-text {
+    background: linear-gradient(135deg, var(--findtell-navy) 0%, var(--findtell-blue) 50%, var(--findtell-purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .findtell-btn-primary {
+    @apply bg-findtell-navy hover:bg-findtell-blue text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300;
+  }
+
+  .findtell-btn-secondary {
+    @apply bg-findtell-purple hover:bg-findtell-blue text-white font-semibold py-2 px-6 rounded-lg transition-colors duration-300;
+  }
+
+  .findtell-card {
+    @apply bg-white rounded-lg shadow-lg border border-gray-200 hover:shadow-xl transition-shadow duration-300;
+  }
+
+  .findtell-link {
+    @apply text-findtell-blue hover:text-findtell-purple transition-colors duration-200 underline;
+  }
 }

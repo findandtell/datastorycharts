@@ -3,12 +3,25 @@ import { getSampleDataset, isComparisonDataset } from "../data/sampleDatasets";
 import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtils";
 
 /**
+ * Get default dataset key based on chart type
+ */
+const getDefaultDatasetKey = (chartType) => {
+  return chartType === 'slope' ? 'slopeRevenue' : 'generic';
+};
+
+/**
  * Custom hook for managing chart data
  */
-export const useChartData = () => {
-  const [data, setData] = useState(null);
-  const [periodNames, setPeriodNames] = useState([]);
-  const [editableData, setEditableData] = useState([]);
+export const useChartData = (chartType = 'funnel') => {
+  // Load default dataset based on chart type
+  const defaultDatasetKey = getDefaultDatasetKey(chartType);
+  const defaultDataset = getSampleDataset(defaultDatasetKey);
+  const defaultChartData = defaultDataset?.data || null;
+  const defaultPeriods = defaultChartData ? Object.keys(defaultChartData[0]).filter((key) => key !== "Stage") : [];
+
+  const [data, setData] = useState(defaultChartData);
+  const [periodNames, setPeriodNames] = useState(defaultPeriods);
+  const [editableData, setEditableData] = useState(defaultChartData ? JSON.parse(JSON.stringify(defaultChartData)) : []);
   const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [error, setError] = useState(null);
 
@@ -212,10 +225,12 @@ export const useChartData = () => {
   }, []);
 
   /**
-   * Apply edited data to main data
+   * Apply edited data to main data (filtering out hidden rows)
    */
   const applyEdits = useCallback(() => {
-    setData(JSON.parse(JSON.stringify(editableData)));
+    // Filter out rows where hidden is true
+    const visibleData = editableData.filter(row => !row.hidden);
+    setData(JSON.parse(JSON.stringify(visibleData)));
   }, [editableData]);
 
   /**
@@ -254,12 +269,38 @@ export const useChartData = () => {
     if (!data) return [];
     const row = data.find((r) => r.Stage === stageName);
     if (!row) return [];
-    
+
     return periodNames.map((period) => ({
       period,
       value: row[period] || 0,
     }));
   }, [data, periodNames]);
+
+  /**
+   * Sort stages by value in a specific period
+   */
+  const sortByPeriod = useCallback((periodName, ascending = false) => {
+    setEditableData((prev) => {
+      const sorted = [...prev].sort((a, b) => {
+        const valueA = a[periodName] || 0;
+        const valueB = b[periodName] || 0;
+        return ascending ? valueA - valueB : valueB - valueA;
+      });
+      return sorted;
+    });
+  }, []);
+
+  /**
+   * Reorder stages (for drag and drop)
+   */
+  const reorderStages = useCallback((fromIndex, toIndex) => {
+    setEditableData((prev) => {
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated;
+    });
+  }, []);
 
   return {
     // State
@@ -281,6 +322,8 @@ export const useChartData = () => {
     addStage,
     removeStage,
     reorderPeriods,
+    reorderStages,
+    sortByPeriod,
     toggleComparisonMode,
     applyEdits,
     resetEdits,

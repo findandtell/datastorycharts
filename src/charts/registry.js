@@ -11,6 +11,7 @@
 
 // Import chart components
 import FunnelChart from './FunnelChart/FunnelChart';
+import SlopeChart from './SlopeChart/SlopeChart';
 // import BarChart from './BarChart/BarChart';
 // import LineChart from './LineChart/LineChart';
 // import SankeyChart from './SankeyChart/SankeyChart';
@@ -36,6 +37,20 @@ export const chartRegistry = {
     defaultSettings: {
       orientation: 'vertical',
       emphasis: 'throughput',
+    },
+  },
+
+  slope: {
+    name: 'Slope Chart',
+    component: SlopeChart,
+    icon: '📈',
+    description: 'Show change between two time periods',
+    supportsComparison: false,
+    category: 'comparison',
+    defaultSettings: {
+      colorMode: 'category',
+      labelPosition: 'left',
+      lineThickness: 3,
     },
   },
 
