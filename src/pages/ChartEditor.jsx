@@ -8,6 +8,7 @@ import { exportAsPNG, exportAsSVG } from '../shared/utils/exportHelpers';
 import { downloadStyleFile, uploadStyleFile, generateStyleName } from '../shared/utils/styleUtils';
 import FunnelChart from '../charts/FunnelChart/FunnelChart';
 import SlopeChart from '../charts/SlopeChart/SlopeChart';
+import BarChart from '../charts/BarChart/BarChart';
 
 /**
  * Chart Editor Page
@@ -24,6 +25,7 @@ export default function ChartEditor() {
   const [showDataTable, setShowDataTable] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     chartType: true,
+    chartSettings: true,
     typography: false,
     colors: false,
     background: false,
@@ -65,7 +67,14 @@ export default function ChartEditor() {
   useEffect(() => {
     if (!chartData.hasData) {
       // Load appropriate sample data based on chart type
-      const sampleDataKey = chartType === 'slope' ? 'slopeDefault' : 'mobileApp';
+      let sampleDataKey;
+      if (chartType === 'slope') {
+        sampleDataKey = 'slopeDefault';
+      } else if (chartType === 'bar') {
+        sampleDataKey = 'barDefault';
+      } else {
+        sampleDataKey = 'mobileApp';
+      }
       chartData.loadSampleData(sampleDataKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -248,10 +257,12 @@ export default function ChartEditor() {
     showAxisLines: true,
     periodSpacing: styleSettings.periodSpacing,
     axisLineColor: styleSettings.darkMode ? '#6b7280' : styleSettings.slopeAxisLineColor,
-    axisLineWidth: styleSettings.slopeAxisLineWidth,
     axisLineStyle: styleSettings.slopeAxisLineStyle,
     axisEnds: styleSettings.axisEnds,
     darkMode: styleSettings.darkMode,
+
+    // Bar Chart specific settings
+    barMode: styleSettings.barMode,
   };
 
   // Render chart component based on type
@@ -275,6 +286,14 @@ export default function ChartEditor() {
             periodNames={chartData.periodNames}
             styleSettings={chartStyleSettings}
             onLineClick={handleSlopeLineClick}
+          />
+        );
+      case 'bar':
+        return (
+          <BarChart
+            data={chartData.data}
+            periodNames={chartData.periodNames}
+            styleSettings={chartStyleSettings}
           />
         );
       default:
@@ -412,6 +431,7 @@ export default function ChartEditor() {
                   >
                     <EditDataTable
                       chartData={chartData}
+                      chartType={chartType}
                       onClose={() => setShowDataTable(false)}
                     />
                   </div>
@@ -537,11 +557,12 @@ export default function ChartEditor() {
  */
 function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, onSaveStyle, onImportStyle }) {
   const isSlopeChart = chartType === 'slope';
+  const isBarChart = chartType === 'bar';
 
   return (
     <div className="space-y-4">
       {/* Chart Type Section - Only for Funnel Chart */}
-      {!isSlopeChart && (
+      {!isSlopeChart && !isBarChart && (
         <CollapsibleSection
           title="Chart Type"
           isExpanded={expandedSections.chartType}
@@ -1142,6 +1163,98 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </button>
                 </div>
               )}
+            </div>
+          </CollapsibleSection>
+        </>
+      )}
+
+      {/* Bar Chart Specific Sections */}
+      {isBarChart && (
+        <>
+          {/* Bar Chart Settings */}
+          <CollapsibleSection
+            title="Chart Settings"
+            isExpanded={expandedSections.chartSettings}
+            onToggle={() => toggleSection('chartSettings')}
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Orientation
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => styleSettings.setOrientation('vertical')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.orientation === 'vertical'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Vertical
+                  </button>
+                  <button
+                    onClick={() => styleSettings.setOrientation('horizontal')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.orientation === 'horizontal'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Horizontal
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Bar Display Mode
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => styleSettings.setBarMode('grouped')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.barMode === 'grouped'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Grouped
+                  </button>
+                  <button
+                    onClick={() => styleSettings.setBarMode('stacked')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.barMode === 'stacked'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Stacked
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {styleSettings.barMode === 'grouped'
+                    ? 'Display bars side by side for each category'
+                    : 'Stack bars on top of each other for cumulative values'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Color Palette
+                </label>
+                <select
+                  value={styleSettings.comparisonPalette}
+                  onChange={(e) => styleSettings.setComparisonPalette(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  {Object.entries(comparisonPalettes).map(([key, palette]) => (
+                    <option key={key} value={key}>
+                      {palette.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </CollapsibleSection>
         </>
@@ -1964,9 +2077,14 @@ function DataTabContent({ chartData, chartType }) {
 /**
  * Edit Data Table Component (for flip card)
  */
-function EditDataTable({ chartData, onClose }) {
+function EditDataTable({ chartData, chartType, onClose }) {
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newStageName, setNewStageName] = useState('');
+
+  // Chart-specific labels
+  const isBarChart = chartType === 'bar';
+  const stageLabel = isBarChart ? 'Category' : 'Stage';
+  const periodLabel = isBarChart ? 'Value' : 'Period';
   const [draggedColumn, setDraggedColumn] = useState(null);
   const [draggedRow, setDraggedRow] = useState(null);
 
@@ -2053,14 +2171,14 @@ function EditDataTable({ chartData, onClose }) {
           value={newPeriodName}
           onChange={(e) => setNewPeriodName(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleAddPeriod()}
-          placeholder="New period name..."
+          placeholder={`New ${periodLabel.toLowerCase()} name...`}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
         />
         <button
           onClick={handleAddPeriod}
           className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700"
         >
-          + Period
+          + {periodLabel}
         </button>
       </div>
 
@@ -2071,7 +2189,7 @@ function EditDataTable({ chartData, onClose }) {
             <thead className="bg-gray-50 sticky top-0">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
-                  Stage
+                  {stageLabel}
                 </th>
                 {chartData.periodNames.map((period, idx) => (
                   <th
@@ -2188,14 +2306,14 @@ function EditDataTable({ chartData, onClose }) {
           value={newStageName}
           onChange={(e) => setNewStageName(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleAddStage()}
-          placeholder="New stage name..."
+          placeholder={`New ${stageLabel.toLowerCase()} name...`}
           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
         />
         <button
           onClick={handleAddStage}
           className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700"
         >
-          + Stage
+          + {stageLabel}
         </button>
       </div>
     </div>

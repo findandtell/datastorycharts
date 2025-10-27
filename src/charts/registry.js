@@ -12,7 +12,7 @@
 // Import chart components
 import FunnelChart from './FunnelChart/FunnelChart';
 import SlopeChart from './SlopeChart/SlopeChart';
-// import BarChart from './BarChart/BarChart';
+import BarChart from './BarChart/BarChart';
 // import LineChart from './LineChart/LineChart';
 // import SankeyChart from './SankeyChart/SankeyChart';
 
@@ -54,20 +54,22 @@ export const chartRegistry = {
     },
   },
 
-  // Future chart types:
-  /*
   bar: {
     name: 'Bar Chart',
     component: BarChart,
-    icon: '📈',
+    icon: '📊',
     description: 'Compare values across categories',
     supportsComparison: true,
     category: 'comparison',
     defaultSettings: {
       orientation: 'vertical',
+      barMode: 'grouped',
       showGrid: true,
     },
   },
+
+  // Future chart types:
+  /*
   
   line: {
     name: 'Line Chart',

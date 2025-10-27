@@ -586,6 +586,19 @@ export const sampleDatasets = {
       { Stage: "Exercise (min/week)", "Baseline": 45, "3 Months": 180 },
     ],
   },
+
+  // Bar Chart datasets
+  barDefault: {
+    name: "Product Sales Data",
+    description: "Unit sales and returns by product",
+    data: [
+      { Category: "Shirts", "Unit Sales": 1250, "Unit Returns": 85 },
+      { Category: "Pants", "Unit Sales": 980, "Unit Returns": 62 },
+      { Category: "Shoes", "Unit Sales": 1540, "Unit Returns": 128 },
+      { Category: "Socks", "Unit Sales": 2100, "Unit Returns": 45 },
+      { Category: "Hats", "Unit Sales": 760, "Unit Returns": 38 },
+    ],
+  },
 };
 
 /**

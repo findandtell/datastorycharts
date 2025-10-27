@@ -78,6 +78,9 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [slopeAxisLineStyle, setSlopeAxisLineStyle] = useState("solid"); // 'solid', 'dashed', 'dotted'
   const [axisEnds, setAxisEnds] = useState("none"); // 'none', 't-end'
 
+  // Bar Chart specific
+  const [barMode, setBarMode] = useState("grouped"); // 'grouped' or 'stacked'
+
   /**
    * Update canvas dimensions based on aspect ratio
    */
@@ -448,6 +451,10 @@ export const useStyleSettings = (initialTheme = theme) => {
     setSlopeAxisLineStyle,
     axisEnds,
     setAxisEnds,
+
+    // Bar Chart specific
+    barMode,
+    setBarMode,
 
     // Actions
     updateAspectRatio,
