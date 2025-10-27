@@ -1238,23 +1238,6 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                     : 'Stack bars on top of each other for cumulative values'}
                 </p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Color Palette
-                </label>
-                <select
-                  value={styleSettings.comparisonPalette}
-                  onChange={(e) => styleSettings.setComparisonPalette(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  {Object.entries(comparisonPalettes).map(([key, palette]) => (
-                    <option key={key} value={key}>
-                      {palette.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </CollapsibleSection>
         </>
@@ -1471,7 +1454,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
         </div>
       </CollapsibleSection>
 
-      {/* Colors Section - Only for Funnel Chart */}
+      {/* Colors Section - For Funnel Chart and Bar Chart */}
       {!isSlopeChart && (
         <CollapsibleSection
           title="Colors"
@@ -1479,7 +1462,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
           onToggle={() => toggleSection('colors')}
         >
           <div className="space-y-4">
-          {chartData.isComparisonMode ? (
+          {(chartData.isComparisonMode || isBarChart) ? (
             <>
               {/* Comparison Mode Colors */}
               <div>

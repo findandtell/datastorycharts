@@ -13,6 +13,12 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
 
   // Destructure style settings with defaults
   const {
+    title = '',
+    subtitle = '',
+    titleFontSize = 28,
+    subtitleFontSize = 20,
+    titleAlignment = 'left',
+    fontFamily = 'Inter',
     orientation = 'vertical',
     barMode = 'grouped',
     colorPalette = 'vibrant',
@@ -80,14 +86,55 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     const width = dimensions.width;
     const height = dimensions.height;
 
+    // Calculate title and subtitle heights
+    const titleHeight = title ? titleFontSize : 0;
+    const subtitleHeight = subtitle ? subtitleFontSize : 0;
+    const titleToSubtitleGap = title && subtitle ? 5 : 0;
+    const headerToChartGap = (title || subtitle) ? 20 : 0;
+    const headerHeight = titleHeight + titleToSubtitleGap + subtitleHeight + headerToChartGap;
+
+    // Render Title
+    if (title) {
+      const titleX = titleAlignment === 'center' ? width / 2 : marginLeft;
+      const titleAnchor = titleAlignment === 'center' ? 'middle' : 'start';
+
+      svg
+        .append('text')
+        .attr('x', titleX)
+        .attr('y', 30)
+        .attr('text-anchor', titleAnchor)
+        .attr('font-family', fontFamily)
+        .attr('font-size', titleHeight + 'px')
+        .attr('font-weight', '700')
+        .attr('fill', '#111827')
+        .text(title);
+    }
+
+    // Render Subtitle
+    if (subtitle) {
+      const subtitleX = titleAlignment === 'center' ? width / 2 : marginLeft;
+      const subtitleAnchor = titleAlignment === 'center' ? 'middle' : 'start';
+
+      svg
+        .append('text')
+        .attr('x', subtitleX)
+        .attr('y', 30 + titleHeight + titleToSubtitleGap)
+        .attr('text-anchor', subtitleAnchor)
+        .attr('font-family', fontFamily)
+        .attr('font-size', subtitleHeight + 'px')
+        .attr('font-weight', '400')
+        .attr('fill', '#6b7280')
+        .text(subtitle);
+    }
+
     // Calculate inner dimensions
     const innerWidth = width - marginLeft - marginRight;
-    const innerHeight = height - marginTop - marginBottom;
+    const innerHeight = height - marginTop - marginBottom - headerHeight;
 
     // Create main SVG group
     const g = svg
       .append('g')
-      .attr('transform', `translate(${marginLeft},${marginTop})`);
+      .attr('transform', `translate(${marginLeft},${marginTop + headerHeight})`);
 
     // Extract categories and prepare data
     const categories = data.map(d => d.Category || d.category || d.Stage || '');
