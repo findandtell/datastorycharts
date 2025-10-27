@@ -60,7 +60,7 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [lineSaturation, setLineSaturation] = useState(100); // 0-100%, where 100% = full color, 0% = grey
   const [endpointSize, setEndpointSize] = useState(6);
   const [endpointStyle, setEndpointStyle] = useState("filled"); // 'filled' or 'outlined'
-  const [labelPosition, setLabelPosition] = useState("left"); // 'left' or 'right'
+  const [labelPosition, setLabelPosition] = useState("left"); // 'left', 'right', or 'both'
   const [showCategoryLabels, setShowCategoryLabels] = useState(true);
   const [showValueLabels, setShowValueLabels] = useState(true);
   const [labelFormat, setLabelFormat] = useState("value"); // 'value', 'percentage', 'both'

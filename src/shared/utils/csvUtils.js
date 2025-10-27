@@ -11,10 +11,30 @@ export const parseCSV = (file) => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: true,
-      dynamicTyping: true,
+      dynamicTyping: false, // Changed to false to preserve column order with numeric headers
       skipEmptyLines: true,
       complete: (results) => {
-        resolve(results);
+        // Manually convert numeric values after parsing to avoid column ordering issues
+        const data = results.data.map(row => {
+          const converted = {};
+          results.meta.fields.forEach(field => {
+            const value = row[field];
+            // Convert to number if it looks like a number
+            converted[field] = (value !== null && value !== undefined && value !== '' && !isNaN(value))
+              ? Number(value)
+              : value;
+          });
+          return converted;
+        });
+
+        resolve({
+          ...results,
+          data,
+          meta: {
+            ...results.meta,
+            fields: results.meta.fields, // Preserve original field order
+          }
+        });
       },
       error: (error) => {
         reject(error);
@@ -26,13 +46,14 @@ export const parseCSV = (file) => {
 /**
  * Convert CSV data to chart format
  */
-export const csvToChartData = (csvData) => {
+export const csvToChartData = (csvData, fieldOrder = null) => {
   if (!csvData || csvData.length === 0) {
     return { data: [], periods: [] };
   }
 
   // Get column names (excluding the first column which is assumed to be stages)
-  const columns = Object.keys(csvData[0]);
+  // Use provided fieldOrder to preserve original column order (important for numeric column names)
+  const columns = fieldOrder || Object.keys(csvData[0]);
   const stageColumn = columns[0];
   const periodColumns = columns.slice(1);
 
@@ -54,7 +75,7 @@ export const csvToChartData = (csvData) => {
 /**
  * Validate CSV structure for funnel chart
  */
-export const validateCSVStructure = (csvData) => {
+export const validateCSVStructure = (csvData, fieldOrder = null) => {
   const errors = [];
 
   if (!csvData || csvData.length === 0) {
@@ -66,7 +87,8 @@ export const validateCSVStructure = (csvData) => {
     errors.push("CSV must contain at least 2 stages");
   }
 
-  const columns = Object.keys(csvData[0]);
+  // Use provided fieldOrder to preserve original column order (important for numeric column names)
+  const columns = fieldOrder || Object.keys(csvData[0]);
   if (columns.length < 2) {
     errors.push("CSV must contain at least one stage column and one period column");
   }

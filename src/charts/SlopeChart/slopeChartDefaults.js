@@ -59,7 +59,7 @@ export const defaultStyleSettings = {
   endpointBorderWidth: 2,
 
   // Label settings
-  labelPosition: 'left', // 'left' or 'right'
+  labelPosition: 'left', // 'left', 'right', or 'both'
   showCategoryLabels: true,
   showValueLabels: true,
   showPercentageChange: true,

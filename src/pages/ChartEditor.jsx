@@ -886,6 +886,16 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   >
                     Right
                   </button>
+                  <button
+                    onClick={() => styleSettings.setLabelPosition('both')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.labelPosition === 'both'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Both
+                  </button>
                 </div>
               </div>
 
@@ -973,7 +983,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 </label>
                 <input
                   type="range"
-                  min="2"
+                  min="0"
                   max="12"
                   value={styleSettings.endpointSize}
                   onChange={(e) => styleSettings.setEndpointSize(Number(e.target.value))}
@@ -1015,7 +1025,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 </label>
                 <input
                   type="range"
-                  min="200"
+                  min="100"
                   max="600"
                   value={styleSettings.periodSpacing}
                   onChange={(e) => styleSettings.setPeriodSpacing(Number(e.target.value))}

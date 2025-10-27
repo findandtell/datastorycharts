@@ -53,20 +53,23 @@ export const useChartData = (chartType = 'funnel') => {
   const loadCSVFile = useCallback(async (file) => {
     try {
       const results = await parseCSV(file);
-      
+
       if (results.errors && results.errors.length > 0) {
         setError("Error parsing CSV: " + results.errors[0].message);
         return false;
       }
 
-      const validation = validateCSVStructure(results.data);
+      // Use meta.fields to preserve original column order (important for numeric column names)
+      const fieldOrder = results.meta?.fields;
+
+      const validation = validateCSVStructure(results.data, fieldOrder);
       if (!validation.valid) {
         setError("Invalid CSV structure: " + validation.errors.join(", "));
         return false;
       }
 
-      const { data: chartData, periods } = csvToChartData(results.data);
-      
+      const { data: chartData, periods } = csvToChartData(results.data, fieldOrder);
+
       setData(chartData);
       setPeriodNames(periods);
       setEditableData(JSON.parse(JSON.stringify(chartData)));

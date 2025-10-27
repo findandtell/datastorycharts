@@ -167,6 +167,37 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
     }
 
     /**
+     * Detect the maximum number of decimal places in the dataset
+     */
+    const detectDecimalPlaces = () => {
+      let maxDecimals = 0;
+      data.forEach(d => {
+        periods.forEach(period => {
+          const value = d[period];
+          if (value != null) {
+            const strValue = value.toString();
+            if (strValue.includes('.')) {
+              const decimals = strValue.split('.')[1].length;
+              maxDecimals = Math.max(maxDecimals, decimals);
+            }
+          }
+        });
+      });
+      return maxDecimals;
+    };
+
+    const decimalPlaces = detectDecimalPlaces();
+
+    /**
+     * Format a number to display with consistent decimal places
+     */
+    const formatValue = (value) => {
+      if (value == null) return '';
+      if (decimalPlaces === 0) return value.toString();
+      return value.toFixed(decimalPlaces);
+    };
+
+    /**
      * Estimate text width based on font size and string length
      * This is a rough approximation - actual width varies by font and characters
      */
@@ -174,7 +205,8 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       // Average character width as a multiplier of font size
       // Bold text (>500) takes ~10% more space
       const charWidthMultiplier = fontWeight > 500 ? 0.65 : 0.6;
-      return text.toString().length * fontSize * charWidthMultiplier;
+      const textStr = text != null ? text.toString() : '';
+      return textStr.length * fontSize * charWidthMultiplier;
     };
 
     /**
@@ -190,12 +222,16 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       data.forEach((d, i) => {
         const startValue = d[periods[0]];
         const endValue = d[periods[1]];
+
+        // Skip if data is incomplete (e.g., during editing)
+        if (startValue == null || endValue == null) return;
+
         const percentChange = calculatePercentageChange(startValue, endValue);
         const isEmphasized = emphasizedLines.includes(i);
         const shouldShowValueLabels = showValueLabels || isEmphasized;
 
         // Calculate left side width
-        if (labelPosition === 'left' && showCategoryLabels) {
+        if ((labelPosition === 'left' || labelPosition === 'both') && showCategoryLabels) {
           const categoryText = d.Stage || d.category || '';
           const categoryWidth = estimateTextWidth(
             categoryText,
@@ -205,7 +241,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
 
           if (shouldShowValueLabels && labelFormat !== 'percentage') {
             // Category + value label both on left
-            const valueWidth = estimateTextWidth(startValue.toString(), valueFontSize);
+            const valueWidth = estimateTextWidth(formatValue(startValue), valueFontSize);
             maxLeftWidth = Math.max(maxLeftWidth, categoryWidth + valueWidth + 35); // 35px spacing between labels
           } else {
             // Only category on left
@@ -213,12 +249,12 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
           }
         } else if (shouldShowValueLabels && labelFormat !== 'percentage') {
           // Only value on left
-          const valueWidth = estimateTextWidth(startValue.toString(), valueFontSize);
+          const valueWidth = estimateTextWidth(formatValue(startValue), valueFontSize);
           maxLeftWidth = Math.max(maxLeftWidth, valueWidth + 20);
         }
 
         // Calculate right side width
-        if (labelPosition === 'right' && showCategoryLabels) {
+        if ((labelPosition === 'right' || labelPosition === 'both') && showCategoryLabels) {
           const categoryText = d.Stage || d.category || '';
           const categoryWidth = estimateTextWidth(
             categoryText,
@@ -232,9 +268,9 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
             if (labelFormat === 'percentage') {
               valueText = `${percentChange > 0 ? '+' : ''}${percentChange}%`;
             } else if (labelFormat === 'both') {
-              valueText = `${endValue} (${percentChange > 0 ? '+' : ''}${percentChange}%)`;
+              valueText = `${formatValue(endValue)} (${percentChange > 0 ? '+' : ''}${percentChange}%)`;
             } else {
-              valueText = endValue.toString();
+              valueText = formatValue(endValue);
             }
             const valueWidth = estimateTextWidth(valueText, valueFontSize);
             maxRightWidth = Math.max(maxRightWidth, categoryWidth + valueWidth + 35); // 35px spacing
@@ -248,9 +284,9 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
           if (labelFormat === 'percentage') {
             valueText = `${percentChange > 0 ? '+' : ''}${percentChange}%`;
           } else if (labelFormat === 'both') {
-            valueText = `${endValue} (${percentChange > 0 ? '+' : ''}${percentChange}%)`;
+            valueText = `${formatValue(endValue)} (${percentChange > 0 ? '+' : ''}${percentChange}%)`;
           } else {
-            valueText = endValue.toString();
+            valueText = formatValue(endValue);
           }
           const valueWidth = estimateTextWidth(valueText, valueFontSize);
           maxRightWidth = Math.max(maxRightWidth, valueWidth + 20);
@@ -494,17 +530,24 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
      * This is needed when value labels are shown for emphasized lines only
      */
     const calculateValueLabelOffsets = (side) => {
-      // Only calculate if we have emphasized lines and showValueLabels is false
-      if (showValueLabels || emphasizedLines.length === 0) return {};
+      // Skip if no value labels are shown at all
+      const hasAnyLabels = showValueLabels || emphasizedLines.length > 0;
+      if (!hasAnyLabels) return {};
 
       const positions = [];
 
       data.forEach((d, i) => {
         const isEmphasized = emphasizedLines.includes(i);
-        if (!isEmphasized) return; // Skip non-emphasized lines
+        const shouldShowLabel = showValueLabels || isEmphasized;
+
+        if (!shouldShowLabel) return; // Skip lines without labels
 
         const startValue = d[periods[0]];
         const endValue = d[periods[1]];
+
+        // Skip if data is incomplete
+        if (startValue == null || endValue == null) return;
+
         const y1 = yScale(startValue);
         const y2 = yScale(endValue);
 
@@ -515,18 +558,43 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         });
       });
 
+      // No collision avoidance needed if 0-1 labels
+      if (positions.length <= 1) return {};
+
       // Sort by y position
       positions.sort((a, b) => a.y - b.y);
 
-      // Detect and resolve overlaps
-      const minSpacing = valueFontSize + 4; // Minimum space between value labels
-      for (let i = 1; i < positions.length; i++) {
-        const prev = positions[i - 1];
-        const curr = positions[i];
-        const gap = curr.y - prev.y;
+      // Calculate bounding box height for each label (considering font size)
+      // Stack spacing should be tight since they're the same label type
+      const labelHeight = valueFontSize * 1.2; // Height including some padding
+      const stackSpacing = 2; // Minimal gap between stacked labels
 
-        if (gap < minSpacing) {
-          curr.y = prev.y + minSpacing;
+      // Detect and resolve overlaps with bidirectional stacking
+      let hasOverlaps = true;
+      let iterations = 0;
+      const maxIterations = 10; // Prevent infinite loops
+
+      while (hasOverlaps && iterations < maxIterations) {
+        hasOverlaps = false;
+        iterations++;
+
+        for (let i = 0; i < positions.length - 1; i++) {
+          const curr = positions[i];
+          const next = positions[i + 1];
+          const gap = next.y - curr.y;
+
+          // Check if labels overlap
+          if (gap < labelHeight) {
+            hasOverlaps = true;
+
+            // Calculate how much space is needed
+            const overlapAmount = labelHeight - gap;
+            const halfOverlap = overlapAmount / 2;
+
+            // Stack: move one up, one down (centered over the midpoint)
+            curr.y -= halfOverlap + stackSpacing / 2;
+            next.y += halfOverlap + stackSpacing / 2;
+          }
         }
       }
 
@@ -547,7 +615,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
      * Need to account for both showValueLabels=true AND emphasized lines
      */
     let maxLeftMetricWidth = 0;
-    if (labelPosition === 'left' && showCategoryLabels) {
+    if ((labelPosition === 'left' || labelPosition === 'both') && showCategoryLabels) {
       data.forEach((d, i) => {
         const isEmphasized = emphasizedLines.includes(i);
         const shouldShowValueLabels = showValueLabels || isEmphasized;
@@ -555,6 +623,10 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         if (!shouldShowValueLabels || labelFormat === 'percentage') return; // Skip if no left values shown
 
         const startValue = d[periods[0]];
+
+        // Skip if data is incomplete
+        if (startValue == null) return;
+
         const metricText = startValue.toString();
         const estimatedWidth = metricText.length * valueFontSize * 0.6;
         maxLeftMetricWidth = Math.max(maxLeftMetricWidth, estimatedWidth);
@@ -567,7 +639,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
      * Need to account for both showValueLabels=true AND emphasized lines
      */
     let maxRightMetricWidth = 0;
-    if (labelPosition === 'right' && showCategoryLabels) {
+    if ((labelPosition === 'right' || labelPosition === 'both') && showCategoryLabels) {
       data.forEach((d, i) => {
         const isEmphasized = emphasizedLines.includes(i);
         const shouldShowValueLabels = showValueLabels || isEmphasized;
@@ -576,6 +648,10 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
 
         const startValue = d[periods[0]];
         const endValue = d[periods[1]];
+
+        // Skip if data is incomplete
+        if (startValue == null || endValue == null) return;
+
         const percentChange = calculatePercentageChange(startValue, endValue);
 
         let metricText = '';
@@ -590,12 +666,16 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         maxRightMetricWidth = Math.max(maxRightMetricWidth, estimatedWidth);
       });
     }
-    const rightCategoryX = maxRightMetricWidth > 0 ? x2 + maxRightMetricWidth + 20 : x2 + 15;
+    const rightCategoryX = maxRightMetricWidth > 0 ? x2 + maxRightMetricWidth + 15 : x2 + 15;
 
     // Draw lines and endpoints for each category
     data.forEach((d, i) => {
       const startValue = d[periods[0]];
       const endValue = d[periods[1]];
+
+      // Skip if data is incomplete (e.g., during editing)
+      if (startValue == null || endValue == null) return;
+
       const percentChange = calculatePercentageChange(startValue, endValue);
       const isEmphasized = emphasizedLines.includes(i);
 
@@ -678,50 +758,54 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         // lineColor is already desaturated above, so endpoints will use that
       }
 
-      // Draw start endpoint
-      if (endpointStyle === 'filled') {
-        lineGroup
-          .append('circle')
-          .attr('cx', x1)
-          .attr('cy', y1)
-          .attr('r', endpointSize)
-          .attr('fill', startEndpointColor)
-          .attr('opacity', calculatedOpacity);
-      } else {
-        // Outlined: white fill with colored border
-        lineGroup
-          .append('circle')
-          .attr('cx', x1)
-          .attr('cy', y1)
-          .attr('r', endpointSize)
-          .attr('fill', 'white')
-          .attr('stroke', startEndpointColor)
-          .attr('stroke-width', endpointBorderWidth)
-          .attr('stroke-opacity', calculatedOpacity)
-          .attr('fill-opacity', 1); // White fill always fully opaque
+      // Draw start endpoint (only if endpointSize > 0)
+      if (endpointSize > 0) {
+        if (endpointStyle === 'filled') {
+          lineGroup
+            .append('circle')
+            .attr('cx', x1)
+            .attr('cy', y1)
+            .attr('r', endpointSize)
+            .attr('fill', startEndpointColor)
+            .attr('opacity', calculatedOpacity);
+        } else {
+          // Outlined: white fill with colored border
+          lineGroup
+            .append('circle')
+            .attr('cx', x1)
+            .attr('cy', y1)
+            .attr('r', endpointSize)
+            .attr('fill', 'white')
+            .attr('stroke', startEndpointColor)
+            .attr('stroke-width', endpointBorderWidth)
+            .attr('stroke-opacity', calculatedOpacity)
+            .attr('fill-opacity', 1); // White fill always fully opaque
+        }
       }
 
-      // Draw end endpoint
-      if (endpointStyle === 'filled') {
-        lineGroup
-          .append('circle')
-          .attr('cx', x2)
-          .attr('cy', y2)
-          .attr('r', endpointSize)
-          .attr('fill', endEndpointColor)
-          .attr('opacity', calculatedOpacity);
-      } else {
-        // Outlined: white fill with colored border
-        lineGroup
-          .append('circle')
-          .attr('cx', x2)
-          .attr('cy', y2)
-          .attr('r', endpointSize)
-          .attr('fill', 'white')
-          .attr('stroke', endEndpointColor)
-          .attr('stroke-width', endpointBorderWidth)
-          .attr('stroke-opacity', calculatedOpacity)
-          .attr('fill-opacity', 1); // White fill always fully opaque
+      // Draw end endpoint (only if endpointSize > 0)
+      if (endpointSize > 0) {
+        if (endpointStyle === 'filled') {
+          lineGroup
+            .append('circle')
+            .attr('cx', x2)
+            .attr('cy', y2)
+            .attr('r', endpointSize)
+            .attr('fill', endEndpointColor)
+            .attr('opacity', calculatedOpacity);
+        } else {
+          // Outlined: white fill with colored border
+          lineGroup
+            .append('circle')
+            .attr('cx', x2)
+            .attr('cy', y2)
+            .attr('r', endpointSize)
+            .attr('fill', 'white')
+            .attr('stroke', endEndpointColor)
+            .attr('stroke-width', endpointBorderWidth)
+            .attr('stroke-opacity', calculatedOpacity)
+            .attr('fill-opacity', 1); // White fill always fully opaque
+        }
       }
 
       // Add interactivity
@@ -750,10 +834,10 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
 
         // Left side value label (start value) - Show ONLY when not in percentage mode
         if (labelFormat !== 'percentage') {
-          const startLabel = `${startValue}`;
+          const startLabel = formatValue(startValue);
 
           // Position closer to chart if category is on left, otherwise at normal position
-          const leftMetricX = (labelPosition === 'left' && showCategoryLabels) ? x1 - 10 : x1 - 15;
+          const leftMetricX = ((labelPosition === 'left' || labelPosition === 'both') && showCategoryLabels) ? x1 - 10 : x1 - 15;
 
           chartGroup
             .append('text')
@@ -772,12 +856,12 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         const endLabel = labelFormat === 'percentage'
           ? `${percentChange > 0 ? '+' : ''}${percentChange}%`
           : labelFormat === 'both'
-          ? `${endValue} (${percentChange > 0 ? '+' : ''}${percentChange}%)`
-          : `${endValue}`;
+          ? `${formatValue(endValue)} (${percentChange > 0 ? '+' : ''}${percentChange}%)`
+          : formatValue(endValue);
 
         // Always show right metric value
         // Position closer to chart if category is on right, otherwise at normal position
-        const rightMetricX = (labelPosition === 'right' && showCategoryLabels) ? x2 + 10 : x2 + 15;
+        const rightMetricX = ((labelPosition === 'right' || labelPosition === 'both') && showCategoryLabels) ? x2 + 10 : x2 + 15;
 
         chartGroup
           .append('text')
@@ -794,16 +878,18 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
 
       // Category labels (on selected side, OUTSIDE metric labels)
       if (showCategoryLabels) {
-        const labelOffset = labelOffsets[i] || 0;
+        // Use the same collision avoidance offsets as value labels to keep them aligned
+        const leftCategoryOffset = leftValueOffsets[i] || 0;
+        const rightCategoryOffset = rightValueOffsets[i] || 0;
 
-        if (labelPosition === 'left') {
+        if (labelPosition === 'left' || labelPosition === 'both') {
           // Category on far left - use consistent position for all labels (right-aligned)
           const categoryX = leftCategoryX;
 
           chartGroup
             .append('text')
             .attr('x', categoryX)
-            .attr('y', y1 + labelOffset)
+            .attr('y', y1 + leftCategoryOffset)
             .attr('dy', '0.35em')
             .attr('text-anchor', 'end')
             .attr('font-family', categoryFont)
@@ -811,14 +897,16 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
             .attr('font-weight', labelWeight)
             .attr('fill', lineColor)
             .text(d.Stage || d.category);
-        } else {
+        }
+
+        if (labelPosition === 'right' || labelPosition === 'both') {
           // Category on far right - use consistent position for all labels (left-aligned)
           const categoryX = rightCategoryX;
 
           chartGroup
             .append('text')
             .attr('x', categoryX)
-            .attr('y', y2 + labelOffset)
+            .attr('y', y2 + rightCategoryOffset)
             .attr('dy', '0.35em')
             .attr('text-anchor', 'start')
             .attr('font-family', categoryFont)
