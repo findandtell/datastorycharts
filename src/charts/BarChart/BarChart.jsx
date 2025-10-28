@@ -128,16 +128,19 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
 
     if (isGroupedStackedData && barMode === 'grouped-stacked') {
       // For grouped-stacked mode with Group/Period format
-      // Groups become the X-axis categories
-      const uniqueGroups = [...new Set(data.map(d => d.Group))];
-      categories = uniqueGroups;
-
-      // Periods are the time series that will be stacked
+      // Periods become the X-axis categories (time on X-axis)
       periods = [...new Set(data.map(d => d.Period))];
+      categories = periods;
+
+      // Groups are the voter types (All Voters, Rep, Dem) - these will be the grouped bars
+      const uniqueGroups = [...new Set(data.map(d => d.Group))];
 
       // Stack columns are the value columns (e.g., "Very Well", "Somewhat Well")
       const firstRow = data[0];
       stackColumns = Object.keys(firstRow).filter(key => key !== 'Group' && key !== 'Period');
+
+      // Store groups for later use in rendering
+      window.__barChartGroups = uniqueGroups;
     } else {
       // Regular format
       categories = data.map(d => d.Category || d.category || d.Stage || '');
@@ -330,8 +333,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       if (isGroupedStackedData) {
         // For new grouped-stacked format with Group/Period columns
         // Find max stacked value across all groups and periods
-        maxValue = d3.max(categories, group => {
-          return d3.max(periods, period => {
+        const uniqueGroups = window.__barChartGroups || [];
+        maxValue = d3.max(periods, period => {
+          return d3.max(uniqueGroups, group => {
             // Sum all stack columns for this group and period
             const groupData = data.filter(d => d.Group === group && d.Period === period);
             if (groupData.length === 0) return 0;
@@ -656,6 +660,33 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
             .attr('opacity', axisOpacity);
         }
       }
+
+      // Add group labels below X-axis for grouped-stacked mode
+      if (isGroupedStackedData && barMode === 'grouped-stacked' && orientation === 'vertical') {
+        const uniqueGroups = window.__barChartGroups || [];
+        const periodWidth = xScale.bandwidth();
+        const groupCount = uniqueGroups.length;
+        const barWidth = periodWidth / groupCount;
+
+        periods.forEach((period, periodIndex) => {
+          const periodX = xScale(period) || 0;
+
+          uniqueGroups.forEach((group, groupIndex) => {
+            const labelX = periodX + groupIndex * barWidth + barWidth / 2;
+
+            g.append('text')
+              .attr('x', labelX)
+              .attr('y', innerHeight + 40) // Below the period labels
+              .attr('text-anchor', 'middle')
+              .attr('font-family', axisFont)
+              .attr('font-size', xAxisFontSize - 2)
+              .attr('font-weight', 400)
+              .attr('fill', axisColor)
+              .attr('opacity', 0.7)
+              .text(group);
+          });
+        });
+      }
     }
 
     if (showYAxis) {
@@ -782,26 +813,28 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     if (barMode === 'grouped-stacked') {
       if (isGroupedStackedData) {
         // NEW: Grouped-Stacked bars with Group/Period columns
-        // Groups are voter types (All Voters, Rep, Dem), each group has multiple time-based stacked bars
+        // X-axis: Periods (Nov '18, Nov '20, etc.)
+        // Within each period: Multiple groups (All Voters, Rep, Dem) with stacked bars
 
-        const groupWidth = orientation === 'vertical' ? xScale.bandwidth() : yScale.bandwidth();
-        const periodCount = periods.length;
-        const barWidth = groupWidth / periodCount * (1 - barPadding);
-        const barOffset = groupWidth / periodCount;
+        const uniqueGroups = window.__barChartGroups || [];
+        const periodWidth = orientation === 'vertical' ? xScale.bandwidth() : yScale.bandwidth();
+        const groupCount = uniqueGroups.length;
+        const barWidth = periodWidth / groupCount * (1 - barPadding);
+        const barOffset = periodWidth / groupCount;
 
         if (orientation === 'vertical') {
           // Vertical grouped-stacked bars
-          categories.forEach((group, groupIndex) => {
-            const groupX = xScale(group) || 0;
+          periods.forEach((period, periodIndex) => {
+            const periodX = xScale(period) || 0;
 
-            periods.forEach((period, periodIndex) => {
-              // Find data for this group and period
-              const groupPeriodData = data.filter(d => d.Group === group && d.Period === period);
+            uniqueGroups.forEach((group, groupIndex) => {
+              // Find data for this period and group
+              const groupPeriodData = data.filter(d => d.Period === period && d.Group === group);
               if (groupPeriodData.length === 0) return;
 
               const dataRow = groupPeriodData[0];
-              const barX = groupX + periodIndex * barOffset;
-              const color = colorScheme[periodIndex % colorScheme.length];
+              const barX = periodX + groupIndex * barOffset;
+              const color = colorScheme[groupIndex % colorScheme.length];
 
               let cumulativeValue = 0;
 
@@ -857,17 +890,17 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           });
         } else {
           // Horizontal grouped-stacked bars
-          categories.forEach((group, groupIndex) => {
-            const groupY = yScale(group) || 0;
+          periods.forEach((period, periodIndex) => {
+            const periodY = yScale(period) || 0;
 
-            periods.forEach((period, periodIndex) => {
-              // Find data for this group and period
-              const groupPeriodData = data.filter(d => d.Group === group && d.Period === period);
+            uniqueGroups.forEach((group, groupIndex) => {
+              // Find data for this period and group
+              const groupPeriodData = data.filter(d => d.Period === period && d.Group === group);
               if (groupPeriodData.length === 0) return;
 
               const dataRow = groupPeriodData[0];
-              const barY = groupY + periodIndex * barOffset;
-              const color = colorScheme[periodIndex % colorScheme.length];
+              const barY = periodY + groupIndex * barOffset;
+              const color = colorScheme[groupIndex % colorScheme.length];
 
               let cumulativeValue = 0;
 
