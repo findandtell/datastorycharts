@@ -1482,6 +1482,60 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       });
     }
 
+    // Render direct labels for grouped-stacked mode (show once on the right side)
+    if (isGroupedStackedData && barMode === 'grouped-stacked' && labelMode === 'direct' && orientation === 'vertical') {
+      // Get the rightmost bars to position labels
+      const lastPeriod = periods[periods.length - 1];
+      const lastPeriodX = xScale(lastPeriod) || 0;
+      const periodWidth = xScale.bandwidth();
+      const labelX = lastPeriodX + periodWidth + 15;
+
+      // Create a reference bar from the last period, first group
+      const uniqueGroups = window.__barChartGroups || [];
+      const firstGroup = uniqueGroups[0];
+      const referenceData = data.find(d => d.Period === lastPeriod && d.Group === firstGroup);
+
+      if (referenceData && stackColumns) {
+        let cumulativeY = 0;
+
+        // Draw labels for each stack segment (bottom to top)
+        stackColumns.forEach((stackCol, stackIndex) => {
+          const value = referenceData[stackCol] || 0;
+          const segmentY = yScale(cumulativeY + value);
+          const segmentHeight = yScale(cumulativeY) - segmentY;
+          const labelY = segmentY + segmentHeight / 2;
+
+          // Use the first group's color with appropriate opacity
+          const color = colorScheme[0 % colorScheme.length];
+
+          g.append('text')
+            .attr('x', labelX)
+            .attr('y', labelY)
+            .attr('dy', '0.35em')
+            .attr('text-anchor', 'start')
+            .attr('font-family', valueFont)
+            .attr('font-size', valueFontSize - 1)
+            .attr('font-weight', 600)
+            .attr('fill', color)
+            .attr('opacity', stackIndex === 0 ? 1 : 0.6)
+            .text(stackCol);
+
+          cumulativeY += value;
+        });
+
+        // Add NET label above all segments
+        g.append('text')
+          .attr('x', labelX)
+          .attr('y', yScale(cumulativeY) - 10)
+          .attr('text-anchor', 'start')
+          .attr('font-family', valueFont)
+          .attr('font-size', valueFontSize)
+          .attr('font-weight', 700)
+          .attr('fill', axisColor)
+          .text('NET');
+      }
+    }
+
     // Render Legend (if labelMode is 'legend' and position is 'below')
     if (labelMode === 'legend' && legendPosition === 'below') {
       const legendY = marginTop + headerHeight + innerHeight + 25;
