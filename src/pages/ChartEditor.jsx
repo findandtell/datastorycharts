@@ -1273,10 +1273,10 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Bar Display Mode
                 </label>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => styleSettings.setBarMode('grouped')}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.barMode === 'grouped'
                         ? 'bg-cyan-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1286,7 +1286,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </button>
                   <button
                     onClick={() => styleSettings.setBarMode('stacked')}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.barMode === 'stacked'
                         ? 'bg-cyan-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1294,11 +1294,23 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   >
                     Stacked
                   </button>
+                  <button
+                    onClick={() => styleSettings.setBarMode('grouped-stacked')}
+                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.barMode === 'grouped-stacked'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Grouped+Stacked
+                  </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
                   {styleSettings.barMode === 'grouped'
                     ? 'Display bars side by side for each category'
-                    : 'Stack bars on top of each other for cumulative values'}
+                    : styleSettings.barMode === 'stacked'
+                    ? 'Stack bars on top of each other for cumulative values'
+                    : 'Group categories with stacked bars (Pew Research style)'}
                 </p>
               </div>
             </div>
