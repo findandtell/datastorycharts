@@ -7,14 +7,14 @@ import { defaultUserColors } from "../design-system/colorPalettes";
  */
 export const useStyleSettings = (initialTheme = theme) => {
   // Typography
-  const [title, setTitle] = useState("Revenue by Product Line");
-  const [subtitle, setSubtitle] = useState("Annual revenue comparison across product categories (2023 vs 2024)");
+  const [title, setTitle] = useState("Units Produced by Region");
+  const [subtitle, setSubtitle] = useState("Production units by regional location (January)");
   const [titleAlignment, setTitleAlignment] = useState("left"); // 'left' or 'center'
   const [fontFamily, setFontFamily] = useState(initialTheme.typography.families[0]);
   const [titleFontSize, setTitleFontSize] = useState(initialTheme.typography.sizes.title);
   const [subtitleFontSize, setSubtitleFontSize] = useState(initialTheme.typography.sizes.subtitle);
   const [segmentLabelFontSize, setSegmentLabelFontSize] = useState(22);
-  const [metricLabelFontSize, setMetricLabelFontSize] = useState(19);
+  const [metricLabelFontSize, setMetricLabelFontSize] = useState(24);
   const [periodLabelFontSize, setPeriodLabelFontSize] = useState(24); // Period label font size for Slope Chart
   const [legendFontSize, setLegendFontSize] = useState(initialTheme.typography.sizes.legend);
   const [conversionLabelFontSize, setConversionLabelFontSize] = useState(initialTheme.typography.sizes.conversionLabel);
@@ -30,19 +30,21 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [canvasWidth, setCanvasWidth] = useState(900);
   const [canvasHeight, setCanvasHeight] = useState(900);
-  const [chartPadding, setChartPadding] = useState(initialTheme.spacing.chartPadding);
-  const [stageGap, setStageGap] = useState(initialTheme.spacing.stageGap);
+  const [chartWidth, setChartWidth] = useState(600);
+  const [chartHeight, setChartHeight] = useState(400);
+  const [chartPadding, setChartPadding] = useState(25);
+  const [stageGap, setStageGap] = useState(0);
   const [stageLabelPosition, setStageLabelPosition] = useState("bottom");
 
   // Visual
-  const [axisLineWidth, setAxisLineWidth] = useState(initialTheme.visual.axisLineWidth);
-  const [backgroundOpacity, setBackgroundOpacity] = useState(initialTheme.visual.backgroundOpacity);
+  const [axisLineWidth, setAxisLineWidth] = useState(3);
+  const [backgroundOpacity, setBackgroundOpacity] = useState(100);
 
   // Display options
   const [emphasis, setEmphasis] = useState("throughput");
   const [metricEmphasis, setMetricEmphasis] = useState("volume");
   const [normalizeToHundred, setNormalizeToHundred] = useState(true);
-  const [compactNumbers, setCompactNumbers] = useState(false);
+  const [compactNumbers, setCompactNumbers] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
   const [legendPosition, setLegendPosition] = useState("direct"); // "legend" or "direct"
   const [inStageLabelFontSize, setInStageLabelFontSize] = useState(13);
@@ -80,6 +82,33 @@ export const useStyleSettings = (initialTheme = theme) => {
 
   // Bar Chart specific
   const [barMode, setBarMode] = useState("grouped"); // 'grouped' or 'stacked'
+  const [labelMode, setLabelMode] = useState("direct"); // 'legend' or 'direct'
+  const [directLabelContent, setDirectLabelContent] = useState("metrics"); // 'metrics', 'metrics-category', or 'category'
+  const [emphasizedBars, setEmphasizedBars] = useState([]); // Array of bar identifiers to emphasize
+  const [xAxisFontSize, setXAxisFontSize] = useState(20); // X-axis label font size
+  const [yAxisFontSize, setYAxisFontSize] = useState(20); // Y-axis label font size
+  const [axisLabel, setAxisLabel] = useState(""); // Axis label text (appears at end of value axis)
+  const [axisLabelFontSize, setAxisLabelFontSize] = useState(17); // Axis label font size
+
+  // Bar Chart axis options
+  const [axisMinimum, setAxisMinimum] = useState(0);
+  const [axisMinimumAuto, setAxisMinimumAuto] = useState(true);
+  const [axisMaximum, setAxisMaximum] = useState(50000);
+  const [axisMaximumAuto, setAxisMaximumAuto] = useState(true);
+  const [axisMajorUnit, setAxisMajorUnit] = useState(10000);
+  const [axisMajorUnitAuto, setAxisMajorUnitAuto] = useState(true);
+  const [axisMinorUnit, setAxisMinorUnit] = useState(5);
+  const [axisMinorUnitAuto, setAxisMinorUnitAuto] = useState(true);
+  const [axisMajorTickType, setAxisMajorTickType] = useState("outside");
+  const [axisMinorTickType, setAxisMinorTickType] = useState("none");
+  const [showHorizontalGridlines, setShowHorizontalGridlines] = useState(false);
+  const [showVerticalGridlines, setShowVerticalGridlines] = useState(false);
+  const [compactAxisNumbers, setCompactAxisNumbers] = useState(false);
+
+  // Calculated bounds (for display when Auto is enabled)
+  const [calculatedAxisMinimum, setCalculatedAxisMinimum] = useState(0);
+  const [calculatedAxisMaximum, setCalculatedAxisMaximum] = useState(100);
+  const [calculatedAxisMajorUnit, setCalculatedAxisMajorUnit] = useState(10);
 
   /**
    * Update canvas dimensions based on aspect ratio
@@ -95,13 +124,13 @@ export const useStyleSettings = (initialTheme = theme) => {
    * Reset all settings to defaults
    */
   const resetToDefaults = useCallback(() => {
-    setTitle("Marketing & Acquisition Funnel");
-    setSubtitle("Tracking 3 periods across 5 conversion stages");
+    setTitle("Units Produced by Region");
+    setSubtitle("Production units by regional location (January)");
     setFontFamily(initialTheme.typography.families[0]);
     setTitleFontSize(initialTheme.typography.sizes.title);
     setSubtitleFontSize(initialTheme.typography.sizes.subtitle);
-    setSegmentLabelFontSize(initialTheme.typography.sizes.segmentLabel);
-    setMetricLabelFontSize(initialTheme.typography.sizes.metricLabel);
+    setSegmentLabelFontSize(22);
+    setMetricLabelFontSize(24);
     setLegendFontSize(initialTheme.typography.sizes.legend);
     setConversionLabelFontSize(initialTheme.typography.sizes.conversionLabel);
     setBarColor("#1e40af");
@@ -112,21 +141,44 @@ export const useStyleSettings = (initialTheme = theme) => {
     setAspectRatio("1:1");
     setCanvasWidth(900);
     setCanvasHeight(900);
-    setChartPadding(initialTheme.spacing.chartPadding);
-    setStageGap(initialTheme.spacing.stageGap);
+    setChartWidth(600);
+    setChartHeight(400);
+    setChartPadding(25);
+    setStageGap(0);
     setStageLabelPosition("bottom");
-    setAxisLineWidth(initialTheme.visual.axisLineWidth);
-    setBackgroundOpacity(initialTheme.visual.backgroundOpacity);
+    setAxisLineWidth(3);
+    setBackgroundOpacity(100);
     setEmphasis("throughput");
     setMetricEmphasis("volume");
     setNormalizeToHundred(true);
-    setCompactNumbers(false);
+    setCompactNumbers(true);
     setShowLegend(true);
     setLegendPosition("direct");
     setInStageLabelFontSize(13);
     setShowSparklines(false);
     setSparklineType("volume");
     setUserTier("pro");
+    setBarMode("grouped");
+    setLabelMode("direct");
+    setDirectLabelContent("metrics");
+    setEmphasizedBars([]);
+    setXAxisFontSize(20);
+    setYAxisFontSize(20);
+    setAxisLabel("");
+    setAxisLabelFontSize(17);
+    setAxisMinimum(0);
+    setAxisMinimumAuto(true);
+    setAxisMaximum(50000);
+    setAxisMaximumAuto(true);
+    setAxisMajorUnit(10000);
+    setAxisMajorUnitAuto(true);
+    setAxisMinorUnit(5);
+    setAxisMinorUnitAuto(true);
+    setAxisMajorTickType("outside");
+    setAxisMinorTickType("none");
+    setShowHorizontalGridlines(false);
+    setShowVerticalGridlines(false);
+    setCompactAxisNumbers(false);
   }, [initialTheme]);
 
   /**
@@ -206,6 +258,29 @@ export const useStyleSettings = (initialTheme = theme) => {
           slopeAxisLineStyle,
           axisEnds,
         },
+        bar: {
+          barMode,
+          labelMode,
+          directLabelContent,
+          emphasizedBars,
+          xAxisFontSize,
+          yAxisFontSize,
+          axisLabel,
+          axisLabelFontSize,
+          axisMinimum,
+          axisMinimumAuto,
+          axisMaximum,
+          axisMaximumAuto,
+          axisMajorUnit,
+          axisMajorUnitAuto,
+          axisMinorUnit,
+          axisMinorUnitAuto,
+          axisMajorTickType,
+          axisMinorTickType,
+          showHorizontalGridlines,
+          showVerticalGridlines,
+          compactAxisNumbers,
+        },
         funnel: {
           // Funnel-specific settings will be here
         },
@@ -225,6 +300,12 @@ export const useStyleSettings = (initialTheme = theme) => {
     increaseColor, decreaseColor, noChangeColor, startColor, endColor,
     periodSpacing, periodHeight, periodLabelPosition,
     slopeAxisLineColor, slopeAxisLineWidth, slopeAxisLineStyle, axisEnds,
+    barMode, labelMode, directLabelContent, emphasizedBars, xAxisFontSize, yAxisFontSize,
+    axisLabel, axisLabelFontSize,
+    axisMinimum, axisMinimumAuto, axisMaximum, axisMaximumAuto,
+    axisMajorUnit, axisMajorUnitAuto, axisMinorUnit, axisMinorUnitAuto,
+    axisMajorTickType, axisMinorTickType, showHorizontalGridlines, showVerticalGridlines,
+    compactAxisNumbers,
   ]);
 
   /**
@@ -314,6 +395,29 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (slopeSettings.slopeAxisLineWidth !== undefined) setSlopeAxisLineWidth(slopeSettings.slopeAxisLineWidth);
         if (slopeSettings.slopeAxisLineStyle !== undefined) setSlopeAxisLineStyle(slopeSettings.slopeAxisLineStyle);
         if (slopeSettings.axisEnds !== undefined) setAxisEnds(slopeSettings.axisEnds);
+      } else if (currentChartType === 'bar' && settings.chartSpecific.bar) {
+        const barSettings = settings.chartSpecific.bar;
+        if (barSettings.barMode !== undefined) setBarMode(barSettings.barMode);
+        if (barSettings.labelMode !== undefined) setLabelMode(barSettings.labelMode);
+        if (barSettings.directLabelContent !== undefined) setDirectLabelContent(barSettings.directLabelContent);
+        if (barSettings.emphasizedBars !== undefined) setEmphasizedBars(barSettings.emphasizedBars);
+        if (barSettings.xAxisFontSize !== undefined) setXAxisFontSize(barSettings.xAxisFontSize);
+        if (barSettings.yAxisFontSize !== undefined) setYAxisFontSize(barSettings.yAxisFontSize);
+        if (barSettings.axisLabel !== undefined) setAxisLabel(barSettings.axisLabel);
+        if (barSettings.axisLabelFontSize !== undefined) setAxisLabelFontSize(barSettings.axisLabelFontSize);
+        if (barSettings.axisMinimum !== undefined) setAxisMinimum(barSettings.axisMinimum);
+        if (barSettings.axisMinimumAuto !== undefined) setAxisMinimumAuto(barSettings.axisMinimumAuto);
+        if (barSettings.axisMaximum !== undefined) setAxisMaximum(barSettings.axisMaximum);
+        if (barSettings.axisMaximumAuto !== undefined) setAxisMaximumAuto(barSettings.axisMaximumAuto);
+        if (barSettings.axisMajorUnit !== undefined) setAxisMajorUnit(barSettings.axisMajorUnit);
+        if (barSettings.axisMajorUnitAuto !== undefined) setAxisMajorUnitAuto(barSettings.axisMajorUnitAuto);
+        if (barSettings.axisMinorUnit !== undefined) setAxisMinorUnit(barSettings.axisMinorUnit);
+        if (barSettings.axisMinorUnitAuto !== undefined) setAxisMinorUnitAuto(barSettings.axisMinorUnitAuto);
+        if (barSettings.axisMajorTickType !== undefined) setAxisMajorTickType(barSettings.axisMajorTickType);
+        if (barSettings.axisMinorTickType !== undefined) setAxisMinorTickType(barSettings.axisMinorTickType);
+        if (barSettings.showHorizontalGridlines !== undefined) setShowHorizontalGridlines(barSettings.showHorizontalGridlines);
+        if (barSettings.showVerticalGridlines !== undefined) setShowVerticalGridlines(barSettings.showVerticalGridlines);
+        if (barSettings.compactAxisNumbers !== undefined) setCompactAxisNumbers(barSettings.compactAxisNumbers);
       } else if (currentChartType === 'funnel' && settings.chartSpecific.funnel) {
         // Apply funnel-specific settings when importing to a funnel chart
         // This will be populated when funnel chart settings are defined
@@ -365,6 +469,10 @@ export const useStyleSettings = (initialTheme = theme) => {
     setCanvasWidth,
     canvasHeight,
     setCanvasHeight,
+    chartWidth,
+    setChartWidth,
+    chartHeight,
+    setChartHeight,
     chartPadding,
     setChartPadding,
     stageGap,
@@ -455,6 +563,52 @@ export const useStyleSettings = (initialTheme = theme) => {
     // Bar Chart specific
     barMode,
     setBarMode,
+    labelMode,
+    setLabelMode,
+    directLabelContent,
+    setDirectLabelContent,
+    emphasizedBars,
+    setEmphasizedBars,
+    xAxisFontSize,
+    setXAxisFontSize,
+    yAxisFontSize,
+    setYAxisFontSize,
+    axisLabel,
+    setAxisLabel,
+    axisLabelFontSize,
+    setAxisLabelFontSize,
+    axisMinimum,
+    setAxisMinimum,
+    axisMinimumAuto,
+    setAxisMinimumAuto,
+    axisMaximum,
+    setAxisMaximum,
+    axisMaximumAuto,
+    setAxisMaximumAuto,
+    axisMajorUnit,
+    setAxisMajorUnit,
+    axisMajorUnitAuto,
+    setAxisMajorUnitAuto,
+    axisMinorUnit,
+    setAxisMinorUnit,
+    axisMinorUnitAuto,
+    setAxisMinorUnitAuto,
+    axisMajorTickType,
+    setAxisMajorTickType,
+    axisMinorTickType,
+    setAxisMinorTickType,
+    showHorizontalGridlines,
+    setShowHorizontalGridlines,
+    showVerticalGridlines,
+    setShowVerticalGridlines,
+    compactAxisNumbers,
+    setCompactAxisNumbers,
+    calculatedAxisMinimum,
+    setCalculatedAxisMinimum,
+    calculatedAxisMaximum,
+    setCalculatedAxisMaximum,
+    calculatedAxisMajorUnit,
+    setCalculatedAxisMajorUnit,
 
     // Actions
     updateAspectRatio,
