@@ -19,7 +19,17 @@ export const useChartData = (chartType = 'funnel') => {
   const defaultDatasetKey = getDefaultDatasetKey(chartType);
   const defaultDataset = getSampleDataset(defaultDatasetKey);
   const defaultChartData = defaultDataset?.data || null;
-  const defaultPeriods = defaultChartData ? Object.keys(defaultChartData[0]).filter((key) => key !== "Stage" && key !== "Category") : [];
+
+  // Extract default periods based on data structure
+  let defaultPeriods = [];
+  if (defaultChartData && defaultChartData.length > 0) {
+    const isGroupedStacked = defaultChartData[0].hasOwnProperty('Group') && defaultChartData[0].hasOwnProperty('Period');
+    if (isGroupedStacked) {
+      defaultPeriods = [...new Set(defaultChartData.map(d => d.Period))];
+    } else {
+      defaultPeriods = Object.keys(defaultChartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+    }
+  }
 
   const [data, setData] = useState(defaultChartData);
   const [periodNames, setPeriodNames] = useState(defaultPeriods);
@@ -38,7 +48,20 @@ export const useChartData = (chartType = 'funnel') => {
     }
 
     const chartData = dataset.data;
-    const periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+
+    // Check if this is grouped-stacked format (has Group and Period columns)
+    const isGroupedStacked = chartData.length > 0 &&
+      chartData[0].hasOwnProperty('Group') &&
+      chartData[0].hasOwnProperty('Period');
+
+    let periods;
+    if (isGroupedStacked) {
+      // For grouped-stacked, extract unique Period values
+      periods = [...new Set(chartData.map(d => d.Period))];
+    } else {
+      // For regular format, filter out Stage/Category columns
+      periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+    }
 
     setData(chartData);
     setPeriodNames(periods);
