@@ -1310,7 +1310,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                     ? 'Display bars side by side for each category'
                     : styleSettings.barMode === 'stacked'
                     ? 'Stack bars on top of each other for cumulative values'
-                    : 'Group categories with stacked bars (Pew Research style)'}
+                    : 'Group categories with stacked bars within each time period'}
                 </p>
               </div>
             </div>

@@ -120,9 +120,30 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     const width = dimensions.width;
     const height = dimensions.height;
 
+    // Detect if this is grouped-stacked format (has Group and Period columns)
+    const isGroupedStackedData = data.length > 0 && data[0].hasOwnProperty('Group') && data[0].hasOwnProperty('Period');
+
     // Extract categories and periods early for use in layout calculations
-    const categories = data.map(d => d.Category || d.category || d.Stage || '');
-    const periods = periodNames;
+    let categories, periods, stackColumns;
+
+    if (isGroupedStackedData && barMode === 'grouped-stacked') {
+      // For grouped-stacked mode with Group/Period format
+      // Groups become the X-axis categories
+      const uniqueGroups = [...new Set(data.map(d => d.Group))];
+      categories = uniqueGroups;
+
+      // Periods are the time series that will be stacked
+      periods = [...new Set(data.map(d => d.Period))];
+
+      // Stack columns are the value columns (e.g., "Very Well", "Somewhat Well")
+      const firstRow = data[0];
+      stackColumns = Object.keys(firstRow).filter(key => key !== 'Group' && key !== 'Period');
+    } else {
+      // Regular format
+      categories = data.map(d => d.Category || d.category || d.Stage || '');
+      periods = periodNames;
+      stackColumns = null;
+    }
 
     // Calculate title and subtitle heights
     const titleHeight = title ? titleFontSize : 0;
@@ -306,25 +327,41 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
         return periods.reduce((sum, period) => sum + (d[period] || 0), 0);
       });
     } else if (barMode === 'grouped-stacked') {
-      // For grouped-stacked, find max sum within each period's groups
-      // Group categories by base name
-      const categoryGroups = {};
-      categories.forEach(cat => {
-        const baseGroup = cat.replace(/ (Very Well|Somewhat Well)$/, '').trim();
-        if (!categoryGroups[baseGroup]) {
-          categoryGroups[baseGroup] = [];
-        }
-        categoryGroups[baseGroup].push(cat);
-      });
+      if (isGroupedStackedData) {
+        // For new grouped-stacked format with Group/Period columns
+        // Find max stacked value across all groups and periods
+        maxValue = d3.max(categories, group => {
+          return d3.max(periods, period => {
+            // Sum all stack columns for this group and period
+            const groupData = data.filter(d => d.Group === group && d.Period === period);
+            if (groupData.length === 0) return 0;
 
-      maxValue = d3.max(periods, period => {
-        return d3.max(Object.values(categoryGroups), groupCategories => {
-          return groupCategories.reduce((sum, category) => {
-            const dataRow = data.find(d => categories[data.indexOf(d)] === category);
-            return sum + (dataRow ? (dataRow[period] || 0) : 0);
-          }, 0);
+            return stackColumns.reduce((sum, col) => {
+              return sum + (groupData[0][col] || 0);
+            }, 0);
+          });
         });
-      });
+      } else {
+        // For old grouped-stacked format, find max sum within each period's groups
+        // Group categories by base name
+        const categoryGroups = {};
+        categories.forEach(cat => {
+          const baseGroup = cat.replace(/ (Very Well|Somewhat Well)$/, '').trim();
+          if (!categoryGroups[baseGroup]) {
+            categoryGroups[baseGroup] = [];
+          }
+          categoryGroups[baseGroup].push(cat);
+        });
+
+        maxValue = d3.max(periods, period => {
+          return d3.max(Object.values(categoryGroups), groupCategories => {
+            return groupCategories.reduce((sum, category) => {
+              const dataRow = data.find(d => categories[data.indexOf(d)] === category);
+              return sum + (dataRow ? (dataRow[period] || 0) : 0);
+            }, 0);
+          });
+        });
+      }
     } else {
       // For grouped, find max across all values
       maxValue = d3.max(data, d => {
@@ -344,8 +381,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
 
     if (orientation === 'vertical') {
       // Vertical bars: categories on X, values on Y
+      // For grouped-stacked mode, use periods on X-axis instead of categories
       xScale = d3.scaleBand()
-        .domain(categories)
+        .domain(barMode === 'grouped-stacked' ? periods : categories)
         .range([0, innerWidth])
         .padding(groupPadding);
 
@@ -425,8 +463,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       yAxis = d3.axisLeft(yScale).tickValues(yTicks).tickSize(majorTickSize).tickFormat(formatAxisValue);
     } else {
       // Horizontal bars: categories on Y, values on X
+      // For grouped-stacked mode, use periods on Y-axis instead of categories
       yScale = d3.scaleBand()
-        .domain(categories)
+        .domain(barMode === 'grouped-stacked' ? periods : categories)
         .range([0, innerHeight])
         .padding(groupPadding);
 
@@ -741,153 +780,290 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
 
     // Draw bars
     if (barMode === 'grouped-stacked') {
-      // Grouped-Stacked bars (Pew Research style)
-      // Groups are periods (time), each period has multiple stacked bars for different voter types
+      if (isGroupedStackedData) {
+        // NEW: Grouped-Stacked bars with Group/Period columns
+        // Groups are voter types (All Voters, Rep, Dem), each group has multiple time-based stacked bars
 
-      // For this mode, we need to group categories by their base name
-      // e.g., "All Voters Very Well" and "All Voters Somewhat Well" belong to "All Voters" group
-      const categoryGroups = {};
-      categories.forEach(cat => {
-        // Extract base group name (everything before "Very Well" or "Somewhat Well")
-        const baseGroup = cat.replace(/ (Very Well|Somewhat Well)$/, '').trim();
-        if (!categoryGroups[baseGroup]) {
-          categoryGroups[baseGroup] = [];
-        }
-        categoryGroups[baseGroup].push(cat);
-      });
+        const groupWidth = orientation === 'vertical' ? xScale.bandwidth() : yScale.bandwidth();
+        const periodCount = periods.length;
+        const barWidth = groupWidth / periodCount * (1 - barPadding);
+        const barOffset = groupWidth / periodCount;
 
-      const groupNames = Object.keys(categoryGroups);
-      const groupCount = groupNames.length;
+        if (orientation === 'vertical') {
+          // Vertical grouped-stacked bars
+          categories.forEach((group, groupIndex) => {
+            const groupX = xScale(group) || 0;
 
-      if (orientation === 'vertical') {
-        // Vertical grouped-stacked bars
-        periods.forEach((period, periodIndex) => {
-          const periodX = xScale(period) || 0;
-          const periodWidth = xScale.bandwidth();
-          const groupWidth = periodWidth / groupCount;
+            periods.forEach((period, periodIndex) => {
+              // Find data for this group and period
+              const groupPeriodData = data.filter(d => d.Group === group && d.Period === period);
+              if (groupPeriodData.length === 0) return;
 
-          groupNames.forEach((groupName, groupIndex) => {
-            const groupX = periodX + groupIndex * groupWidth;
-            const groupCategories = categoryGroups[groupName];
-            let cumulativeValue = 0;
+              const dataRow = groupPeriodData[0];
+              const barX = groupX + periodIndex * barOffset;
+              const color = colorScheme[periodIndex % colorScheme.length];
 
-            groupCategories.forEach((category, catIndex) => {
-              const dataRow = data.find(d => categories[data.indexOf(d)] === category);
-              if (!dataRow) return;
+              let cumulativeValue = 0;
 
-              const value = dataRow[period] || 0;
-              const color = colorScheme[groupIndex % colorScheme.length];
-              const y = yScale(cumulativeValue + value);
-              const height = yScale(cumulativeValue) - y;
+              // Stack the values (Very Well, Somewhat Well)
+              stackColumns.forEach((stackCol, stackIndex) => {
+                const value = dataRow[stackCol] || 0;
+                const y = yScale(cumulativeValue + value);
+                const height = yScale(cumulativeValue) - y;
 
-              const barGroup = g.append('g').attr('class', 'bar-group');
+                const barGroup = g.append('g').attr('class', 'bar-group');
 
-              barGroup.append('rect')
-                .attr('x', groupX)
-                .attr('y', y)
-                .attr('width', groupWidth * (1 - barPadding))
-                .attr('height', height)
-                .attr('fill', color)
-                .attr('opacity', barOpacity * (catIndex === 0 ? 1 : 0.7)) // Darker for "Very Well"
-                .attr('stroke', barBorderColor)
-                .attr('stroke-width', barBorderWidth)
-                .style('cursor', 'pointer');
+                barGroup.append('rect')
+                  .attr('x', barX)
+                  .attr('y', y)
+                  .attr('width', barWidth)
+                  .attr('height', height)
+                  .attr('fill', color)
+                  .attr('opacity', barOpacity * (stackIndex === 0 ? 1 : 0.6)) // First stack column darker
+                  .attr('stroke', barBorderColor)
+                  .attr('stroke-width', barBorderWidth)
+                  .style('cursor', 'pointer');
 
-              // Add value label if there's space
-              if (height > 20) {
-                barGroup.append('text')
-                  .attr('x', groupX + (groupWidth * (1 - barPadding)) / 2)
-                  .attr('y', y + height / 2)
-                  .attr('dy', '0.35em')
+                // Add value label if there's space
+                if (showValueLabels && height > 15) {
+                  barGroup.append('text')
+                    .attr('x', barX + barWidth / 2)
+                    .attr('y', y + height / 2)
+                    .attr('dy', '0.35em')
+                    .attr('text-anchor', 'middle')
+                    .attr('font-family', valueFont)
+                    .attr('font-size', valueFontSize - 2)
+                    .attr('font-weight', valueWeight)
+                    .attr('fill', '#ffffff')
+                    .text(formatValue(value));
+                }
+
+                cumulativeValue += value;
+              });
+
+              // Add NET total label above the stacked bar
+              if (showValueLabels) {
+                g.append('text')
+                  .attr('x', barX + barWidth / 2)
+                  .attr('y', yScale(cumulativeValue) - 5)
                   .attr('text-anchor', 'middle')
                   .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize - 2)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', '#ffffff')
-                  .text(formatValue(value));
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', 600)
+                  .attr('fill', axisColor)
+                  .text(formatValue(cumulativeValue));
               }
-
-              cumulativeValue += value;
             });
-
-            // Add NET total label above the stacked bars
-            if (showValueLabels) {
-              g.append('text')
-                .attr('x', groupX + (groupWidth * (1 - barPadding)) / 2)
-                .attr('y', yScale(cumulativeValue) - 5)
-                .attr('text-anchor', 'middle')
-                .attr('font-family', valueFont)
-                .attr('font-size', valueFontSize)
-                .attr('font-weight', 600)
-                .attr('fill', axisColor)
-                .text(formatValue(cumulativeValue));
-            }
           });
-        });
+        } else {
+          // Horizontal grouped-stacked bars
+          categories.forEach((group, groupIndex) => {
+            const groupY = yScale(group) || 0;
+
+            periods.forEach((period, periodIndex) => {
+              // Find data for this group and period
+              const groupPeriodData = data.filter(d => d.Group === group && d.Period === period);
+              if (groupPeriodData.length === 0) return;
+
+              const dataRow = groupPeriodData[0];
+              const barY = groupY + periodIndex * barOffset;
+              const color = colorScheme[periodIndex % colorScheme.length];
+
+              let cumulativeValue = 0;
+
+              // Stack the values (Very Well, Somewhat Well)
+              stackColumns.forEach((stackCol, stackIndex) => {
+                const value = dataRow[stackCol] || 0;
+                const x = xScale(cumulativeValue);
+                const width = xScale(cumulativeValue + value) - x;
+
+                const barGroup = g.append('g').attr('class', 'bar-group');
+
+                barGroup.append('rect')
+                  .attr('x', x)
+                  .attr('y', barY)
+                  .attr('width', width)
+                  .attr('height', barWidth)
+                  .attr('fill', color)
+                  .attr('opacity', barOpacity * (stackIndex === 0 ? 1 : 0.6))
+                  .attr('stroke', barBorderColor)
+                  .attr('stroke-width', barBorderWidth)
+                  .style('cursor', 'pointer');
+
+                // Add value label if there's space
+                if (showValueLabels && width > 40) {
+                  barGroup.append('text')
+                    .attr('x', x + width / 2)
+                    .attr('y', barY + barWidth / 2)
+                    .attr('dy', '0.35em')
+                    .attr('text-anchor', 'middle')
+                    .attr('font-family', valueFont)
+                    .attr('font-size', valueFontSize - 2)
+                    .attr('font-weight', valueWeight)
+                    .attr('fill', '#ffffff')
+                    .text(formatValue(value));
+                }
+
+                cumulativeValue += value;
+              });
+
+              // Add NET total label to the right of the stacked bar
+              if (showValueLabels) {
+                g.append('text')
+                  .attr('x', xScale(cumulativeValue) + 5)
+                  .attr('y', barY + barWidth / 2)
+                  .attr('dy', '0.35em')
+                  .attr('text-anchor', 'start')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', 600)
+                  .attr('fill', axisColor)
+                  .text(formatValue(cumulativeValue));
+              }
+            });
+          });
+        }
       } else {
-        // Horizontal grouped-stacked bars (if needed)
-        periods.forEach((period, periodIndex) => {
-          const periodY = yScale(period) || 0;
-          const periodHeight = yScale.bandwidth();
-          const groupHeight = periodHeight / groupCount;
+        // OLD: Legacy grouped-stacked format (kept for backward compatibility)
+        // Groups are periods (time), each period has multiple stacked bars for different voter types
+        const categoryGroups = {};
+        categories.forEach(cat => {
+          const baseGroup = cat.replace(/ (Very Well|Somewhat Well)$/, '').trim();
+          if (!categoryGroups[baseGroup]) {
+            categoryGroups[baseGroup] = [];
+          }
+          categoryGroups[baseGroup].push(cat);
+        });
 
-          groupNames.forEach((groupName, groupIndex) => {
-            const groupY = periodY + groupIndex * groupHeight;
-            const groupCategories = categoryGroups[groupName];
-            let cumulativeValue = 0;
+        const groupNames = Object.keys(categoryGroups);
+        const groupCount = groupNames.length;
 
-            groupCategories.forEach((category, catIndex) => {
-              const dataRow = data.find(d => categories[data.indexOf(d)] === category);
-              if (!dataRow) return;
+        if (orientation === 'vertical') {
+          periods.forEach((period, periodIndex) => {
+            const periodX = xScale(period) || 0;
+            const periodWidth = xScale.bandwidth();
+            const groupWidth = periodWidth / groupCount;
 
-              const value = dataRow[period] || 0;
-              const color = colorScheme[groupIndex % colorScheme.length];
-              const x = xScale(cumulativeValue);
-              const width = xScale(cumulativeValue + value) - x;
+            groupNames.forEach((groupName, groupIndex) => {
+              const groupX = periodX + groupIndex * groupWidth;
+              const groupCategories = categoryGroups[groupName];
+              let cumulativeValue = 0;
 
-              const barGroup = g.append('g').attr('class', 'bar-group');
+              groupCategories.forEach((category, catIndex) => {
+                const dataRow = data.find(d => categories[data.indexOf(d)] === category);
+                if (!dataRow) return;
 
-              barGroup.append('rect')
-                .attr('x', x)
-                .attr('y', groupY)
-                .attr('width', width)
-                .attr('height', groupHeight * (1 - barPadding))
-                .attr('fill', color)
-                .attr('opacity', barOpacity * (catIndex === 0 ? 1 : 0.7))
-                .attr('stroke', barBorderColor)
-                .attr('stroke-width', barBorderWidth)
-                .style('cursor', 'pointer');
+                const value = dataRow[period] || 0;
+                const color = colorScheme[groupIndex % colorScheme.length];
+                const y = yScale(cumulativeValue + value);
+                const height = yScale(cumulativeValue) - y;
 
-              if (width > 40) {
-                barGroup.append('text')
-                  .attr('x', x + width / 2)
+                const barGroup = g.append('g').attr('class', 'bar-group');
+
+                barGroup.append('rect')
+                  .attr('x', groupX)
+                  .attr('y', y)
+                  .attr('width', groupWidth * (1 - barPadding))
+                  .attr('height', height)
+                  .attr('fill', color)
+                  .attr('opacity', barOpacity * (catIndex === 0 ? 1 : 0.7))
+                  .attr('stroke', barBorderColor)
+                  .attr('stroke-width', barBorderWidth)
+                  .style('cursor', 'pointer');
+
+                if (height > 20) {
+                  barGroup.append('text')
+                    .attr('x', groupX + (groupWidth * (1 - barPadding)) / 2)
+                    .attr('y', y + height / 2)
+                    .attr('dy', '0.35em')
+                    .attr('text-anchor', 'middle')
+                    .attr('font-family', valueFont)
+                    .attr('font-size', valueFontSize - 2)
+                    .attr('font-weight', valueWeight)
+                    .attr('fill', '#ffffff')
+                    .text(formatValue(value));
+                }
+
+                cumulativeValue += value;
+              });
+
+              if (showValueLabels) {
+                g.append('text')
+                  .attr('x', groupX + (groupWidth * (1 - barPadding)) / 2)
+                  .attr('y', yScale(cumulativeValue) - 5)
+                  .attr('text-anchor', 'middle')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', 600)
+                  .attr('fill', axisColor)
+                  .text(formatValue(cumulativeValue));
+              }
+            });
+          });
+        } else {
+          periods.forEach((period, periodIndex) => {
+            const periodY = yScale(period) || 0;
+            const periodHeight = yScale.bandwidth();
+            const groupHeight = periodHeight / groupCount;
+
+            groupNames.forEach((groupName, groupIndex) => {
+              const groupY = periodY + groupIndex * groupHeight;
+              const groupCategories = categoryGroups[groupName];
+              let cumulativeValue = 0;
+
+              groupCategories.forEach((category, catIndex) => {
+                const dataRow = data.find(d => categories[data.indexOf(d)] === category);
+                if (!dataRow) return;
+
+                const value = dataRow[period] || 0;
+                const color = colorScheme[groupIndex % colorScheme.length];
+                const x = xScale(cumulativeValue);
+                const width = xScale(cumulativeValue + value) - x;
+
+                const barGroup = g.append('g').attr('class', 'bar-group');
+
+                barGroup.append('rect')
+                  .attr('x', x)
+                  .attr('y', groupY)
+                  .attr('width', width)
+                  .attr('height', groupHeight * (1 - barPadding))
+                  .attr('fill', color)
+                  .attr('opacity', barOpacity * (catIndex === 0 ? 1 : 0.7))
+                  .attr('stroke', barBorderColor)
+                  .attr('stroke-width', barBorderWidth)
+                  .style('cursor', 'pointer');
+
+                if (width > 40) {
+                  barGroup.append('text')
+                    .attr('x', x + width / 2)
+                    .attr('y', groupY + (groupHeight * (1 - barPadding)) / 2)
+                    .attr('dy', '0.35em')
+                    .attr('text-anchor', 'middle')
+                    .attr('font-family', valueFont)
+                    .attr('font-size', valueFontSize - 2)
+                    .attr('font-weight', valueWeight)
+                    .attr('fill', '#ffffff')
+                    .text(formatValue(value));
+                }
+
+                cumulativeValue += value;
+              });
+
+              if (showValueLabels) {
+                g.append('text')
+                  .attr('x', xScale(cumulativeValue) + 5)
                   .attr('y', groupY + (groupHeight * (1 - barPadding)) / 2)
                   .attr('dy', '0.35em')
-                  .attr('text-anchor', 'middle')
+                  .attr('text-anchor', 'start')
                   .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize - 2)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', '#ffffff')
-                  .text(formatValue(value));
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', 600)
+                  .attr('fill', axisColor)
+                  .text(formatValue(cumulativeValue));
               }
-
-              cumulativeValue += value;
             });
-
-            if (showValueLabels) {
-              g.append('text')
-                .attr('x', xScale(cumulativeValue) + 5)
-                .attr('y', groupY + (groupHeight * (1 - barPadding)) / 2)
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'start')
-                .attr('font-family', valueFont)
-                .attr('font-size', valueFontSize)
-                .attr('font-weight', 600)
-                .attr('fill', axisColor)
-                .text(formatValue(cumulativeValue));
-            }
           });
-        });
+        }
       }
     } else if (barMode === 'grouped') {
       // Grouped bars

@@ -659,14 +659,20 @@ export const sampleDatasets = {
 
   barElectionOpinion: {
     name: "Election Administration Opinion",
-    description: "Voter opinions on election administration (Pew Research style)",
+    description: "Voter opinions on election administration (grouped-stacked style)",
     data: [
-      { Category: "All Voters Very Well", "Nov '18": 21, "Nov '20": 35, "Nov '22": 37, "Nov '24": 43 },
-      { Category: "All Voters Somewhat Well", "Nov '18": 54, "Nov '20": 24, "Nov '22": 37, "Nov '24": 45 },
-      { Category: "Rep Candidate Very Well", "Nov '18": 24, "Nov '20": 14, "Nov '22": 39, "Nov '24": 39 },
-      { Category: "Rep Candidate Somewhat Well", "Nov '18": 54, "Nov '20": 39, "Nov '22": 54, "Nov '24": 54 },
-      { Category: "Dem Candidate Very Well", "Nov '18": 19, "Nov '20": 64, "Nov '22": 61, "Nov '24": 47 },
-      { Category: "Dem Candidate Somewhat Well", "Nov '18": 54, "Nov '20": 30, "Nov '22": 35, "Nov '24": 37 },
+      { Group: "All Voters", Period: "Nov '18", "Very Well": 21, "Somewhat Well": 54 },
+      { Group: "All Voters", Period: "Nov '20", "Very Well": 35, "Somewhat Well": 24 },
+      { Group: "All Voters", Period: "Nov '22", "Very Well": 37, "Somewhat Well": 37 },
+      { Group: "All Voters", Period: "Nov '24", "Very Well": 43, "Somewhat Well": 45 },
+      { Group: "Rep Candidate Voters", Period: "Nov '18", "Very Well": 24, "Somewhat Well": 35 },
+      { Group: "Rep Candidate Voters", Period: "Nov '20", "Very Well": 14, "Somewhat Well": 39 },
+      { Group: "Rep Candidate Voters", Period: "Nov '22", "Very Well": 39, "Somewhat Well": 54 },
+      { Group: "Rep Candidate Voters", Period: "Nov '24", "Very Well": 47, "Somewhat Well": 37 },
+      { Group: "Dem Candidate Voters", Period: "Nov '18", "Very Well": 19, "Somewhat Well": 54 },
+      { Group: "Dem Candidate Voters", Period: "Nov '20", "Very Well": 64, "Somewhat Well": 30 },
+      { Group: "Dem Candidate Voters", Period: "Nov '22", "Very Well": 61, "Somewhat Well": 35 },
+      { Group: "Dem Candidate Voters", Period: "Nov '24", "Very Well": 47, "Somewhat Well": 37 },
     ],
   },
 };
