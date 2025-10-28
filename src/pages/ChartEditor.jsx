@@ -2548,6 +2548,7 @@ function DataTabContent({ chartData, chartType }) {
               <option value="barProductRevenue">Product Category Revenue</option>
               <option value="barTeamPerformance">Team Performance Metrics</option>
               <option value="barCustomerAcquisition">Customer Acquisition by Source</option>
+              <option value="barElectionOpinion">Election Administration Opinion</option>
             </optgroup>
           ) : (
             <>
