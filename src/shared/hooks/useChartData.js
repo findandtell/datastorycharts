@@ -38,6 +38,36 @@ export const useChartData = (chartType = 'funnel') => {
   const [error, setError] = useState(null);
 
   /**
+   * Transform Group/Period format to Category/Period format for editing
+   */
+  const transformGroupPeriodToEditor = (data) => {
+    // Get unique groups and periods
+    const groups = [...new Set(data.map(d => d.Group))];
+    const periods = [...new Set(data.map(d => d.Period))];
+
+    // Get value column names (everything except Group and Period)
+    const valueColumns = Object.keys(data[0]).filter(key => key !== 'Group' && key !== 'Period');
+
+    // Create rows for editor: one row per Group+ValueColumn combination
+    const editorData = [];
+
+    groups.forEach(group => {
+      valueColumns.forEach(valueCol => {
+        const row = { Category: `${group} - ${valueCol}` };
+
+        periods.forEach(period => {
+          const dataRow = data.find(d => d.Group === group && d.Period === period);
+          row[period] = dataRow ? dataRow[valueCol] : 0;
+        });
+
+        editorData.push(row);
+      });
+    });
+
+    return editorData;
+  };
+
+  /**
    * Load sample dataset
    */
   const loadSampleData = useCallback((datasetKey) => {
@@ -54,18 +84,21 @@ export const useChartData = (chartType = 'funnel') => {
       chartData[0].hasOwnProperty('Group') &&
       chartData[0].hasOwnProperty('Period');
 
-    let periods;
+    let periods, editableData;
     if (isGroupedStacked) {
       // For grouped-stacked, extract unique Period values
       periods = [...new Set(chartData.map(d => d.Period))];
+      // Transform to editor-friendly format
+      editableData = transformGroupPeriodToEditor(chartData);
     } else {
       // For regular format, filter out Stage/Category columns
       periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+      editableData = JSON.parse(JSON.stringify(chartData));
     }
 
     setData(chartData);
     setPeriodNames(periods);
-    setEditableData(JSON.parse(JSON.stringify(chartData)));
+    setEditableData(editableData);
     setIsComparisonMode(isComparisonDataset(datasetKey));
     setError(null);
 
