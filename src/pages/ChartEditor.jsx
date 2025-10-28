@@ -2660,11 +2660,25 @@ function EditDataTable({ chartData, chartType, onClose }) {
   const [newPeriodName, setNewPeriodName] = useState('');
   const [newStageName, setNewStageName] = useState('');
 
+  // Detect if we're using flattened grouped-stacked format (Datawrapper style)
+  const isFlattenedGroupedStacked = chartData.editableData.length > 0 &&
+    chartData.editableData[0].hasOwnProperty('Period') &&
+    Object.keys(chartData.editableData[0]).some(key => key !== 'Period' && key.includes(' - '));
+
   // Chart-specific labels
   const isBarChart = chartType === 'bar';
-  const stageLabel = isBarChart ? 'Category' : 'Stage';
-  const periodLabel = isBarChart ? 'Value' : 'Period';
-  const stageFieldName = isBarChart ? 'Category' : 'Stage'; // The actual data field name
+
+  // For flattened format, rows are Periods and columns are "Group - Value" combinations
+  // For regular format, rows are Stage/Category and columns are period names
+  const stageLabel = isFlattenedGroupedStacked ? 'Period' : (isBarChart ? 'Category' : 'Stage');
+  const periodLabel = isFlattenedGroupedStacked ? 'Series' : (isBarChart ? 'Value' : 'Period');
+  const stageFieldName = isFlattenedGroupedStacked ? 'Period' : (isBarChart ? 'Category' : 'Stage');
+
+  // For flattened format, "periods" are actually the Group-Value column names
+  const columnNames = isFlattenedGroupedStacked
+    ? (chartData.editableData.length > 0 ? Object.keys(chartData.editableData[0]).filter(key => key !== 'Period') : [])
+    : chartData.periodNames;
+
   const [draggedColumn, setDraggedColumn] = useState(null);
   const [draggedRow, setDraggedRow] = useState(null);
 
@@ -2771,54 +2785,60 @@ function EditDataTable({ chartData, chartType, onClose }) {
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
                   {stageLabel}
                 </th>
-                {chartData.periodNames.map((period, idx) => (
+                {columnNames.map((columnName, idx) => (
                   <th
                     key={idx}
-                    draggable
-                    onDragStart={(e) => handleColumnDragStart(e, idx)}
-                    onDragOver={handleColumnDragOver}
-                    onDrop={(e) => handleColumnDrop(e, idx)}
-                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-move hover:bg-gray-100"
+                    draggable={!isFlattenedGroupedStacked}
+                    onDragStart={(e) => !isFlattenedGroupedStacked && handleColumnDragStart(e, idx)}
+                    onDragOver={!isFlattenedGroupedStacked && handleColumnDragOver}
+                    onDrop={(e) => !isFlattenedGroupedStacked && handleColumnDrop(e, idx)}
+                    className={`px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${!isFlattenedGroupedStacked ? 'cursor-move hover:bg-gray-100' : ''}`}
                   >
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <input
-                          type="text"
-                          value={period}
-                          onChange={(e) => chartData.updatePeriodName(period, e.target.value)}
-                          className="bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-cyan-500 rounded px-1 flex-1"
-                        />
-                        <button
-                          onClick={() => chartData.removePeriod(period)}
-                          className="text-red-600 hover:text-red-800 font-bold"
-                          title="Delete column"
-                        >
-                          ×
-                        </button>
+                    {isFlattenedGroupedStacked ? (
+                      // For flattened format, just show the column name (Group - Value)
+                      <div className="font-medium">{columnName}</div>
+                    ) : (
+                      // For regular format, show editable period name with controls
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <input
+                            type="text"
+                            value={columnName}
+                            onChange={(e) => chartData.updatePeriodName(columnName, e.target.value)}
+                            className="bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-cyan-500 rounded px-1 flex-1"
+                          />
+                          <button
+                            onClick={() => chartData.removePeriod(columnName)}
+                            className="text-red-600 hover:text-red-800 font-bold"
+                            title="Delete column"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              chartData.sortByPeriod(columnName, false);
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                            title="Sort descending"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              chartData.sortByPeriod(columnName, true);
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                            title="Sort ascending"
+                          >
+                            ↑
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            chartData.sortByPeriod(period, false);
-                          }}
-                          className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded"
-                          title="Sort descending"
-                        >
-                          ↓
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            chartData.sortByPeriod(period, true);
-                          }}
-                          className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded"
-                          title="Sort ascending"
-                        >
-                          ↑
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </th>
                 ))}
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
@@ -2845,12 +2865,12 @@ function EditDataTable({ chartData, chartType, onClose }) {
                       className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
                   </td>
-                  {chartData.periodNames.map((period, colIndex) => (
+                  {columnNames.map((columnName, colIndex) => (
                     <td key={colIndex} className="px-3 py-2">
                       <input
                         type="number"
-                        value={row[period] || 0}
-                        onChange={(e) => chartData.updateDataValue(rowIndex, period, parseFloat(e.target.value) || 0)}
+                        value={row[columnName] || 0}
+                        onChange={(e) => chartData.updateDataValue(rowIndex, columnName, parseFloat(e.target.value) || 0)}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       />
                     </td>
