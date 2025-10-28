@@ -38,33 +38,56 @@ export const useChartData = (chartType = 'funnel') => {
   const [error, setError] = useState(null);
 
   /**
-   * Transform Group/Period format to Category/Period format for editing
+   * Detect if data is in flattened grouped-stacked format
+   * Format: { Period: "Nov '18", "Group - Value": 21, ... }
    */
-  const transformGroupPeriodToEditor = (data) => {
-    // Get unique groups and periods
-    const groups = [...new Set(data.map(d => d.Group))];
-    const periods = [...new Set(data.map(d => d.Period))];
+  const isFlattenedGroupedStacked = (data) => {
+    if (data.length === 0) return false;
+    const firstRow = data[0];
 
-    // Get value column names (everything except Group and Period)
-    const valueColumns = Object.keys(data[0]).filter(key => key !== 'Group' && key !== 'Period');
+    // Must have "Period" column
+    if (!firstRow.hasOwnProperty('Period')) return false;
 
-    // Create rows for editor: one row per Group+ValueColumn combination
-    const editorData = [];
+    // Check if other columns follow "Group - Value" pattern
+    const otherKeys = Object.keys(firstRow).filter(key => key !== 'Period');
+    return otherKeys.some(key => key.includes(' - '));
+  };
 
-    groups.forEach(group => {
-      valueColumns.forEach(valueCol => {
-        const row = { Category: `${group} - ${valueCol}` };
+  /**
+   * Transform flattened format to Group/Period format for chart rendering
+   * From: { Period: "Nov '18", "All Voters - Very Well": 21, ... }
+   * To: { Group: "All Voters", Period: "Nov '18", "Very Well": 21, ... }
+   */
+  const transformFlattenedToGroupPeriod = (data) => {
+    const result = [];
 
-        periods.forEach(period => {
-          const dataRow = data.find(d => d.Group === group && d.Period === period);
-          row[period] = dataRow ? dataRow[valueCol] : 0;
-        });
+    data.forEach(row => {
+      const period = row.Period;
+      const groupedData = {};
 
-        editorData.push(row);
+      // Parse each column to extract group and value column
+      Object.keys(row).forEach(key => {
+        if (key === 'Period') return;
+
+        const parts = key.split(' - ');
+        if (parts.length >= 2) {
+          const group = parts[0];
+          const valueColumn = parts.slice(1).join(' - '); // Handle cases like "Group - Sub - Value"
+
+          if (!groupedData[group]) {
+            groupedData[group] = { Group: group, Period: period };
+          }
+          groupedData[group][valueColumn] = row[key];
+        }
+      });
+
+      // Add all group rows for this period
+      Object.values(groupedData).forEach(groupRow => {
+        result.push(groupRow);
       });
     });
 
-    return editorData;
+    return result;
   };
 
   /**
@@ -77,23 +100,25 @@ export const useChartData = (chartType = 'funnel') => {
       return false;
     }
 
-    const chartData = dataset.data;
+    let chartData = dataset.data;
+    let editableData = JSON.parse(JSON.stringify(chartData));
+    let periods;
 
-    // Check if this is grouped-stacked format (has Group and Period columns)
-    const isGroupedStacked = chartData.length > 0 &&
-      chartData[0].hasOwnProperty('Group') &&
-      chartData[0].hasOwnProperty('Period');
+    // Check if this is flattened grouped-stacked format
+    const isFlattenedGS = isFlattenedGroupedStacked(chartData);
 
-    let periods, editableData;
-    if (isGroupedStacked) {
-      // For grouped-stacked, extract unique Period values
-      periods = [...new Set(chartData.map(d => d.Period))];
-      // Transform to editor-friendly format
-      editableData = transformGroupPeriodToEditor(chartData);
+    if (isFlattenedGS) {
+      // Extract periods from the Period column
+      periods = chartData.map(d => d.Period);
+
+      // Transform to Group/Period format for chart rendering
+      chartData = transformFlattenedToGroupPeriod(chartData);
+
+      // Keep flattened format for editing (Datawrapper style!)
+      editableData = JSON.parse(JSON.stringify(dataset.data));
     } else {
       // For regular format, filter out Stage/Category columns
       periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
-      editableData = JSON.parse(JSON.stringify(chartData));
     }
 
     setData(chartData);

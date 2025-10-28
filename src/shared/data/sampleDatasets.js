@@ -661,18 +661,42 @@ export const sampleDatasets = {
     name: "Election Administration Opinion",
     description: "Voter opinions on election administration (grouped-stacked style)",
     data: [
-      { Group: "All Voters", Period: "Nov '18", "Very Well": 21, "Somewhat Well": 54 },
-      { Group: "All Voters", Period: "Nov '20", "Very Well": 35, "Somewhat Well": 24 },
-      { Group: "All Voters", Period: "Nov '22", "Very Well": 37, "Somewhat Well": 37 },
-      { Group: "All Voters", Period: "Nov '24", "Very Well": 43, "Somewhat Well": 45 },
-      { Group: "Rep Candidate Voters", Period: "Nov '18", "Very Well": 24, "Somewhat Well": 35 },
-      { Group: "Rep Candidate Voters", Period: "Nov '20", "Very Well": 14, "Somewhat Well": 39 },
-      { Group: "Rep Candidate Voters", Period: "Nov '22", "Very Well": 39, "Somewhat Well": 54 },
-      { Group: "Rep Candidate Voters", Period: "Nov '24", "Very Well": 47, "Somewhat Well": 37 },
-      { Group: "Dem Candidate Voters", Period: "Nov '18", "Very Well": 19, "Somewhat Well": 54 },
-      { Group: "Dem Candidate Voters", Period: "Nov '20", "Very Well": 64, "Somewhat Well": 30 },
-      { Group: "Dem Candidate Voters", Period: "Nov '22", "Very Well": 61, "Somewhat Well": 35 },
-      { Group: "Dem Candidate Voters", Period: "Nov '24", "Very Well": 47, "Somewhat Well": 37 },
+      {
+        "Period": "Nov '18",
+        "All Voters - Very Well": 21,
+        "All Voters - Somewhat Well": 54,
+        "Rep Candidate Voters - Very Well": 24,
+        "Rep Candidate Voters - Somewhat Well": 35,
+        "Dem Candidate Voters - Very Well": 19,
+        "Dem Candidate Voters - Somewhat Well": 54
+      },
+      {
+        "Period": "Nov '20",
+        "All Voters - Very Well": 35,
+        "All Voters - Somewhat Well": 24,
+        "Rep Candidate Voters - Very Well": 14,
+        "Rep Candidate Voters - Somewhat Well": 39,
+        "Dem Candidate Voters - Very Well": 64,
+        "Dem Candidate Voters - Somewhat Well": 30
+      },
+      {
+        "Period": "Nov '22",
+        "All Voters - Very Well": 37,
+        "All Voters - Somewhat Well": 37,
+        "Rep Candidate Voters - Very Well": 39,
+        "Rep Candidate Voters - Somewhat Well": 54,
+        "Dem Candidate Voters - Very Well": 61,
+        "Dem Candidate Voters - Somewhat Well": 35
+      },
+      {
+        "Period": "Nov '24",
+        "All Voters - Very Well": 43,
+        "All Voters - Somewhat Well": 45,
+        "Rep Candidate Voters - Very Well": 47,
+        "Rep Candidate Voters - Somewhat Well": 37,
+        "Dem Candidate Voters - Very Well": 47,
+        "Dem Candidate Voters - Somewhat Well": 37
+      },
     ],
   },
 };
