@@ -588,15 +588,72 @@ export const sampleDatasets = {
   },
 
   // Bar Chart datasets
-  barDefault: {
-    name: "Product Sales Data",
-    description: "Unit sales and returns by product",
+  barSimple: {
+    name: "Units Produced by Region",
+    description: "Production units by regional location",
     data: [
-      { Category: "Shirts", "Unit Sales": 1250, "Unit Returns": 85 },
-      { Category: "Pants", "Unit Sales": 980, "Unit Returns": 62 },
-      { Category: "Shoes", "Unit Sales": 1540, "Unit Returns": 128 },
-      { Category: "Socks", "Unit Sales": 2100, "Unit Returns": 45 },
-      { Category: "Hats", "Unit Sales": 760, "Unit Returns": 38 },
+      { Category: "East", "Jan": 41427 },
+      { Category: "Central", "Jan": 37284 },
+      { Category: "North", "Jan": 22371 },
+      { Category: "West", "Jan": 20134 },
+    ],
+  },
+
+  barRegionalSales: {
+    name: "Sales Performance by Region",
+    description: "Compare regional sales across multiple quarters",
+    data: [
+      { Category: "North America", "Q1 2024": 245000, "Q2 2024": 298000, "Q3 2024": 312000 },
+      { Category: "Europe", "Q1 2024": 189000, "Q2 2024": 215000, "Q3 2024": 228000 },
+      { Category: "Asia Pacific", "Q1 2024": 156000, "Q2 2024": 198000, "Q3 2024": 245000 },
+      { Category: "Latin America", "Q1 2024": 98000, "Q2 2024": 112000, "Q3 2024": 125000 },
+    ],
+  },
+
+  barMarketingChannels: {
+    name: "Marketing Channel Performance",
+    description: "Compare marketing channel effectiveness (conversions)",
+    data: [
+      { Category: "Organic Search", "2023": 12500, "2024": 15800 },
+      { Category: "Paid Social", "2023": 8900, "2024": 11200 },
+      { Category: "Email Marketing", "2023": 6700, "2024": 7400 },
+      { Category: "Direct Traffic", "2023": 5200, "2024": 5800 },
+      { Category: "Referral", "2023": 3400, "2024": 4100 },
+    ],
+  },
+
+  barProductRevenue: {
+    name: "Product Category Revenue",
+    description: "E-commerce revenue by product category",
+    data: [
+      { Category: "Electronics", "Jan": 145000, "Feb": 132000, "Mar": 168000 },
+      { Category: "Clothing", "Jan": 98000, "Feb": 115000, "Mar": 122000 },
+      { Category: "Home & Garden", "Jan": 76000, "Feb": 82000, "Mar": 91000 },
+      { Category: "Sports", "Jan": 62000, "Feb": 71000, "Mar": 78000 },
+      { Category: "Books", "Jan": 34000, "Feb": 38000, "Mar": 41000 },
+    ],
+  },
+
+  barTeamPerformance: {
+    name: "Team Performance Metrics",
+    description: "Track team productivity across quarters",
+    data: [
+      { Category: "Engineering", "Q1": 145, "Q2": 162, "Q3": 178, "Q4": 189 },
+      { Category: "Product", "Q1": 98, "Q2": 112, "Q3": 125, "Q4": 134 },
+      { Category: "Design", "Q1": 76, "Q2": 84, "Q3": 91, "Q4": 98 },
+      { Category: "Marketing", "Q1": 112, "Q2": 128, "Q3": 145, "Q4": 156 },
+    ],
+  },
+
+  barCustomerAcquisition: {
+    name: "Customer Acquisition by Source",
+    description: "New customers acquired through different channels",
+    data: [
+      { Category: "Google Ads", "Month 1": 450, "Month 2": 520, "Month 3": 580 },
+      { Category: "Facebook Ads", "Month 1": 380, "Month 2": 420, "Month 3": 390 },
+      { Category: "Content Marketing", "Month 1": 290, "Month 2": 340, "Month 3": 410 },
+      { Category: "Partnerships", "Month 1": 180, "Month 2": 210, "Month 3": 245 },
+      { Category: "Events", "Month 1": 120, "Month 2": 95, "Month 3": 145 },
     ],
   },
 };

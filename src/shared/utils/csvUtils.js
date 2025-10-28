@@ -14,13 +14,19 @@ export const parseCSV = (file) => {
       dynamicTyping: false, // Changed to false to preserve column order with numeric headers
       skipEmptyLines: true,
       complete: (results) => {
+        // Remove BOM from field names if present
+        const cleanedFields = results.meta.fields.map(field =>
+          field.replace(/^\uFEFF/, '') // Remove UTF-8 BOM
+        );
+
         // Manually convert numeric values after parsing to avoid column ordering issues
         const data = results.data.map(row => {
           const converted = {};
-          results.meta.fields.forEach(field => {
+          results.meta.fields.forEach((field, index) => {
+            const cleanField = cleanedFields[index];
             const value = row[field];
             // Convert to number if it looks like a number
-            converted[field] = (value !== null && value !== undefined && value !== '' && !isNaN(value))
+            converted[cleanField] = (value !== null && value !== undefined && value !== '' && !isNaN(value))
               ? Number(value)
               : value;
           });
@@ -32,7 +38,7 @@ export const parseCSV = (file) => {
           data,
           meta: {
             ...results.meta,
-            fields: results.meta.fields, // Preserve original field order
+            fields: cleanedFields, // Use cleaned field names
           }
         });
       },
@@ -46,7 +52,7 @@ export const parseCSV = (file) => {
 /**
  * Convert CSV data to chart format
  */
-export const csvToChartData = (csvData, fieldOrder = null) => {
+export const csvToChartData = (csvData, fieldOrder = null, stageFieldName = 'Stage') => {
   if (!csvData || csvData.length === 0) {
     return { data: [], periods: [] };
   }
@@ -59,7 +65,7 @@ export const csvToChartData = (csvData, fieldOrder = null) => {
 
   // Transform data
   const data = csvData.map((row) => {
-    const stage = { Stage: row[stageColumn] };
+    const stage = { [stageFieldName]: row[stageColumn] };
     periodColumns.forEach((col) => {
       stage[col] = Number(row[col]) || 0;
     });

@@ -29,6 +29,14 @@ export const defaultStyleSettings = {
   showValueLabels: true,
   showCategoryLabels: true,
 
+  // Legend and Direct Label settings
+  labelMode: 'legend', // 'legend' or 'direct'
+  legendPosition: 'above', // 'above' or 'below' (used when labelMode is 'legend')
+  directLabelContent: 'metrics', // 'metrics', 'metrics-category', or 'category' (used when labelMode is 'direct')
+
+  // Bar emphasis settings
+  emphasizedBars: [], // Array of bar identifiers to emphasize (max 3)
+
   // Grid settings
   showGrid: true,
   gridOpacity: 0.1,

@@ -6,7 +6,9 @@ import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtil
  * Get default dataset key based on chart type
  */
 const getDefaultDatasetKey = (chartType) => {
-  return chartType === 'slope' ? 'slopeRevenue' : 'generic';
+  if (chartType === 'slope') return 'slopeRevenue';
+  if (chartType === 'bar') return 'barSimple';
+  return 'generic';
 };
 
 /**
@@ -17,7 +19,7 @@ export const useChartData = (chartType = 'funnel') => {
   const defaultDatasetKey = getDefaultDatasetKey(chartType);
   const defaultDataset = getSampleDataset(defaultDatasetKey);
   const defaultChartData = defaultDataset?.data || null;
-  const defaultPeriods = defaultChartData ? Object.keys(defaultChartData[0]).filter((key) => key !== "Stage") : [];
+  const defaultPeriods = defaultChartData ? Object.keys(defaultChartData[0]).filter((key) => key !== "Stage" && key !== "Category") : [];
 
   const [data, setData] = useState(defaultChartData);
   const [periodNames, setPeriodNames] = useState(defaultPeriods);
@@ -36,7 +38,7 @@ export const useChartData = (chartType = 'funnel') => {
     }
 
     const chartData = dataset.data;
-    const periods = Object.keys(chartData[0]).filter((key) => key !== "Stage");
+    const periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
 
     setData(chartData);
     setPeriodNames(periods);
@@ -68,7 +70,9 @@ export const useChartData = (chartType = 'funnel') => {
         return false;
       }
 
-      const { data: chartData, periods } = csvToChartData(results.data, fieldOrder);
+      // Determine the field name based on chart type
+      const stageFieldName = chartType === 'bar' ? 'Category' : 'Stage';
+      const { data: chartData, periods } = csvToChartData(results.data, fieldOrder, stageFieldName);
 
       setData(chartData);
       setPeriodNames(periods);
@@ -81,7 +85,7 @@ export const useChartData = (chartType = 'funnel') => {
       setError("Failed to load CSV: " + err.message);
       return false;
     }
-  }, []);
+  }, [chartType]);
 
   /**
    * Update data value
@@ -100,12 +104,12 @@ export const useChartData = (chartType = 'funnel') => {
   /**
    * Update stage name
    */
-  const updateStageName = useCallback((stageIndex, newName) => {
+  const updateStageName = useCallback((stageIndex, newName, fieldName = 'Stage') => {
     setEditableData((prev) => {
       const updated = [...prev];
       updated[stageIndex] = {
         ...updated[stageIndex],
-        Stage: newName,
+        [fieldName]: newName,
       };
       return updated;
     });
@@ -183,10 +187,10 @@ export const useChartData = (chartType = 'funnel') => {
   /**
    * Add new stage/row
    */
-  const addStage = useCallback((stageName) => {
+  const addStage = useCallback((stageName, fieldName = 'Stage') => {
     if (!stageName) return false;
 
-    const newRow = { Stage: stageName };
+    const newRow = { [fieldName]: stageName };
     periodNames.forEach((period) => {
       newRow[period] = 0;
     });
@@ -260,7 +264,7 @@ export const useChartData = (chartType = 'funnel') => {
   const getPeriodData = useCallback((periodName) => {
     if (!data) return [];
     return data.map((row) => ({
-      stage: row.Stage,
+      stage: row.Stage || row.Category,
       value: row[periodName] || 0,
     }));
   }, [data]);
@@ -270,7 +274,7 @@ export const useChartData = (chartType = 'funnel') => {
    */
   const getStageData = useCallback((stageName) => {
     if (!data) return [];
-    const row = data.find((r) => r.Stage === stageName);
+    const row = data.find((r) => r.Stage === stageName || r.Category === stageName);
     if (!row) return [];
 
     return periodNames.map((period) => ({
