@@ -15,6 +15,8 @@ export const theme = {
       "Poppins",
       "Source Sans Pro",
       "Raleway",
+      "Economica",
+      "Newsreader",
     ],
     sizes: {
       title: 28,

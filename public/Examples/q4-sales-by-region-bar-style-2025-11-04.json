@@ -1,0 +1,130 @@
+{
+  "styleVersion": "1.0",
+  "appVersion": "2.0.0",
+  "typography": {
+    "title": "Q4 Sales by Region",
+    "subtitle": "Revenue performance across North American territories",
+    "titleAlignment": "center",
+    "fontFamily": "Economica",
+    "titleFontSize": 33,
+    "subtitleFontSize": 26,
+    "segmentLabelFontSize": 22,
+    "metricLabelFontSize": 24,
+    "periodLabelFontSize": 21,
+    "legendFontSize": 14,
+    "conversionLabelFontSize": 19,
+    "inStageLabelFontSize": 13
+  },
+  "colors": {
+    "barColor": "#1e40af",
+    "colorTransition": 60,
+    "comparisonPalette": "observable10",
+    "userCustomColors": [
+      "#4269d0",
+      "#efb118",
+      "#ff725c",
+      "#6cc5b0",
+      "#3ca951",
+      "#ff8ab7",
+      "#a463f2",
+      "#97bbf5",
+      "#9c6b4e",
+      "#9498a0"
+    ]
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspectRatio": "1:1",
+    "canvasWidth": 1178,
+    "canvasHeight": 702,
+    "chartPadding": 25,
+    "stageGap": 10,
+    "barWidth": 100,
+    "stageLabelPosition": "bottom"
+  },
+  "visual": {
+    "axisLineWidth": 3,
+    "backgroundOpacity": 100,
+    "darkMode": false,
+    "backgroundColor": "#ffffff"
+  },
+  "display": {
+    "emphasis": "throughput",
+    "metricEmphasis": "volume",
+    "normalizeToHundred": true,
+    "compactNumbers": true,
+    "showLegend": true,
+    "legendPosition": "direct",
+    "showSparklines": false,
+    "sparklineType": "volume",
+    "userTier": "free",
+    "percentChangeEnabled": true,
+    "percentChangeLabelFormat": "percent-volume"
+  },
+  "chartSpecific": {
+    "slope": {
+      "colorMode": "category",
+      "lineThickness": 3,
+      "lineOpacity": 1,
+      "lineSaturation": 100,
+      "endpointSize": 6,
+      "endpointStyle": "filled",
+      "labelPosition": "left",
+      "showCategoryLabels": true,
+      "showValueLabels": true,
+      "labelFormat": "value",
+      "increaseColor": "#10b981",
+      "decreaseColor": "#ef4444",
+      "noChangeColor": "#6b7280",
+      "startColor": "#1e40af",
+      "endColor": "#10b981",
+      "periodSpacing": 400,
+      "periodHeight": 700,
+      "periodLabelPosition": "below",
+      "slopeAxisLineColor": "#ababab",
+      "slopeAxisLineWidth": 1,
+      "slopeAxisLineStyle": "solid",
+      "axisEnds": "none"
+    },
+    "bar": {
+      "barMode": "grouped",
+      "labelMode": "direct",
+      "directLabelContent": "metrics",
+      "emphasizedBars": [
+        "Latin America-Q1 2024",
+        "Latin America-Q3 2024",
+        "Asia Pacific-Q1 2024",
+        "Asia Pacific-Q3 2024"
+      ],
+      "showMetricLabels": true,
+      "metricLabelPosition": "inside",
+      "percentChangeBracketDistance": 24,
+      "xAxisFontSize": 27,
+      "yAxisFontSize": 25,
+      "axisLabel": "Units Sold",
+      "axisLabelFontSize": 17,
+      "xAxisLabelRotation": 0,
+      "axisMinimum": 0,
+      "axisMinimumAuto": true,
+      "axisMaximum": 50000,
+      "axisMaximumAuto": true,
+      "axisMajorUnit": 175000,
+      "axisMajorUnitAuto": false,
+      "axisMinorUnit": 5,
+      "axisMinorUnitAuto": true,
+      "axisMajorTickType": "outside",
+      "axisMinorTickType": "none",
+      "showHorizontalGridlines": false,
+      "showVerticalGridlines": false,
+      "compactAxisNumbers": true
+    },
+    "funnel": {}
+  },
+  "metadata": {
+    "name": "Q4 Sales by Region",
+    "description": "",
+    "chartType": "bar",
+    "createdDate": "2025-11-04T23:15:13.200Z",
+    "author": "User"
+  }
+}

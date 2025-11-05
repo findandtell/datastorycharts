@@ -9,31 +9,32 @@ export const useStyleSettings = (initialTheme = theme) => {
   // Typography
   const [title, setTitle] = useState("Units Produced by Region");
   const [subtitle, setSubtitle] = useState("Production units by regional location (January)");
-  const [titleAlignment, setTitleAlignment] = useState("left"); // 'left' or 'center'
+  const [titleAlignment, setTitleAlignment] = useState("center"); // 'left' or 'center'
   const [fontFamily, setFontFamily] = useState(initialTheme.typography.families[0]);
   const [titleFontSize, setTitleFontSize] = useState(initialTheme.typography.sizes.title);
   const [subtitleFontSize, setSubtitleFontSize] = useState(initialTheme.typography.sizes.subtitle);
   const [segmentLabelFontSize, setSegmentLabelFontSize] = useState(22);
   const [metricLabelFontSize, setMetricLabelFontSize] = useState(24);
-  const [periodLabelFontSize, setPeriodLabelFontSize] = useState(24); // Period label font size for Slope Chart
+  const [periodLabelFontSize, setPeriodLabelFontSize] = useState(14); // Period label font size
   const [legendFontSize, setLegendFontSize] = useState(initialTheme.typography.sizes.legend);
   const [conversionLabelFontSize, setConversionLabelFontSize] = useState(initialTheme.typography.sizes.conversionLabel);
 
   // Colors
   const [barColor, setBarColor] = useState("#1e40af");
   const [colorTransition, setColorTransition] = useState(60);
-  const [comparisonPalette, setComparisonPalette] = useState("professional");
+  const [comparisonPalette, setComparisonPalette] = useState("observable10");
   const [userCustomColors, setUserCustomColors] = useState(defaultUserColors);
 
   // Layout
   const [orientation, setOrientation] = useState("vertical");
   const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [canvasWidth, setCanvasWidth] = useState(900);
-  const [canvasHeight, setCanvasHeight] = useState(900);
+  const [canvasWidth, setCanvasWidth] = useState(1000);
+  const [canvasHeight, setCanvasHeight] = useState(600);
   const [chartWidth, setChartWidth] = useState(600);
   const [chartHeight, setChartHeight] = useState(400);
   const [chartPadding, setChartPadding] = useState(25);
-  const [stageGap, setStageGap] = useState(0);
+  const [stageGap, setStageGap] = useState(10);
+  const [barWidth, setBarWidth] = useState(100);
   const [stageLabelPosition, setStageLabelPosition] = useState("bottom");
 
   // Visual
@@ -50,10 +51,11 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [inStageLabelFontSize, setInStageLabelFontSize] = useState(13);
   const [showSparklines, setShowSparklines] = useState(false);
   const [sparklineType, setSparklineType] = useState("volume");
-  const [userTier, setUserTier] = useState("pro");
+  const [userTier, setUserTier] = useState("free"); // "free" or "pro"
 
   // Theme settings
   const [darkMode, setDarkMode] = useState(false); // Light/Dark mode toggle
+  const [backgroundColor, setBackgroundColor] = useState("#ffffff"); // Background color
 
   // Slope Chart specific settings
   const [colorMode, setColorMode] = useState("category"); // 'category', 'trend', 'custom', 'gradient'
@@ -65,6 +67,10 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [labelPosition, setLabelPosition] = useState("left"); // 'left', 'right', or 'both'
   const [showCategoryLabels, setShowCategoryLabels] = useState(true);
   const [showValueLabels, setShowValueLabels] = useState(true);
+  const [showMetricLabels, setShowMetricLabels] = useState(true); // Toggle for metric/value labels
+  const [showPeriodLabels, setShowPeriodLabels] = useState(true); // Toggle for period/category labels
+  const [metricLabelPosition, setMetricLabelPosition] = useState("outside"); // 'inside' or 'outside' - position at end of bars
+  const [periodLabelDisplay, setPeriodLabelDisplay] = useState("first"); // 'first' or 'all' - show in first group only or all groups
   const [labelFormat, setLabelFormat] = useState("value"); // 'value', 'percentage', 'both'
   const [emphasizedLines, setEmphasizedLines] = useState([]);
   const [increaseColor, setIncreaseColor] = useState("#10b981");
@@ -85,16 +91,31 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [labelMode, setLabelMode] = useState("direct"); // 'legend' or 'direct'
   const [directLabelContent, setDirectLabelContent] = useState("metrics"); // 'metrics', 'metrics-category', or 'category'
   const [emphasizedBars, setEmphasizedBars] = useState([]); // Array of bar identifiers to emphasize
-  const [xAxisFontSize, setXAxisFontSize] = useState(20); // X-axis label font size
+  const [showTotalLabels, setShowTotalLabels] = useState(true); // Show total labels on stacked bars
+  const [boldTotal, setBoldTotal] = useState(false); // Make total labels bold
+  const [xAxisFontSize, setXAxisFontSize] = useState(12); // X-axis primary label font size
+  const [xAxisSecondaryFontSize, setXAxisSecondaryFontSize] = useState(12); // X-axis secondary label font size
   const [yAxisFontSize, setYAxisFontSize] = useState(20); // Y-axis label font size
   const [axisLabel, setAxisLabel] = useState(""); // Axis label text (appears at end of value axis)
   const [axisLabelFontSize, setAxisLabelFontSize] = useState(17); // Axis label font size
+  const [xAxisLabelRotation, setXAxisLabelRotation] = useState(0); // X-axis label rotation angle (0-90 degrees)
+
+  // Number Styling (Values)
+  const [valuePrefix, setValuePrefix] = useState(""); // Prefix for values (e.g., "$")
+  const [valueSuffix, setValueSuffix] = useState(""); // Suffix for values (e.g., "%")
+  const [valueDecimalPlaces, setValueDecimalPlaces] = useState(0); // Decimal places for values
+  const [valueFormat, setValueFormat] = useState("number"); // 'number' or 'percentage'
 
   // Bar Chart axis options
   const [axisMinimum, setAxisMinimum] = useState(0);
   const [axisMinimumAuto, setAxisMinimumAuto] = useState(true);
   const [axisMaximum, setAxisMaximum] = useState(50000);
   const [axisMaximumAuto, setAxisMaximumAuto] = useState(true);
+
+  // Percent Change Emphasis
+  const [percentChangeEnabled, setPercentChangeEnabled] = useState(false);
+  const [percentChangeLabelFormat, setPercentChangeLabelFormat] = useState('percent'); // 'percent' or 'percent-volume'
+  const [percentChangeBracketDistance, setPercentChangeBracketDistance] = useState(100); // 0-100, controls how far brackets extend from bars
   const [axisMajorUnit, setAxisMajorUnit] = useState(10000);
   const [axisMajorUnitAuto, setAxisMajorUnitAuto] = useState(true);
   const [axisMinorUnit, setAxisMinorUnit] = useState(5);
@@ -103,12 +124,59 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [axisMinorTickType, setAxisMinorTickType] = useState("none");
   const [showHorizontalGridlines, setShowHorizontalGridlines] = useState(false);
   const [showVerticalGridlines, setShowVerticalGridlines] = useState(false);
-  const [compactAxisNumbers, setCompactAxisNumbers] = useState(false);
+  const [compactAxisNumbers, setCompactAxisNumbers] = useState(true);
 
   // Calculated bounds (for display when Auto is enabled)
   const [calculatedAxisMinimum, setCalculatedAxisMinimum] = useState(0);
   const [calculatedAxisMaximum, setCalculatedAxisMaximum] = useState(100);
   const [calculatedAxisMajorUnit, setCalculatedAxisMajorUnit] = useState(10);
+
+  // Line Chart specific
+  const [timeScale, setTimeScale] = useState('month'); // 'year', 'month', 'week', 'day', 'hour'
+  const [lineStyle, setLineStyle] = useState('solid'); // 'solid', 'dashed', 'dotted'
+  const [smoothLines, setSmoothLines] = useState(false);
+  const [showPoints, setShowPoints] = useState(true);
+  const [pointSize, setPointSize] = useState(4);
+  const [pointStyle, setPointStyle] = useState('filled'); // 'filled' or 'outlined'
+  const [pointBorderWidth, setPointBorderWidth] = useState(2);
+  const [showAreaFill, setShowAreaFill] = useState(true);
+  const [areaOpacity, setAreaOpacity] = useState(0.2);
+  const [areaGradient, setAreaGradient] = useState(true);
+  const [showXAxis, setShowXAxis] = useState(true);
+  const [showYAxis, setShowYAxis] = useState(true);
+  const [showGridLines, setShowGridLines] = useState(true);
+  const [gridDirection, setGridDirection] = useState('horizontal'); // 'horizontal', 'vertical', 'both'
+  const [gridLineColor, setGridLineColor] = useState('#e5e7eb');
+  const [gridLineStyle, setGridLineStyle] = useState('solid'); // 'solid', 'dashed', 'dotted'
+  const [gridLineOpacity, setGridLineOpacity] = useState(0.5);
+  const [showDirectLabels, setShowDirectLabels] = useState(true);
+  const [directLabelFontSize, setDirectLabelFontSize] = useState(14); // Direct label font size (Line Chart)
+  const [yAxisFormat, setYAxisFormat] = useState('auto');
+  const [excludeZeroValues, setExcludeZeroValues] = useState(true); // Exclude zero/null values from plotting
+
+  // Time aggregation settings (Line Chart)
+  const [aggregationLevel, setAggregationLevel] = useState('day'); // 'day', 'week', 'month', 'quarter', 'year'
+  const [aggregationMethod, setAggregationMethod] = useState('sum'); // 'sum', 'average', 'min', 'max', 'count'
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1); // 1-12 (1 = January)
+  const [xAxisTimeGrouping, setXAxisTimeGrouping] = useState('auto'); // 'auto', 'day-week', 'day-month', 'week-month', 'month-year', etc.
+  const [xAxisLabelLevels, setXAxisLabelLevels] = useState(2); // 1 = single level, 2 = two levels
+  const [dateRangeFilter, setDateRangeFilter] = useState([0, 100]); // [startPercent, endPercent] - 0-100
+  const [xAxisPrimaryLabel, setXAxisPrimaryLabel] = useState('auto'); // 'auto', 'day', 'week', 'month', 'quarter', 'year', 'date'
+  const [xAxisSecondaryLabel, setXAxisSecondaryLabel] = useState('auto'); // 'auto', 'week', 'month', 'quarter', 'year', 'none'
+  const [dateFormatPreset, setDateFormatPreset] = useState('MM/dd/yy'); // Date format preset
+  const [dateFormatCustom, setDateFormatCustom] = useState(''); // Custom date format (overrides preset if not empty)
+
+  // Emphasis settings (Line Chart)
+  const [emphasizedPoints, setEmphasizedPoints] = useState([]); // Array of point identifiers (max 4)
+  const [emphasizedMetric, setEmphasizedMetric] = useState(null); // Single metric name to emphasize entire line
+  const [emphasisLabelPosition, setEmphasisLabelPosition] = useState('above'); // 'above', 'below'
+  const [emphasisLabelFontSize, setEmphasisLabelFontSize] = useState(12); // Font size for emphasis labels
+  const [showEmphasisDate, setShowEmphasisDate] = useState(true); // Show date below metric value
+  const [emphasisCompactNumbers, setEmphasisCompactNumbers] = useState(false); // Compact number formatting (K, M, B)
+  const [emphasisValuePrefix, setEmphasisValuePrefix] = useState(''); // Prefix for emphasis values
+  const [emphasisValueSuffix, setEmphasisValueSuffix] = useState(''); // Suffix for emphasis values
+  const [emphasisDecimalPlaces, setEmphasisDecimalPlaces] = useState(0); // Decimal places for emphasis values
+  const [showEmphasisVerticalLine, setShowEmphasisVerticalLine] = useState(false); // Show vertical line from X-axis to emphasized point
 
   /**
    * Update canvas dimensions based on aspect ratio
@@ -144,7 +212,7 @@ export const useStyleSettings = (initialTheme = theme) => {
     setChartWidth(600);
     setChartHeight(400);
     setChartPadding(25);
-    setStageGap(0);
+    setStageGap(10);
     setStageLabelPosition("bottom");
     setAxisLineWidth(3);
     setBackgroundOpacity(100);
@@ -166,6 +234,7 @@ export const useStyleSettings = (initialTheme = theme) => {
     setYAxisFontSize(20);
     setAxisLabel("");
     setAxisLabelFontSize(17);
+    setXAxisLabelRotation(0);
     setAxisMinimum(0);
     setAxisMinimumAuto(true);
     setAxisMaximum(50000);
@@ -178,7 +247,12 @@ export const useStyleSettings = (initialTheme = theme) => {
     setAxisMinorTickType("none");
     setShowHorizontalGridlines(false);
     setShowVerticalGridlines(false);
-    setCompactAxisNumbers(false);
+    setCompactAxisNumbers(true);
+    setValuePrefix("");
+    setValueSuffix("");
+    setValueDecimalPlaces(0);
+    setValueFormat("number");
+    setPeriodLabelFontSize(14);
   }, [initialTheme]);
 
   /**
@@ -213,14 +287,18 @@ export const useStyleSettings = (initialTheme = theme) => {
         aspectRatio,
         canvasWidth,
         canvasHeight,
+        chartWidth,
+        chartHeight,
         chartPadding,
         stageGap,
+        barWidth,
         stageLabelPosition,
       },
       visual: {
         axisLineWidth,
         backgroundOpacity,
         darkMode,
+        backgroundColor,
       },
       display: {
         emphasis,
@@ -232,6 +310,8 @@ export const useStyleSettings = (initialTheme = theme) => {
         showSparklines,
         sparklineType,
         userTier,
+        percentChangeEnabled,
+        percentChangeLabelFormat,
       },
       chartSpecific: {
         slope: {
@@ -263,10 +343,19 @@ export const useStyleSettings = (initialTheme = theme) => {
           labelMode,
           directLabelContent,
           emphasizedBars,
+          showMetricLabels,
+          showPeriodLabels,
+          metricLabelPosition,
+          periodLabelDisplay,
+          percentChangeBracketDistance,
+          showTotalLabels,
+          boldTotal,
           xAxisFontSize,
+          xAxisSecondaryFontSize,
           yAxisFontSize,
           axisLabel,
           axisLabelFontSize,
+          xAxisLabelRotation,
           axisMinimum,
           axisMinimumAuto,
           axisMaximum,
@@ -280,9 +369,64 @@ export const useStyleSettings = (initialTheme = theme) => {
           showHorizontalGridlines,
           showVerticalGridlines,
           compactAxisNumbers,
+          valuePrefix,
+          valueSuffix,
+          valueDecimalPlaces,
+          valueFormat,
         },
         funnel: {
           // Funnel-specific settings will be here
+        },
+        line: {
+          // Time settings
+          timeScale,
+          aggregationLevel,
+          aggregationMethod,
+          fiscalYearStartMonth,
+          xAxisTimeGrouping,
+          xAxisLabelLevels,
+          dateRangeFilter,
+          xAxisPrimaryLabel,
+          xAxisSecondaryLabel,
+          dateFormatPreset,
+          dateFormatCustom,
+          // Line styling
+          lineStyle,
+          smoothLines,
+          // Point styling
+          showPoints,
+          pointSize,
+          pointStyle,
+          pointBorderWidth,
+          excludeZeroValues,
+          // Area fill
+          showAreaFill,
+          areaOpacity,
+          areaGradient,
+          // Axis display
+          showXAxis,
+          showYAxis,
+          yAxisFormat,
+          // Grid
+          showGridLines,
+          gridDirection,
+          gridLineColor,
+          gridLineStyle,
+          gridLineOpacity,
+          // Direct labels
+          showDirectLabels,
+          directLabelFontSize,
+          // Emphasis
+          emphasizedPoints,
+          emphasizedMetric,
+          emphasisLabelPosition,
+          emphasisLabelFontSize,
+          showEmphasisDate,
+          emphasisCompactNumbers,
+          emphasisValuePrefix,
+          emphasisValueSuffix,
+          emphasisDecimalPlaces,
+          showEmphasisVerticalLine,
         },
       },
     };
@@ -291,21 +435,32 @@ export const useStyleSettings = (initialTheme = theme) => {
     segmentLabelFontSize, metricLabelFontSize, periodLabelFontSize, legendFontSize,
     conversionLabelFontSize, inStageLabelFontSize,
     barColor, colorTransition, comparisonPalette, userCustomColors,
-    orientation, aspectRatio, canvasWidth, canvasHeight, chartPadding, stageGap, stageLabelPosition,
-    axisLineWidth, backgroundOpacity, darkMode,
+    orientation, aspectRatio, canvasWidth, canvasHeight, chartWidth, chartHeight, chartPadding, stageGap, barWidth, stageLabelPosition,
+    axisLineWidth, backgroundOpacity, darkMode, backgroundColor,
     emphasis, metricEmphasis, normalizeToHundred, compactNumbers, showLegend, legendPosition,
-    showSparklines, sparklineType, userTier,
+    showSparklines, sparklineType, userTier, percentChangeEnabled, percentChangeLabelFormat,
     colorMode, lineThickness, lineOpacity, lineSaturation, endpointSize, endpointStyle,
     labelPosition, showCategoryLabels, showValueLabels, labelFormat,
     increaseColor, decreaseColor, noChangeColor, startColor, endColor,
     periodSpacing, periodHeight, periodLabelPosition,
     slopeAxisLineColor, slopeAxisLineWidth, slopeAxisLineStyle, axisEnds,
-    barMode, labelMode, directLabelContent, emphasizedBars, xAxisFontSize, yAxisFontSize,
-    axisLabel, axisLabelFontSize,
+    barMode, labelMode, directLabelContent, emphasizedBars, showMetricLabels, showPeriodLabels,
+    metricLabelPosition, periodLabelDisplay, percentChangeBracketDistance, showTotalLabels, boldTotal,
+    xAxisFontSize, xAxisSecondaryFontSize, yAxisFontSize, axisLabel, axisLabelFontSize, xAxisLabelRotation,
     axisMinimum, axisMinimumAuto, axisMaximum, axisMaximumAuto,
     axisMajorUnit, axisMajorUnitAuto, axisMinorUnit, axisMinorUnitAuto,
     axisMajorTickType, axisMinorTickType, showHorizontalGridlines, showVerticalGridlines,
-    compactAxisNumbers,
+    compactAxisNumbers, valuePrefix, valueSuffix, valueDecimalPlaces, valueFormat,
+    timeScale, aggregationLevel, aggregationMethod, fiscalYearStartMonth,
+    xAxisTimeGrouping, xAxisLabelLevels, dateRangeFilter, xAxisPrimaryLabel, xAxisSecondaryLabel,
+    dateFormatPreset, dateFormatCustom, lineStyle, smoothLines,
+    showPoints, pointSize, pointStyle, pointBorderWidth, excludeZeroValues,
+    showAreaFill, areaOpacity, areaGradient, showXAxis, showYAxis, yAxisFormat,
+    showGridLines, gridDirection, gridLineColor, gridLineStyle, gridLineOpacity,
+    showDirectLabels, directLabelFontSize,
+    emphasizedPoints, emphasizedMetric, emphasisLabelPosition, emphasisLabelFontSize,
+    showEmphasisDate, emphasisCompactNumbers, emphasisValuePrefix, emphasisValueSuffix,
+    emphasisDecimalPlaces, showEmphasisVerticalLine,
   ]);
 
   /**
@@ -344,8 +499,11 @@ export const useStyleSettings = (initialTheme = theme) => {
       if (settings.layout.aspectRatio !== undefined) setAspectRatio(settings.layout.aspectRatio);
       if (settings.layout.canvasWidth !== undefined) setCanvasWidth(settings.layout.canvasWidth);
       if (settings.layout.canvasHeight !== undefined) setCanvasHeight(settings.layout.canvasHeight);
+      if (settings.layout.chartWidth !== undefined) setChartWidth(settings.layout.chartWidth);
+      if (settings.layout.chartHeight !== undefined) setChartHeight(settings.layout.chartHeight);
       if (settings.layout.chartPadding !== undefined) setChartPadding(settings.layout.chartPadding);
       if (settings.layout.stageGap !== undefined) setStageGap(settings.layout.stageGap);
+      if (settings.layout.barWidth !== undefined) setBarWidth(settings.layout.barWidth);
       if (settings.layout.stageLabelPosition !== undefined) setStageLabelPosition(settings.layout.stageLabelPosition);
     }
 
@@ -354,6 +512,7 @@ export const useStyleSettings = (initialTheme = theme) => {
       if (settings.visual.axisLineWidth !== undefined) setAxisLineWidth(settings.visual.axisLineWidth);
       if (settings.visual.backgroundOpacity !== undefined) setBackgroundOpacity(settings.visual.backgroundOpacity);
       if (settings.visual.darkMode !== undefined) setDarkMode(settings.visual.darkMode);
+      if (settings.visual.backgroundColor !== undefined) setBackgroundColor(settings.visual.backgroundColor);
     }
 
     // Display (universal - applies to all charts)
@@ -367,6 +526,8 @@ export const useStyleSettings = (initialTheme = theme) => {
       if (settings.display.showSparklines !== undefined) setShowSparklines(settings.display.showSparklines);
       if (settings.display.sparklineType !== undefined) setSparklineType(settings.display.sparklineType);
       if (settings.display.userTier !== undefined) setUserTier(settings.display.userTier);
+      if (settings.display.percentChangeEnabled !== undefined) setPercentChangeEnabled(settings.display.percentChangeEnabled);
+      if (settings.display.percentChangeLabelFormat !== undefined) setPercentChangeLabelFormat(settings.display.percentChangeLabelFormat);
     }
 
     // Chart-specific settings (smart import based on current chart type)
@@ -405,6 +566,7 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.yAxisFontSize !== undefined) setYAxisFontSize(barSettings.yAxisFontSize);
         if (barSettings.axisLabel !== undefined) setAxisLabel(barSettings.axisLabel);
         if (barSettings.axisLabelFontSize !== undefined) setAxisLabelFontSize(barSettings.axisLabelFontSize);
+        if (barSettings.xAxisLabelRotation !== undefined) setXAxisLabelRotation(barSettings.xAxisLabelRotation);
         if (barSettings.axisMinimum !== undefined) setAxisMinimum(barSettings.axisMinimum);
         if (barSettings.axisMinimumAuto !== undefined) setAxisMinimumAuto(barSettings.axisMinimumAuto);
         if (barSettings.axisMaximum !== undefined) setAxisMaximum(barSettings.axisMaximum);
@@ -418,6 +580,69 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.showHorizontalGridlines !== undefined) setShowHorizontalGridlines(barSettings.showHorizontalGridlines);
         if (barSettings.showVerticalGridlines !== undefined) setShowVerticalGridlines(barSettings.showVerticalGridlines);
         if (barSettings.compactAxisNumbers !== undefined) setCompactAxisNumbers(barSettings.compactAxisNumbers);
+        if (barSettings.showMetricLabels !== undefined) setShowMetricLabels(barSettings.showMetricLabels);
+        if (barSettings.showPeriodLabels !== undefined) setShowPeriodLabels(barSettings.showPeriodLabels);
+        if (barSettings.metricLabelPosition !== undefined) setMetricLabelPosition(barSettings.metricLabelPosition);
+        if (barSettings.periodLabelDisplay !== undefined) setPeriodLabelDisplay(barSettings.periodLabelDisplay);
+        if (barSettings.percentChangeBracketDistance !== undefined) setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
+        if (barSettings.showTotalLabels !== undefined) setShowTotalLabels(barSettings.showTotalLabels);
+        if (barSettings.boldTotal !== undefined) setBoldTotal(barSettings.boldTotal);
+        if (barSettings.xAxisSecondaryFontSize !== undefined) setXAxisSecondaryFontSize(barSettings.xAxisSecondaryFontSize);
+        if (barSettings.valuePrefix !== undefined) setValuePrefix(barSettings.valuePrefix);
+        if (barSettings.valueSuffix !== undefined) setValueSuffix(barSettings.valueSuffix);
+        if (barSettings.valueDecimalPlaces !== undefined) setValueDecimalPlaces(barSettings.valueDecimalPlaces);
+        if (barSettings.valueFormat !== undefined) setValueFormat(barSettings.valueFormat);
+      } else if (currentChartType === 'line' && settings.chartSpecific.line) {
+        const lineSettings = settings.chartSpecific.line;
+        // Time settings
+        if (lineSettings.timeScale !== undefined) setTimeScale(lineSettings.timeScale);
+        if (lineSettings.aggregationLevel !== undefined) setAggregationLevel(lineSettings.aggregationLevel);
+        if (lineSettings.aggregationMethod !== undefined) setAggregationMethod(lineSettings.aggregationMethod);
+        if (lineSettings.fiscalYearStartMonth !== undefined) setFiscalYearStartMonth(lineSettings.fiscalYearStartMonth);
+        if (lineSettings.xAxisTimeGrouping !== undefined) setXAxisTimeGrouping(lineSettings.xAxisTimeGrouping);
+        if (lineSettings.xAxisLabelLevels !== undefined) setXAxisLabelLevels(lineSettings.xAxisLabelLevels);
+        if (lineSettings.dateRangeFilter !== undefined) setDateRangeFilter(lineSettings.dateRangeFilter);
+        if (lineSettings.xAxisPrimaryLabel !== undefined) setXAxisPrimaryLabel(lineSettings.xAxisPrimaryLabel);
+        if (lineSettings.xAxisSecondaryLabel !== undefined) setXAxisSecondaryLabel(lineSettings.xAxisSecondaryLabel);
+        if (lineSettings.dateFormatPreset !== undefined) setDateFormatPreset(lineSettings.dateFormatPreset);
+        if (lineSettings.dateFormatCustom !== undefined) setDateFormatCustom(lineSettings.dateFormatCustom);
+        // Line styling
+        if (lineSettings.lineStyle !== undefined) setLineStyle(lineSettings.lineStyle);
+        if (lineSettings.smoothLines !== undefined) setSmoothLines(lineSettings.smoothLines);
+        // Point styling
+        if (lineSettings.showPoints !== undefined) setShowPoints(lineSettings.showPoints);
+        if (lineSettings.pointSize !== undefined) setPointSize(lineSettings.pointSize);
+        if (lineSettings.pointStyle !== undefined) setPointStyle(lineSettings.pointStyle);
+        if (lineSettings.pointBorderWidth !== undefined) setPointBorderWidth(lineSettings.pointBorderWidth);
+        if (lineSettings.excludeZeroValues !== undefined) setExcludeZeroValues(lineSettings.excludeZeroValues);
+        // Area fill
+        if (lineSettings.showAreaFill !== undefined) setShowAreaFill(lineSettings.showAreaFill);
+        if (lineSettings.areaOpacity !== undefined) setAreaOpacity(lineSettings.areaOpacity);
+        if (lineSettings.areaGradient !== undefined) setAreaGradient(lineSettings.areaGradient);
+        // Axis display
+        if (lineSettings.showXAxis !== undefined) setShowXAxis(lineSettings.showXAxis);
+        if (lineSettings.showYAxis !== undefined) setShowYAxis(lineSettings.showYAxis);
+        if (lineSettings.yAxisFormat !== undefined) setYAxisFormat(lineSettings.yAxisFormat);
+        // Grid
+        if (lineSettings.showGridLines !== undefined) setShowGridLines(lineSettings.showGridLines);
+        if (lineSettings.gridDirection !== undefined) setGridDirection(lineSettings.gridDirection);
+        if (lineSettings.gridLineColor !== undefined) setGridLineColor(lineSettings.gridLineColor);
+        if (lineSettings.gridLineStyle !== undefined) setGridLineStyle(lineSettings.gridLineStyle);
+        if (lineSettings.gridLineOpacity !== undefined) setGridLineOpacity(lineSettings.gridLineOpacity);
+        // Direct labels
+        if (lineSettings.showDirectLabels !== undefined) setShowDirectLabels(lineSettings.showDirectLabels);
+        if (lineSettings.directLabelFontSize !== undefined) setDirectLabelFontSize(lineSettings.directLabelFontSize);
+        // Emphasis
+        if (lineSettings.emphasizedPoints !== undefined) setEmphasizedPoints(lineSettings.emphasizedPoints);
+        if (lineSettings.emphasizedMetric !== undefined) setEmphasizedMetric(lineSettings.emphasizedMetric);
+        if (lineSettings.emphasisLabelPosition !== undefined) setEmphasisLabelPosition(lineSettings.emphasisLabelPosition);
+        if (lineSettings.emphasisLabelFontSize !== undefined) setEmphasisLabelFontSize(lineSettings.emphasisLabelFontSize);
+        if (lineSettings.showEmphasisDate !== undefined) setShowEmphasisDate(lineSettings.showEmphasisDate);
+        if (lineSettings.emphasisCompactNumbers !== undefined) setEmphasisCompactNumbers(lineSettings.emphasisCompactNumbers);
+        if (lineSettings.emphasisValuePrefix !== undefined) setEmphasisValuePrefix(lineSettings.emphasisValuePrefix);
+        if (lineSettings.emphasisValueSuffix !== undefined) setEmphasisValueSuffix(lineSettings.emphasisValueSuffix);
+        if (lineSettings.emphasisDecimalPlaces !== undefined) setEmphasisDecimalPlaces(lineSettings.emphasisDecimalPlaces);
+        if (lineSettings.showEmphasisVerticalLine !== undefined) setShowEmphasisVerticalLine(lineSettings.showEmphasisVerticalLine);
       } else if (currentChartType === 'funnel' && settings.chartSpecific.funnel) {
         // Apply funnel-specific settings when importing to a funnel chart
         // This will be populated when funnel chart settings are defined
@@ -477,6 +702,8 @@ export const useStyleSettings = (initialTheme = theme) => {
     setChartPadding,
     stageGap,
     setStageGap,
+    barWidth,
+    setBarWidth,
     stageLabelPosition,
     setStageLabelPosition,
 
@@ -507,10 +734,18 @@ export const useStyleSettings = (initialTheme = theme) => {
     setSparklineType,
     userTier,
     setUserTier,
+    percentChangeEnabled,
+    setPercentChangeEnabled,
+    percentChangeLabelFormat,
+    setPercentChangeLabelFormat,
+    percentChangeBracketDistance,
+    setPercentChangeBracketDistance,
 
     // Theme
     darkMode,
     setDarkMode,
+    backgroundColor,
+    setBackgroundColor,
 
     // Slope Chart specific
     colorMode,
@@ -531,6 +766,14 @@ export const useStyleSettings = (initialTheme = theme) => {
     setShowCategoryLabels,
     showValueLabels,
     setShowValueLabels,
+    showMetricLabels,
+    setShowMetricLabels,
+    showPeriodLabels,
+    setShowPeriodLabels,
+    metricLabelPosition,
+    setMetricLabelPosition,
+    periodLabelDisplay,
+    setPeriodLabelDisplay,
     labelFormat,
     setLabelFormat,
     emphasizedLines,
@@ -569,14 +812,30 @@ export const useStyleSettings = (initialTheme = theme) => {
     setDirectLabelContent,
     emphasizedBars,
     setEmphasizedBars,
+    showTotalLabels,
+    setShowTotalLabels,
+    boldTotal,
+    setBoldTotal,
     xAxisFontSize,
     setXAxisFontSize,
+    xAxisSecondaryFontSize,
+    setXAxisSecondaryFontSize,
     yAxisFontSize,
     setYAxisFontSize,
     axisLabel,
     setAxisLabel,
     axisLabelFontSize,
     setAxisLabelFontSize,
+    xAxisLabelRotation,
+    setXAxisLabelRotation,
+    valuePrefix,
+    setValuePrefix,
+    valueSuffix,
+    setValueSuffix,
+    valueDecimalPlaces,
+    setValueDecimalPlaces,
+    valueFormat,
+    setValueFormat,
     axisMinimum,
     setAxisMinimum,
     axisMinimumAuto,
@@ -609,6 +868,94 @@ export const useStyleSettings = (initialTheme = theme) => {
     setCalculatedAxisMaximum,
     calculatedAxisMajorUnit,
     setCalculatedAxisMajorUnit,
+
+    // Line Chart specific
+    timeScale,
+    setTimeScale,
+    lineStyle,
+    setLineStyle,
+    smoothLines,
+    setSmoothLines,
+    showPoints,
+    setShowPoints,
+    pointSize,
+    setPointSize,
+    pointStyle,
+    setPointStyle,
+    pointBorderWidth,
+    setPointBorderWidth,
+    showAreaFill,
+    setShowAreaFill,
+    areaOpacity,
+    setAreaOpacity,
+    areaGradient,
+    setAreaGradient,
+    showXAxis,
+    setShowXAxis,
+    showYAxis,
+    setShowYAxis,
+    showGridLines,
+    setShowGridLines,
+    gridDirection,
+    setGridDirection,
+    gridLineColor,
+    setGridLineColor,
+    gridLineStyle,
+    setGridLineStyle,
+    gridLineOpacity,
+    setGridLineOpacity,
+    showDirectLabels,
+    setShowDirectLabels,
+    directLabelFontSize,
+    setDirectLabelFontSize,
+    yAxisFormat,
+    setYAxisFormat,
+    excludeZeroValues,
+    setExcludeZeroValues,
+
+    // Time aggregation (Line Chart)
+    aggregationLevel,
+    setAggregationLevel,
+    aggregationMethod,
+    setAggregationMethod,
+    fiscalYearStartMonth,
+    setFiscalYearStartMonth,
+    xAxisTimeGrouping,
+    setXAxisTimeGrouping,
+    xAxisLabelLevels,
+    setXAxisLabelLevels,
+    dateRangeFilter,
+    setDateRangeFilter,
+    xAxisPrimaryLabel,
+    setXAxisPrimaryLabel,
+    xAxisSecondaryLabel,
+    setXAxisSecondaryLabel,
+    dateFormatPreset,
+    setDateFormatPreset,
+    dateFormatCustom,
+    setDateFormatCustom,
+
+    // Emphasis (Line Chart)
+    emphasizedPoints,
+    setEmphasizedPoints,
+    emphasizedMetric,
+    setEmphasizedMetric,
+    emphasisLabelPosition,
+    setEmphasisLabelPosition,
+    emphasisLabelFontSize,
+    setEmphasisLabelFontSize,
+    showEmphasisDate,
+    setShowEmphasisDate,
+    emphasisCompactNumbers,
+    setEmphasisCompactNumbers,
+    emphasisValuePrefix,
+    setEmphasisValuePrefix,
+    emphasisValueSuffix,
+    setEmphasisValueSuffix,
+    emphasisDecimalPlaces,
+    setEmphasisDecimalPlaces,
+    showEmphasisVerticalLine,
+    setShowEmphasisVerticalLine,
 
     // Actions
     updateAspectRatio,

@@ -3,52 +3,143 @@
  */
 
 /**
- * Export SVG element as PNG
+ * Export SVG element as PNG with embedded fonts
+ * This approach embeds fonts in the SVG first, then converts to PNG
  */
-export const exportAsPNG = (svgElement, filename = "chart.png", scale = 2) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const svgData = new XMLSerializer().serializeToString(svgElement);
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
+export const exportAsPNG = async (svgElement, filename = "chart.png", scale = 2) => {
+  try {
+    // Wait for all fonts to be loaded
+    await document.fonts.ready;
 
-      const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(svgBlob);
+    // Clone the SVG to avoid modifying the original
+    const svgClone = svgElement.cloneNode(true);
 
+    // Check if defs already exists
+    let defs = svgClone.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      if (svgClone.firstChild) {
+        svgClone.insertBefore(defs, svgClone.firstChild);
+      } else {
+        svgClone.appendChild(defs);
+      }
+    }
+
+    // Check if style already exists in defs
+    let style = defs.querySelector('style');
+    if (!style) {
+      style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+      defs.appendChild(style);
+    }
+
+    // Import Google Fonts - embed them in the SVG
+    const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&family=Roboto+Condensed:wght@300;400;700&family=Open+Sans+Condensed:wght@300;700&family=Lato:wght@300;400;700;900&family=Merriweather:wght@300;400;700;900&family=Playfair+Display:wght@400;500;600;700;800;900&family=Lora:wght@400;500;600;700&family=PT+Serif:wght@400;700&family=Economica:wght@400;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap');`;
+
+    // Prepend the font import to existing styles
+    style.textContent = fontImport + (style.textContent || '');
+
+    // Serialize the SVG with embedded fonts
+    const svgData = new XMLSerializer().serializeToString(svgClone);
+
+    // Create a canvas and draw the SVG to it
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+
+    // Get original SVG dimensions
+    const svgWidth = svgElement.width?.baseVal?.value || svgElement.getBoundingClientRect().width;
+    const svgHeight = svgElement.height?.baseVal?.value || svgElement.getBoundingClientRect().height;
+
+    // Set canvas size with scaling
+    canvas.width = svgWidth * scale;
+    canvas.height = svgHeight * scale;
+
+    // Create a blob URL from the SVG data
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    return new Promise((resolve, reject) => {
       img.onload = () => {
-        canvas.width = svgElement.width.baseVal.value * scale;
-        canvas.height = svgElement.height.baseVal.value * scale;
+        // Draw the SVG image to canvas
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
+        // Convert canvas to blob and download
         canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error('Failed to create PNG blob'));
+            return;
+          }
+
           const link = document.createElement("a");
           link.download = filename;
           link.href = URL.createObjectURL(blob);
           link.click();
+          URL.revokeObjectURL(link.href);
           URL.revokeObjectURL(url);
           resolve();
-        });
+        }, 'image/png', 1.0);
       };
 
       img.onerror = (err) => {
         URL.revokeObjectURL(url);
-        reject(err);
+        reject(new Error('Failed to load SVG image: ' + err));
       };
 
       img.src = url;
-    } catch (err) {
-      reject(err);
-    }
-  });
+    });
+  } catch (err) {
+    console.error('Export PNG failed:', err);
+    throw err;
+  }
 };
 
 /**
- * Export SVG element as SVG file
+ * Export SVG element as SVG file with embedded fonts
  */
 export const exportAsSVG = (svgElement, filename = "chart.svg") => {
   try {
-    const svgData = new XMLSerializer().serializeToString(svgElement);
+    // Clone the SVG to avoid modifying the original
+    const svgClone = svgElement.cloneNode(true);
+
+    // Get SVG dimensions for viewBox
+    const width = svgElement.width?.baseVal?.value || svgElement.getBoundingClientRect().width;
+    const height = svgElement.height?.baseVal?.value || svgElement.getBoundingClientRect().height;
+
+    // Add viewBox attribute for proper scaling in containers
+    if (!svgClone.hasAttribute('viewBox')) {
+      svgClone.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    }
+
+    // Add preserveAspectRatio for better scaling behavior
+    if (!svgClone.hasAttribute('preserveAspectRatio')) {
+      svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    }
+
+    // Check if defs already exists
+    let defs = svgClone.querySelector('defs');
+    if (!defs) {
+      defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      if (svgClone.firstChild) {
+        svgClone.insertBefore(defs, svgClone.firstChild);
+      } else {
+        svgClone.appendChild(defs);
+      }
+    }
+
+    // Check if style already exists in defs
+    let style = defs.querySelector('style');
+    if (!style) {
+      style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+      defs.appendChild(style);
+    }
+
+    // Import Google Fonts - use both @import and link for maximum compatibility
+    const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&family=Roboto+Condensed:wght@300;400;700&family=Open+Sans+Condensed:wght@300;700&family=Lato:wght@300;400;700;900&family=Merriweather:wght@300;400;700;900&family=Playfair+Display:wght@400;500;600;700;800;900&family=Lora:wght@400;500;600;700&family=PT+Serif:wght@400;700&family=Economica:wght@400;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap');`;
+
+    // Prepend the font import to existing styles
+    style.textContent = fontImport + (style.textContent || '');
+
+    const svgData = new XMLSerializer().serializeToString(svgClone);
     const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
 

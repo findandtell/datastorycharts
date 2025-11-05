@@ -24,11 +24,23 @@ export const parseCSV = (file) => {
           const converted = {};
           results.meta.fields.forEach((field, index) => {
             const cleanField = cleanedFields[index];
-            const value = row[field];
-            // Convert to number if it looks like a number
-            converted[cleanField] = (value !== null && value !== undefined && value !== '' && !isNaN(value))
-              ? Number(value)
-              : value;
+            let value = row[field];
+
+            // Clean up value: trim whitespace and remove thousand separator commas
+            if (typeof value === 'string') {
+              value = value.trim();
+              // Remove commas (thousand separators) from numeric strings
+              const cleanedValue = value.replace(/,/g, '');
+              // Convert to number if it looks like a number after cleaning
+              converted[cleanField] = (cleanedValue !== '' && !isNaN(cleanedValue))
+                ? Number(cleanedValue)
+                : value; // Keep original if not a number
+            } else {
+              // Convert to number if it looks like a number
+              converted[cleanField] = (value !== null && value !== undefined && value !== '' && !isNaN(value))
+                ? Number(value)
+                : value;
+            }
           });
           return converted;
         });
@@ -50,6 +62,47 @@ export const parseCSV = (file) => {
 };
 
 /**
+ * Convert month names to dates
+ * Handles: Jan, Feb, January, February, 1, 2, etc.
+ */
+const convertMonthToDate = (value, year = new Date().getFullYear()) => {
+  if (!value) return value;
+
+  const monthMap = {
+    'jan': 0, 'january': 0,
+    'feb': 1, 'february': 1,
+    'mar': 2, 'march': 2,
+    'apr': 3, 'april': 3,
+    'may': 4,
+    'jun': 5, 'june': 5,
+    'jul': 6, 'july': 6,
+    'aug': 7, 'august': 7,
+    'sep': 8, 'september': 8,
+    'oct': 9, 'october': 9,
+    'nov': 10, 'november': 10,
+    'dec': 11, 'december': 11
+  };
+
+  const str = String(value).toLowerCase().trim();
+
+  // Check if it's a month name
+  if (monthMap.hasOwnProperty(str)) {
+    const date = new Date(year, monthMap[str], 1);
+    return date.toISOString().split('T')[0]; // Return YYYY-MM-DD format
+  }
+
+  // Check if it's a month number (1-12)
+  const num = parseInt(str);
+  if (!isNaN(num) && num >= 1 && num <= 12) {
+    const date = new Date(year, num - 1, 1);
+    return date.toISOString().split('T')[0];
+  }
+
+  // Return original value if not a month
+  return value;
+};
+
+/**
  * Convert CSV data to chart format
  */
 export const csvToChartData = (csvData, fieldOrder = null, stageFieldName = 'Stage') => {
@@ -63,9 +116,22 @@ export const csvToChartData = (csvData, fieldOrder = null, stageFieldName = 'Sta
   const stageColumn = columns[0];
   const periodColumns = columns.slice(1);
 
+  // Auto-detect if we need to convert months to dates
+  const isDateField = stageFieldName === 'date';
+  const needsMonthConversion = isDateField && csvData.length > 0 &&
+    /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|may|june|july|august|september|october|november|december|\d{1,2})$/i
+    .test(String(csvData[0][stageColumn]).trim());
+
   // Transform data
   const data = csvData.map((row) => {
-    const stage = { [stageFieldName]: row[stageColumn] };
+    let stageValue = row[stageColumn];
+
+    // Convert month to date if needed
+    if (needsMonthConversion) {
+      stageValue = convertMonthToDate(stageValue);
+    }
+
+    const stage = { [stageFieldName]: stageValue };
     periodColumns.forEach((col) => {
       stage[col] = Number(row[col]) || 0;
     });
@@ -169,13 +235,21 @@ export const cleanCSVData = (data) => {
   return data.map((row) => {
     const cleaned = {};
     Object.keys(row).forEach((key) => {
-      const value = row[key];
+      let value = row[key];
       // Remove any leading/trailing whitespace from keys
       const cleanKey = key.trim();
-      // Convert numeric strings to numbers
-      cleaned[cleanKey] = typeof value === "string" && !isNaN(value) 
-        ? Number(value) 
-        : value;
+
+      // Clean and convert numeric strings to numbers
+      if (typeof value === "string") {
+        value = value.trim();
+        // Remove commas (thousand separators) from numeric strings
+        const cleanedValue = value.replace(/,/g, '');
+        cleaned[cleanKey] = (cleanedValue !== '' && !isNaN(cleanedValue))
+          ? Number(cleanedValue)
+          : value; // Keep original if not a number
+      } else {
+        cleaned[cleanKey] = value;
+      }
     });
     return cleaned;
   });

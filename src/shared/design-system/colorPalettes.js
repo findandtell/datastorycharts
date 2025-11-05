@@ -1,6 +1,9 @@
 /**
  * Color palettes and presets for charts
+ * Using D3.js categorical color schemes from d3-scale-chromatic
  */
+
+import * as d3 from 'd3';
 
 /**
  * Single color presets for monochrome charts
@@ -22,168 +25,75 @@ export const colorPresets = [
 
 /**
  * Multi-color palettes for comparison charts
+ * Using D3.js categorical color schemes
  */
 export const comparisonPalettes = {
-  professional: {
-    name: "Professional",
-    description: "Classic business colors",
-    colors: [
-      "#1e40af", // Navy blue
-      "#0d9488", // Teal
-      "#991b1b", // Dark red
-      "#d97706", // Amber
-      "#475569", // Slate
-      "#64748b", // Light slate
-      "#0891b2", // Cyan
-      "#7c2d12", // Brown
-      "#7c3aed", // Purple
-      "#059669", // Emerald
-      "#dc2626", // Red
-      "#4f46e5", // Indigo
-    ],
+  observable10: {
+    name: "Observable10",
+    description: "Observable's 10-color palette",
+    colors: d3.schemeObservable10,
   },
-  vibrant: {
-    name: "Vibrant",
-    description: "Bold and energetic colors",
-    colors: [
-      "#2563eb", // Blue
-      "#ea580c", // Orange
-      "#16a34a", // Green
-      "#9333ea", // Purple
-      "#dc2626", // Red
-      "#0891b2", // Cyan
-      "#f59e0b", // Amber
-      "#ec4899", // Pink
-      "#14b8a6", // Teal
-      "#8b5cf6", // Violet
-      "#f97316", // Dark orange
-      "#10b981", // Emerald
-    ],
+  category10: {
+    name: "Category10",
+    description: "D3's classic 10-color palette",
+    colors: d3.schemeCategory10,
   },
-  corporate: {
-    name: "Corporate",
-    description: "Conservative corporate palette",
-    colors: [
-      "#1e3a8a", // Dark blue
-      "#0284c7", // Sky blue
-      "#065f46", // Dark green
-      "#9a3412", // Dark orange
-      "#374151", // Gray
-      "#475569", // Slate
-      "#0e7490", // Cyan
-      "#713f12", // Brown
-      "#1e40af", // Navy
-      "#047857", // Emerald
-      "#92400e", // Amber
-      "#6b7280", // Medium gray
-    ],
+  accent: {
+    name: "Accent",
+    description: "ColorBrewer Accent palette (max 8 colors)",
+    colors: d3.schemeAccent,
   },
-  accessible: {
-    name: "Accessible",
-    description: "High contrast, colorblind-friendly",
-    colors: [
-      "#0066cc", // Blue
-      "#ff6600", // Orange
-      "#00b8d4", // Cyan
-      "#d81b60", // Pink
-      "#fdd835", // Yellow
-      "#7b1fa2", // Purple
-      "#00897b", // Teal
-      "#c62828", // Red
-      "#5e35b1", // Deep purple
-      "#00acc1", // Light cyan
-      "#ff8f00", // Amber
-      "#e53935", // Bright red
-    ],
+  dark2: {
+    name: "Dark2",
+    description: "ColorBrewer Dark2 palette (max 8 colors)",
+    colors: d3.schemeDark2,
   },
-  elegant: {
-    name: "Elegant",
-    description: "Sophisticated and refined",
-    colors: [
-      "#4f46e5", // Indigo
-      "#059669", // Emerald
-      "#e11d48", // Rose
-      "#f59e0b", // Amber
-      "#64748b", // Slate
-      "#7c3aed", // Violet
-      "#0d9488", // Teal
-      "#dc2626", // Red
-      "#8b5cf6", // Purple
-      "#10b981", // Green
-      "#f43f5e", // Pink
-      "#475569", // Dark slate
-    ],
+  paired: {
+    name: "Paired",
+    description: "ColorBrewer Paired palette (12 colors)",
+    colors: d3.schemePaired,
   },
-  pastel: {
-    name: "Pastel",
-    description: "Soft and gentle tones",
-    colors: [
-      "#93c5fd", // Light blue
-      "#fbbf24", // Yellow
-      "#86efac", // Light green
-      "#c084fc", // Light purple
-      "#fca5a5", // Light red
-      "#67e8f9", // Light cyan
-      "#fdba74", // Light orange
-      "#f9a8d4", // Light pink
-      "#a5b4fc", // Light indigo
-      "#bef264", // Lime
-      "#fcd34d", // Light amber
-      "#d8b4fe", // Light violet
-    ],
+  pastel1: {
+    name: "Pastel1",
+    description: "ColorBrewer Pastel1 palette (max 9 colors)",
+    colors: d3.schemePastel1,
   },
-  earth: {
-    name: "Earth",
-    description: "Natural, organic tones",
-    colors: [
-      "#78716c", // Stone
-      "#a16207", // Yellow
-      "#15803d", // Green
-      "#be123c", // Rose
-      "#92400e", // Amber
-      "#166534", // Dark green
-      "#b45309", // Orange
-      "#831843", // Pink
-      "#6b7280", // Gray
-      "#ca8a04", // Yellow
-      "#14532d", // Forest green
-      "#9f1239", // Dark rose
-    ],
+  pastel2: {
+    name: "Pastel2",
+    description: "ColorBrewer Pastel2 palette (max 8 colors)",
+    colors: d3.schemePastel2,
   },
-  ocean: {
-    name: "Ocean",
-    description: "Cool blues and teals",
-    colors: [
-      "#0369a1", // Blue
-      "#0891b2", // Cyan
-      "#0e7490", // Teal
-      "#155e75", // Dark cyan
-      "#1e40af", // Navy
-      "#0284c7", // Sky
-      "#0c4a6e", // Dark blue
-      "#164e63", // Dark teal
-      "#075985", // Medium blue
-      "#06b6d4", // Bright cyan
-      "#1e3a8a", // Deep blue
-      "#0d9488", // Teal green
-    ],
+  set1: {
+    name: "Set1",
+    description: "ColorBrewer Set1 palette (max 9 colors)",
+    colors: d3.schemeSet1,
+  },
+  set2: {
+    name: "Set2",
+    description: "ColorBrewer Set2 palette (max 8 colors)",
+    colors: d3.schemeSet2,
+  },
+  set3: {
+    name: "Set3",
+    description: "ColorBrewer Set3 palette (12 colors)",
+    colors: d3.schemeSet3,
   },
   monochrome: {
     name: "Monochrome Grey",
-    description: "Shades of grey from light to dark",
+    description: "Warm grey shades from medium to light",
     colors: [
-      "#e5e7eb", // Very light gray
-      "#d1d5db", // Light gray
-      "#c4c4c4", // Light-medium gray
-      "#9ca3af", // Medium-light gray
-      "#6b7280", // Medium gray
-      "#52525b", // Medium-dark gray
-      "#4b5563", // Dark gray
-      "#374151", // Darker gray
-      "#404040", // Very dark gray
-      "#2d2d2d", // Near black
-      "#1f2937", // Almost black
-      "#111827", // Black
+      "#78716c", // Medium gray (warm)
+      "#8b8680", // Medium-light gray (warm)
+      "#9c9691", // Medium-light gray (warmer)
+      "#a8a29e", // Light-medium gray (warm)
+      "#b8b2ad", // Light-medium gray (warmer)
+      "#c4bfba", // Light gray (warm)
+      "#ccc7c2", // Light gray (warmer)
+      "#d6d1cc", // Very light gray (warm)
+      "#ddd9d4", // Very light gray (warmer)
+      "#e4e0db", // Almost white (warm)
+      "#ebe7e2", // Almost white (warmer)
+      "#f0ece7", // Nearly white (warm)
     ],
   },
   user: {
@@ -203,7 +113,7 @@ export const getColorFromPalette = (paletteKey, index, userColors = []) => {
 
   const palette = comparisonPalettes[paletteKey];
   if (!palette || !palette.colors.length) {
-    return comparisonPalettes.professional.colors[index % 12];
+    return comparisonPalettes.observable10.colors[index % comparisonPalettes.observable10.colors.length];
   }
 
   return palette.colors[index % palette.colors.length];
@@ -216,10 +126,10 @@ export const getPaletteColors = (paletteKey, userColors = []) => {
   if (paletteKey === "user") {
     return userColors.length > 0
       ? userColors
-      : comparisonPalettes.professional.colors;
+      : comparisonPalettes.observable10.colors;
   }
 
-  return comparisonPalettes[paletteKey]?.colors || comparisonPalettes.professional.colors;
+  return comparisonPalettes[paletteKey]?.colors || comparisonPalettes.observable10.colors;
 };
 
 /**
@@ -230,19 +140,6 @@ export const getPaletteKeys = () => {
 };
 
 /**
- * Default user custom colors
+ * Default user custom colors (using Observable10 as default)
  */
-export const defaultUserColors = [
-  "#1e40af",
-  "#0d9488",
-  "#991b1b",
-  "#d97706",
-  "#475569",
-  "#7c3aed",
-  "#059669",
-  "#dc2626",
-  "#0891b2",
-  "#f59e0b",
-  "#64748b",
-  "#4f46e5",
-];
+export const defaultUserColors = d3.schemeObservable10;

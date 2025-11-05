@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
 import { comparisonPalettes } from '../../shared/design-system/colorPalettes';
+import { getContrastTextColor, generateColorGradient } from '../../shared/utils/colorUtils';
 
 /**
  * BarChart Component
  * Displays data as rectangular bars with lengths proportional to values
  * Supports vertical/horizontal orientation and grouped/stacked modes
+ * Data format: { Category: "East", "Jan": 41427, "Feb": 52341, ... }
  */
-const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
+const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEmphasis }) => {
   const svgRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [selectedBarsForComparison, setSelectedBarsForComparison] = useState([]);
 
   // Destructure style settings with defaults
   const {
@@ -34,6 +37,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     yAxisFontSize = 12,
     axisLabel = '',
     axisLabelFontSize = 14,
+    xAxisLabelRotation = 0,
     axisWeight = 400,
     axisMinimum = 0,
     axisMinimumAuto = true,
@@ -51,6 +55,10 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     setCalculatedAxisMaximum,
     setCalculatedAxisMajorUnit,
     showValueLabels = true,
+    showMetricLabels = true,
+    showPeriodLabels = true,
+    metricLabelPosition = 'outside',
+    periodLabelDisplay = 'all',
     showCategoryLabels = true,
     labelMode = 'legend',
     legendPosition = 'above',
@@ -64,28 +72,64 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     showYAxis = true,
     axisColor = '#000000',
     axisOpacity = 1,
-    barPadding = 0.2,
+    barWidthPercent = 100,
     groupPadding = 0.3,
     barOpacity = 1,
     barBorderWidth = 0,
     barBorderColor = '#ffffff',
     chartHeight = 500,
     chartWidth = 600,
-    marginTop = 40,
-    marginRight = 40,
+    marginTop = 60,
+    marginRight = 60,
     marginBottom = 80,
-    marginLeft = 80,
+    marginLeft = 180,
+    percentChangeEnabled = false,
+    percentChangeLabelFormat = 'percent',
+    percentChangeBracketDistance = 100,
+    barColor = '#1e40af',
+    colorTransition = 60,
+    valuePrefix = '',
+    valueSuffix = '',
+    valueDecimalPlaces = 0,
+    valueFormat = 'number',
+    periodLabelFontSize = 14,
+    darkMode = false,
+    backgroundColor = '#ffffff',
+    showTotalLabels = true,
+    boldTotal = false,
   } = styleSettings;
 
-  // Get color scheme from comparison palettes or use custom colors
+  // Define theme-aware colors based on dark mode
+  const themeColors = useMemo(() => ({
+    // Title and subtitle
+    titleColor: darkMode ? '#f9fafb' : '#111827',
+    subtitleColor: darkMode ? '#d1d5db' : '#6b7280',
+    // Axis labels and text
+    axisLabelColor: darkMode ? '#e5e7eb' : '#374151',
+    // Axis lines and gridlines
+    axisLineColor: darkMode ? '#4b5563' : '#d1d5db',
+    gridlineColor: darkMode ? '#374151' : '#e5e7eb',
+    // Legend text
+    legendTextColor: darkMode ? '#e5e7eb' : '#374151',
+  }), [darkMode]);
+
+  // Determine if we're in comparison mode (multiple periods) or single-color mode
+  const isComparisonMode = periodNames && periodNames.length > 1;
+
+  // Get color scheme
   const colorScheme = useMemo(() => {
-    // Use custom colors only if palette is set to 'user'
-    if (colorPalette === 'user' && customColors.length > 0) {
-      return customColors;
+    if (isComparisonMode) {
+      // Comparison mode: use palettes
+      if (colorPalette === 'user' && customColors.length > 0) {
+        return customColors;
+      }
+      return comparisonPalettes[colorPalette]?.colors || comparisonPalettes.vibrant.colors;
+    } else {
+      // Single-color mode: use barColor with color transition for different categories
+      // Generate shades based on colorTransition setting
+      return [barColor]; // Single color for all bars in single-period mode
     }
-    // Otherwise use the selected palette
-    return comparisonPalettes[colorPalette]?.colors || comparisonPalettes.vibrant.colors;
-  }, [customColors, colorPalette]);
+  }, [isComparisonMode, customColors, colorPalette, barColor, colorTransition, periodNames]);
 
   // Handle container resize
   useEffect(() => {
@@ -108,6 +152,32 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [chartHeight, chartWidth, marginLeft, marginRight, marginTop, marginBottom]);
 
+  // Handle bar click for percent change comparison
+  const handleBarClickForComparison = useCallback((barData) => {
+    if (!percentChangeEnabled) return;
+
+    setSelectedBarsForComparison(prev => {
+      const newSelected = [...prev];
+      // Add the clicked bar
+      newSelected.push(barData);
+      return newSelected;
+    });
+  }, [percentChangeEnabled]);
+
+  // Check if a bar is selected for comparison
+  const isBarSelected = useCallback((barId) => {
+    return selectedBarsForComparison.some(bar => bar.barId === barId);
+  }, [selectedBarsForComparison]);
+
+  // Expose clear function to parent component
+  useEffect(() => {
+    if (onClearEmphasis) {
+      onClearEmphasis(() => {
+        setSelectedBarsForComparison([]);
+      });
+    }
+  }, [onClearEmphasis]);
+
   // Main chart rendering
   useEffect(() => {
     if (!data || data.length === 0 || !periodNames || periodNames.length === 0 || dimensions.width === 0) {
@@ -120,33 +190,12 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     const width = dimensions.width;
     const height = dimensions.height;
 
-    // Detect if this is grouped-stacked format (has Group and Period columns)
-    const isGroupedStackedData = data.length > 0 && data[0].hasOwnProperty('Group') && data[0].hasOwnProperty('Period');
+    // Set background color
+    svg.style('background-color', backgroundColor);
 
-    // Extract categories and periods early for use in layout calculations
-    let categories, periods, stackColumns;
-
-    if (isGroupedStackedData && barMode === 'grouped-stacked') {
-      // For grouped-stacked mode with Group/Period format
-      // Periods become the X-axis categories (time on X-axis)
-      periods = [...new Set(data.map(d => d.Period))];
-      categories = periods;
-
-      // Groups are the voter types (All Voters, Rep, Dem) - these will be the grouped bars
-      const uniqueGroups = [...new Set(data.map(d => d.Group))];
-
-      // Stack columns are the value columns (e.g., "Very Well", "Somewhat Well")
-      const firstRow = data[0];
-      stackColumns = Object.keys(firstRow).filter(key => key !== 'Group' && key !== 'Period');
-
-      // Store groups for later use in rendering
-      window.__barChartGroups = uniqueGroups;
-    } else {
-      // Regular format
-      categories = data.map(d => d.Category || d.category || d.Stage || '');
-      periods = periodNames;
-      stackColumns = null;
-    }
+    // Extract categories from data (simple format: Category + Value columns)
+    const categories = data.map(d => d.Category || d.category || d.Stage || '');
+    const periods = periodNames;
 
     // Calculate title and subtitle heights
     const titleHeight = title ? titleFontSize : 0;
@@ -157,10 +206,10 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     // Calculate legend height
     const legendItemHeight = 24;
     const legendGap = 15;
-    const legendHeight = (labelMode === 'legend' && legendPosition !== 'off') ? (legendItemHeight + legendGap) : 0;
+    const legendHeight = (showPeriodLabels && showValueLabels && labelMode === 'legend' && legendPosition !== 'off') ? (legendItemHeight + legendGap) : 0;
 
     const headerHeight = titleHeight + titleToSubtitleGap + subtitleHeight + headerToChartGap +
-      (labelMode === 'legend' && legendPosition === 'above' ? legendHeight : 0);
+      (showPeriodLabels && showValueLabels && labelMode === 'legend' && legendPosition === 'above' ? legendHeight : 0);
 
     // Render Title
     if (title) {
@@ -175,7 +224,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
         .attr('font-family', fontFamily)
         .attr('font-size', titleHeight + 'px')
         .attr('font-weight', '700')
-        .attr('fill', '#111827')
+        .attr('fill', themeColors.titleColor)
         .text(title);
     }
 
@@ -192,12 +241,12 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
         .attr('font-family', fontFamily)
         .attr('font-size', subtitleHeight + 'px')
         .attr('font-weight', '400')
-        .attr('fill', '#6b7280')
+        .attr('fill', themeColors.subtitleColor)
         .text(subtitle);
     }
 
-    // Render Legend (if labelMode is 'legend' and position is 'above')
-    if (labelMode === 'legend' && legendPosition === 'above') {
+    // Render Legend (if labelMode is 'legend' and position is 'above' and showValueLabels is true and showPeriodLabels is true)
+    if (showPeriodLabels && showValueLabels && labelMode === 'legend' && legendPosition === 'above') {
       const legendY = 30 + titleHeight + titleToSubtitleGap + subtitleHeight + (title || subtitle ? 20 : 0);
       const legendItemWidth = 120;
       const legendItemSpacing = 20;
@@ -227,19 +276,50 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           .attr('font-family', fontFamily)
           .attr('font-size', '14px')
           .attr('font-weight', '500')
-          .attr('fill', '#374151')
+          .attr('fill', themeColors.legendTextColor)
           .text(period);
       });
     }
 
+    // Calculate dynamic left margin for horizontal orientation to prevent label clipping
+    let dynamicMarginLeft = marginLeft;
+
+    if (orientation === 'horizontal') {
+      // Create a temporary text element to measure category label widths
+      const tempText = svg.append('text')
+        .attr('font-family', categoryFont || axisFont)
+        .attr('font-size', yAxisFontSize)
+        .attr('font-weight', categoryWeight || axisWeight)
+        .style('visibility', 'hidden');
+
+      // Find the maximum width among all category labels
+      let maxLabelWidth = 0;
+      categories.forEach(category => {
+        tempText.text(category);
+        const bbox = tempText.node().getBBox();
+        maxLabelWidth = Math.max(maxLabelWidth, bbox.width);
+      });
+
+      // Remove temporary text
+      tempText.remove();
+
+      // Set dynamic margin with some padding (add 30px for tick marks and spacing)
+      dynamicMarginLeft = Math.max(marginLeft, maxLabelWidth + 30);
+    }
+
     // Calculate inner dimensions
-    const innerWidth = width - marginLeft - marginRight;
-    const innerHeight = height - marginTop - marginBottom - headerHeight;
+    // Increase bottom margin when legend is at bottom to accommodate legend + watermark
+    const hasBottomLegend = showPeriodLabels && showValueLabels && labelMode === 'legend' && legendPosition === 'below';
+    const legendAndWatermarkSpace = 50; // Extra space needed for legend (24px) + spacing + watermark
+    const adjustedMarginBottom = hasBottomLegend ? marginBottom + legendAndWatermarkSpace : marginBottom;
+
+    const innerWidth = width - dynamicMarginLeft - marginRight;
+    const innerHeight = height - marginTop - adjustedMarginBottom - headerHeight;
 
     // Create main SVG group
     const g = svg
       .append('g')
-      .attr('transform', `translate(${marginLeft},${marginTop + headerHeight})`);
+      .attr('transform', `translate(${dynamicMarginLeft},${marginTop + headerHeight})`);
 
     /**
      * Detect the maximum number of decimal places in the dataset
@@ -269,36 +349,93 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
     const formatValue = (value) => {
       if (value == null) return '';
 
+      // Handle percentage format
+      if (valueFormat === 'percentage') {
+        const percentValue = value * 100;
+        let formattedValue;
+
+        if (compactNumbers) {
+          const absValue = Math.abs(percentValue);
+          if (absValue >= 1000000) {
+            formattedValue = (percentValue / 1000000).toFixed(valueDecimalPlaces).replace(/\.0+$/, '') + 'M';
+          } else if (absValue >= 1000) {
+            formattedValue = (percentValue / 1000).toFixed(valueDecimalPlaces).replace(/\.0+$/, '') + 'K';
+          } else {
+            formattedValue = valueDecimalPlaces === 0 ? percentValue.toString() : percentValue.toFixed(valueDecimalPlaces);
+          }
+        } else {
+          formattedValue = valueDecimalPlaces === 0 ? percentValue.toString() : percentValue.toFixed(valueDecimalPlaces);
+        }
+
+        return `${valuePrefix}${formattedValue}%${valueSuffix}`;
+      }
+
+      // Handle number format (existing logic)
+      let formattedValue;
+
       if (compactNumbers) {
         const absValue = Math.abs(value);
         if (absValue >= 1000000) {
-          return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+          formattedValue = (value / 1000000).toFixed(valueDecimalPlaces).replace(/\.0+$/, '') + 'M';
         } else if (absValue >= 1000) {
-          return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+          formattedValue = (value / 1000).toFixed(valueDecimalPlaces).replace(/\.0+$/, '') + 'K';
+        } else {
+          formattedValue = valueDecimalPlaces === 0 ? value.toString() : value.toFixed(valueDecimalPlaces);
         }
+      } else {
+        formattedValue = valueDecimalPlaces === 0 ? value.toString() : value.toFixed(valueDecimalPlaces);
       }
 
-      if (decimalPlaces === 0) return value.toString();
-      return value.toFixed(decimalPlaces);
+      // Apply prefix and suffix
+      return `${valuePrefix}${formattedValue}${valueSuffix}`;
     };
 
     /**
      * Format axis tick values in compact format if compactAxisNumbers is enabled
+     * Applies prefix, suffix, and decimal places from Number Styling settings
      */
     const formatAxisValue = (value) => {
       if (value == null) return '';
 
+      // Handle percentage format
+      if (valueFormat === 'percentage') {
+        const percentValue = value * 100;
+        let formattedValue;
+
+        if (compactAxisNumbers) {
+          const absValue = Math.abs(percentValue);
+          if (absValue >= 1000000) {
+            formattedValue = (percentValue / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+          } else if (absValue >= 1000) {
+            formattedValue = (percentValue / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+          } else {
+            formattedValue = valueDecimalPlaces === 0 ? percentValue.toString() : percentValue.toFixed(valueDecimalPlaces);
+          }
+        } else {
+          formattedValue = valueDecimalPlaces === 0 ? percentValue.toString() : percentValue.toFixed(valueDecimalPlaces);
+        }
+
+        return `${valuePrefix}${formattedValue}%${valueSuffix}`;
+      }
+
+      // Handle number format
+      let formattedValue;
+
       if (compactAxisNumbers) {
         const absValue = Math.abs(value);
         if (absValue >= 1000000) {
-          return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+          formattedValue = (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
         } else if (absValue >= 1000) {
-          return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+          formattedValue = (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        } else {
+          formattedValue = valueDecimalPlaces === 0 ? value.toString() : value.toFixed(valueDecimalPlaces);
         }
+      } else {
+        formattedValue = valueDecimalPlaces === 0 ? value.toString() : value.toFixed(valueDecimalPlaces);
       }
 
-      if (decimalPlaces === 0) return value.toString();
-      return value.toFixed(decimalPlaces);
+      // Apply prefix and suffix
+      return `${valuePrefix}${formattedValue}${valueSuffix}`;
     };
 
     /**
@@ -319,62 +456,39 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       const newG = Math.round(gray * 0.7 + g * 0.3);
       const newB = Math.round(gray * 0.7 + b * 0.3);
 
-      return `rgb(${newR}, ${newG}, ${newB})`;
+      // Convert back to hex format
+      const toHex = (n) => {
+        const hex = Math.round(n).toString(16);
+        return hex.length === 1 ? '0' + hex : hex;
+      };
+      return '#' + toHex(newR) + toHex(newG) + toHex(newB);
     };
 
-    // Calculate max value for scale
+    // Calculate min and max values for scale
     let maxValue = 0;
+    let minValue = 0;
+
     if (barMode === 'stacked') {
       // For stacked, sum all periods for each category
       maxValue = d3.max(data, d => {
         return periods.reduce((sum, period) => sum + (d[period] || 0), 0);
       });
-    } else if (barMode === 'grouped-stacked') {
-      if (isGroupedStackedData) {
-        // For new grouped-stacked format with Group/Period columns
-        // Find max stacked value across all groups and periods
-        const uniqueGroups = window.__barChartGroups || [];
-        maxValue = d3.max(periods, period => {
-          return d3.max(uniqueGroups, group => {
-            // Sum all stack columns for this group and period
-            const groupData = data.filter(d => d.Group === group && d.Period === period);
-            if (groupData.length === 0) return 0;
-
-            return stackColumns.reduce((sum, col) => {
-              return sum + (groupData[0][col] || 0);
-            }, 0);
-          });
-        });
-      } else {
-        // For old grouped-stacked format, find max sum within each period's groups
-        // Group categories by base name
-        const categoryGroups = {};
-        categories.forEach(cat => {
-          const baseGroup = cat.replace(/ (Very Well|Somewhat Well)$/, '').trim();
-          if (!categoryGroups[baseGroup]) {
-            categoryGroups[baseGroup] = [];
-          }
-          categoryGroups[baseGroup].push(cat);
-        });
-
-        maxValue = d3.max(periods, period => {
-          return d3.max(Object.values(categoryGroups), groupCategories => {
-            return groupCategories.reduce((sum, category) => {
-              const dataRow = data.find(d => categories[data.indexOf(d)] === category);
-              return sum + (dataRow ? (dataRow[period] || 0) : 0);
-            }, 0);
-          });
-        });
-      }
+      minValue = d3.min(data, d => {
+        return periods.reduce((sum, period) => sum + (d[period] || 0), 0);
+      });
     } else {
-      // For grouped, find max across all values
+      // For grouped, find max and min across all values
       maxValue = d3.max(data, d => {
         return d3.max(periods, period => d[period] || 0);
+      });
+      minValue = d3.min(data, d => {
+        return d3.min(periods, period => d[period] || 0);
       });
     }
 
     // Determine axis minimum and maximum
-    const minValue = axisMinimumAuto ? 0 : axisMinimum;
+    // When auto, use calculated min (which could be negative), but default to 0 if all values are positive
+    const calculatedMinValue = axisMinimumAuto ? (minValue < 0 ? minValue * 1.1 : 0) : axisMinimum;
     const calculatedMaxValue = axisMaximumAuto ? (maxValue * 1.1) : axisMaximum;
 
     // Create scales based on orientation
@@ -385,14 +499,13 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
 
     if (orientation === 'vertical') {
       // Vertical bars: categories on X, values on Y
-      // For grouped-stacked mode, use periods on X-axis instead of categories
       xScale = d3.scaleBand()
-        .domain(barMode === 'grouped-stacked' ? periods : categories)
+        .domain(categories)
         .range([0, innerWidth])
         .padding(groupPadding);
 
       yScale = d3.scaleLinear()
-        .domain([minValue, calculatedMaxValue])
+        .domain([calculatedMinValue, calculatedMaxValue])
         .range([innerHeight, 0]);
 
       if (axisMaximumAuto) {
@@ -409,7 +522,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       // Create Y-axis with custom major unit or auto ticks
       if (!axisMajorUnitAuto && axisMajorUnit > 0) {
         yTicks = [];
-        for (let i = minValue; i <= calculatedMaxValue; i += axisMajorUnit) {
+        for (let i = calculatedMinValue; i <= calculatedMaxValue; i += axisMajorUnit) {
           yTicks.push(i);
         }
         // Always include the maximum value if it's not already in the array
@@ -435,7 +548,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       // Generate minor ticks for Y-axis
       yMinorTicks = [];
       if (!axisMinorUnitAuto && axisMinorUnit > 0 && axisMinorTickType !== 'none') {
-        for (let i = minValue; i <= calculatedMaxValue; i += axisMinorUnit) {
+        for (let i = calculatedMinValue; i <= calculatedMaxValue; i += axisMinorUnit) {
           // Only include minor ticks that aren't also major ticks
           if (!yTicks.includes(i)) {
             yMinorTicks.push(i);
@@ -467,14 +580,13 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       yAxis = d3.axisLeft(yScale).tickValues(yTicks).tickSize(majorTickSize).tickFormat(formatAxisValue);
     } else {
       // Horizontal bars: categories on Y, values on X
-      // For grouped-stacked mode, use periods on Y-axis instead of categories
       yScale = d3.scaleBand()
-        .domain(barMode === 'grouped-stacked' ? periods : categories)
+        .domain(categories)
         .range([0, innerHeight])
         .padding(groupPadding);
 
       xScale = d3.scaleLinear()
-        .domain([minValue, calculatedMaxValue])
+        .domain([calculatedMinValue, calculatedMaxValue])
         .range([0, innerWidth]);
 
       if (axisMaximumAuto) {
@@ -491,7 +603,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       // Create X-axis with custom major unit or auto ticks
       if (!axisMajorUnitAuto && axisMajorUnit > 0) {
         xTicks = [];
-        for (let i = minValue; i <= calculatedMaxValue; i += axisMajorUnit) {
+        for (let i = calculatedMinValue; i <= calculatedMaxValue; i += axisMajorUnit) {
           xTicks.push(i);
         }
         // Always include the maximum value if it's not already in the array
@@ -517,7 +629,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
       // Generate minor ticks for X-axis
       xMinorTicks = [];
       if (!axisMinorUnitAuto && axisMinorUnit > 0 && axisMinorTickType !== 'none') {
-        for (let i = minValue; i <= calculatedMaxValue; i += axisMinorUnit) {
+        for (let i = calculatedMinValue; i <= calculatedMaxValue; i += axisMinorUnit) {
           // Only include minor ticks that aren't also major ticks
           if (!xTicks.includes(i)) {
             xMinorTicks.push(i);
@@ -563,7 +675,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           .attr('x2', innerWidth)
           .attr('y1', d => yScale(d))
           .attr('y2', d => yScale(d))
-          .attr('stroke', axisColor)
+          .attr('stroke', themeColors.gridlineColor)
           .attr('stroke-opacity', gridOpacity)
           .attr('stroke-width', 1);
       }
@@ -580,7 +692,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           .attr('x2', d => xScale(d) + xScale.bandwidth() / 2)
           .attr('y1', 0)
           .attr('y2', innerHeight)
-          .attr('stroke', axisColor)
+          .attr('stroke', themeColors.gridlineColor)
           .attr('stroke-opacity', gridOpacity)
           .attr('stroke-width', 1);
       }
@@ -597,7 +709,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           .attr('x2', innerWidth)
           .attr('y1', d => yScale(d) + yScale.bandwidth() / 2)
           .attr('y2', d => yScale(d) + yScale.bandwidth() / 2)
-          .attr('stroke', axisColor)
+          .attr('stroke', themeColors.gridlineColor)
           .attr('stroke-opacity', gridOpacity)
           .attr('stroke-width', 1);
       }
@@ -614,37 +726,707 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           .attr('x2', d => xScale(d))
           .attr('y1', 0)
           .attr('y2', innerHeight)
-          .attr('stroke', axisColor)
+          .attr('stroke', themeColors.gridlineColor)
           .attr('stroke-opacity', gridOpacity)
           .attr('stroke-width', 1);
       }
     }
 
-    // Draw axes
+    // Note: Axes rendering moved to after bars to ensure axes are always on top
+
+    // Draw bars
+    if (barMode === 'grouped') {
+      // Grouped bars
+      const groupWidth = orientation === 'vertical' ? xScale.bandwidth() : yScale.bandwidth();
+      // Calculate bar width based on barWidthPercent
+      // 0% = no width, 100% = bars fill their allocated space (touching), 150% = 50% overlap
+      const barSpace = groupWidth / periods.length; // Space allocated per bar
+      const barWidth = barSpace * (barWidthPercent / 100);
+      const barOffset = barSpace;
+
+      data.forEach((d, categoryIndex) => {
+        const categoryValue = categories[categoryIndex];
+
+        periods.forEach((period, periodIndex) => {
+          const value = d[period] || 0;
+          const color = colorScheme[periodIndex % colorScheme.length];
+
+          // Calculate bar emphasis
+          const barId = `${categoryValue}-${period}`;
+          const hasEmphasizedBars = emphasizedBars && emphasizedBars.length > 0;
+          const isEmphasized = emphasizedBars && emphasizedBars.includes(barId);
+          const effectiveColor = hasEmphasizedBars && !isEmphasized ? desaturateColor(color) : color;
+
+          let barGroup;
+
+          if (orientation === 'vertical') {
+            const x = xScale(categoryValue) + barOffset * periodIndex + (barOffset - barWidth) / 2;
+            // For vertical bars: positive values grow up from zero, negative values grow down from zero
+            const zeroY = yScale(0);
+            const valueY = yScale(value);
+            const y = value >= 0 ? valueY : zeroY;
+            const height = Math.abs(valueY - zeroY);
+
+            barGroup = g.append('g')
+              .attr('class', 'bar-group');
+
+            barGroup.append('rect')
+              .attr('x', x)
+              .attr('y', y)
+              .attr('width', barWidth)
+              .attr('height', height)
+              .attr('fill', effectiveColor)
+              .attr('opacity', barOpacity)
+              .attr('stroke', barBorderColor)
+              .attr('stroke-width', barBorderWidth)
+              .style('cursor', 'pointer')
+              .on('click', () => {
+                if (onBarClick) onBarClick(d, period, barId);
+                // Calculate label position based on metricLabelPosition setting
+                const labelX = x + barWidth / 2;
+                let labelY;
+                if (value < 0) {
+                  // For negative values, position at the bottom (end) of the bar
+                  labelY = metricLabelPosition === 'inside' ? y + height - 5 : y + height + valueFontSize + 5;
+                } else {
+                  // For positive values, position at the top (end) of the bar
+                  labelY = metricLabelPosition === 'inside' ? y + valueFontSize + 5 : y - 5;
+                }
+                handleBarClickForComparison({
+                  category: categoryValue,
+                  period,
+                  value,
+                  barId,
+                  x,
+                  y,
+                  barWidth,
+                  height,
+                  labelX,
+                  labelY,
+                  orientation: 'vertical'
+                });
+              });
+
+            // Labels (direct or value)
+            // Show label if: (1) showValueLabels is on and labelMode is direct, OR (2) bar is emphasized (clicked)
+            const showLabel = (showValueLabels && labelMode === 'direct') || isEmphasized;
+            const isSelected = selectedBarsForComparison.some(bar => bar.barId === barId);
+            const labelWeight = (isSelected || isEmphasized) ? 700 : valueWeight;
+
+            if (showLabel) {
+              // Determine if we should show period label for this bar
+              const shouldShowPeriodLabel = showPeriodLabels && (
+                periodLabelDisplay === 'all' ||
+                (periodLabelDisplay === 'first' && categoryIndex === 0)
+              );
+
+              // Metric Label - show if showMetricLabels is on OR bar is emphasized
+              if (showMetricLabels || isEmphasized) {
+                const textColor = metricLabelPosition === 'inside'
+                  ? getContrastTextColor(effectiveColor)
+                  : themeColors.axisLabelColor;
+
+                let metricY;
+                if (value < 0) {
+                  // For negative values, position at the bottom (end) of the bar
+                  metricY = metricLabelPosition === 'inside'
+                    ? y + height - 5 // Inside: near the bottom edge
+                    : y + height + valueFontSize + 5; // Outside: below the bar
+                } else {
+                  // For positive values, position at the top (end) of the bar
+                  metricY = metricLabelPosition === 'inside'
+                    ? y + valueFontSize + 5 // Inside: below the top edge, accounting for font size
+                    : y - 5; // Outside: above the bar
+                }
+
+                barGroup.append('text')
+                  .attr('x', x + barWidth / 2)
+                  .attr('y', metricY)
+                  .attr('text-anchor', 'middle')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', labelWeight)
+                  .attr('fill', textColor)
+                  .text(formatValue(value));
+              }
+
+              // Period Label
+              if (shouldShowPeriodLabel) {
+                const textColor = getContrastTextColor(effectiveColor);
+
+                // Period label always appears inside the bar, near the base
+                const periodY = y + height - 10;
+
+                barGroup.append('text')
+                  .attr('x', x + barWidth / 2)
+                  .attr('y', periodY)
+                  .attr('text-anchor', 'middle')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', periodLabelFontSize)
+                  .attr('font-weight', labelWeight)
+                  .attr('fill', textColor)
+                  .text(period);
+              }
+            } else if (labelMode === 'legend' && showValueLabels && showMetricLabels) {
+              // Traditional value label (when labelMode is 'legend')
+              // This label is OUTSIDE the bar, so it uses axisColor for background contrast
+              const legendLabelY = value < 0
+                ? y + height + valueFontSize + 5 // Negative: below the bar
+                : y - 5; // Positive: above the bar
+
+              barGroup.append('text')
+                .attr('x', x + barWidth / 2)
+                .attr('y', legendLabelY)
+                .attr('text-anchor', 'middle')
+                .attr('font-family', valueFont)
+                .attr('font-size', valueFontSize)
+                .attr('font-weight', labelWeight)
+                .attr('fill', axisColor)
+                .text(formatValue(value));
+            }
+          } else {
+            // Horizontal bars
+            const y = yScale(categoryValue) + barOffset * periodIndex + (barOffset - barWidth) / 2;
+            // For horizontal bars: positive values grow right from zero, negative values grow left from zero
+            const zeroX = xScale(0);
+            const valueX = xScale(value);
+            const x = value >= 0 ? zeroX : valueX;
+            const width = Math.abs(valueX - zeroX);
+
+            barGroup = g.append('g')
+              .attr('class', 'bar-group');
+
+            barGroup.append('rect')
+              .attr('x', x)
+              .attr('y', y)
+              .attr('width', width)
+              .attr('height', barWidth)
+              .attr('fill', effectiveColor)
+              .attr('opacity', barOpacity)
+              .attr('stroke', barBorderColor)
+              .attr('stroke-width', barBorderWidth)
+              .style('cursor', 'pointer')
+              .on('click', () => {
+                if (onBarClick) onBarClick(d, period, barId);
+                // Calculate label position based on metricLabelPosition setting
+                let labelX;
+                if (value < 0) {
+                  // For negative values (extending left)
+                  labelX = metricLabelPosition === 'inside' ? x + 15 : x - 5;
+                } else {
+                  // For positive values (extending right)
+                  labelX = metricLabelPosition === 'inside' ? x + width - 15 : x + width + 5;
+                }
+                const labelY = y + barWidth / 2;
+                handleBarClickForComparison({
+                  category: categoryValue,
+                  period,
+                  value,
+                  barId,
+                  x: 0,
+                  y,
+                  width,
+                  barWidth,
+                  labelX,
+                  labelY,
+                  orientation: 'horizontal'
+                });
+              });
+
+            // Labels (direct or value)
+            // Show label if: (1) showValueLabels is on and labelMode is direct, OR (2) bar is emphasized (clicked)
+            const showLabel = (showValueLabels && labelMode === 'direct') || isEmphasized;
+            const isSelected = selectedBarsForComparison.some(bar => bar.barId === barId);
+            const labelWeight = (isSelected || isEmphasized) ? 700 : valueWeight;
+
+            if (showLabel) {
+              // Determine if we should show period label for this bar
+              const shouldShowPeriodLabel = showPeriodLabels && (
+                periodLabelDisplay === 'all' ||
+                (periodLabelDisplay === 'first' && categoryIndex === 0)
+              );
+
+              // Metric Label - show if showMetricLabels is on OR bar is emphasized
+              if (showMetricLabels || isEmphasized) {
+                const textColor = metricLabelPosition === 'inside'
+                  ? getContrastTextColor(effectiveColor)
+                  : themeColors.axisLabelColor;
+
+                let metricX, textAnchor;
+                if (value < 0) {
+                  // For negative values (extending left), position at the left end
+                  if (metricLabelPosition === 'inside') {
+                    metricX = x + 15; // Inside: inset from the left edge
+                    textAnchor = 'start';
+                  } else {
+                    metricX = x - 5; // Outside: to the left of the bar
+                    textAnchor = 'end';
+                  }
+                } else {
+                  // For positive values (extending right), position at the right end
+                  if (metricLabelPosition === 'inside') {
+                    metricX = x + width - 15; // Inside: inset from the right edge
+                    textAnchor = 'end';
+                  } else {
+                    metricX = x + width + 5; // Outside: to the right of the bar
+                    textAnchor = 'start';
+                  }
+                }
+
+                barGroup.append('text')
+                  .attr('x', metricX)
+                  .attr('y', y + barWidth / 2)
+                  .attr('dy', '0.35em')
+                  .attr('text-anchor', textAnchor)
+                  .attr('font-family', valueFont)
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', labelWeight)
+                  .attr('fill', textColor)
+                  .text(formatValue(value));
+              }
+
+              // Period Label
+              if (shouldShowPeriodLabel) {
+                const textColor = getContrastTextColor(effectiveColor);
+
+                // Period label always appears inside the bar, near the left edge
+                barGroup.append('text')
+                  .attr('x', 15)
+                  .attr('y', y + barWidth / 2)
+                  .attr('dy', '0.35em')
+                  .attr('text-anchor', 'start')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', periodLabelFontSize)
+                  .attr('font-weight', labelWeight)
+                  .attr('fill', textColor)
+                  .text(period);
+              }
+            } else if (labelMode === 'legend' && showValueLabels && showMetricLabels) {
+              // Traditional value label (when labelMode is 'legend')
+              // Label is OUTSIDE the bar, use axisColor for background contrast
+              const legendLabelX = value < 0
+                ? x - 5 // Negative: to the left of the bar
+                : x + width + 5; // Positive: to the right of the bar
+              const textAnchor = value < 0 ? 'end' : 'start';
+
+              barGroup.append('text')
+                .attr('x', legendLabelX)
+                .attr('y', y + barWidth / 2)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', textAnchor)
+                .attr('font-family', valueFont)
+                .attr('font-size', valueFontSize)
+                .attr('font-weight', labelWeight)
+                .attr('fill', axisColor)
+                .text(formatValue(value));
+            }
+          }
+        });
+      });
+    } else {
+      // Stacked bars
+      data.forEach((d, categoryIndex) => {
+        const categoryValue = categories[categoryIndex];
+        let cumulativeValue = 0;
+
+        periods.forEach((period, periodIndex) => {
+          const value = d[period] || 0;
+          const color = colorScheme[periodIndex % colorScheme.length];
+
+          // Calculate bar emphasis
+          const barId = `${categoryValue}-${period}`;
+          const hasEmphasizedBars = emphasizedBars && emphasizedBars.length > 0;
+          const isEmphasized = emphasizedBars && emphasizedBars.includes(barId);
+          const effectiveColor = hasEmphasizedBars && !isEmphasized ? desaturateColor(color) : color;
+
+          let barGroup;
+
+          if (orientation === 'vertical') {
+            const x = xScale(categoryValue);
+            const barWidth = xScale.bandwidth();
+            // For stacked vertical bars: stack from cumulative value
+            const startY = yScale(cumulativeValue);
+            const endY = yScale(cumulativeValue + value);
+            const y = Math.min(startY, endY);
+            const height = Math.abs(endY - startY);
+
+            barGroup = g.append('g')
+              .attr('class', 'bar-group');
+
+            barGroup.append('rect')
+              .attr('x', x)
+              .attr('y', y)
+              .attr('width', barWidth)
+              .attr('height', height)
+              .attr('fill', effectiveColor)
+              .attr('opacity', barOpacity)
+              .attr('stroke', barBorderColor)
+              .attr('stroke-width', barBorderWidth)
+              .style('cursor', 'pointer')
+              .on('click', () => {
+                if (onBarClick) onBarClick(d, period, barId);
+                // For stacked bars, label is in the center of the segment
+                const labelX = x + barWidth / 2;
+                const labelY = y + height / 2;
+                handleBarClickForComparison({
+                  category: categoryValue,
+                  period,
+                  value,
+                  barId,
+                  x,
+                  y,
+                  barWidth,
+                  height,
+                  labelX,
+                  labelY,
+                  orientation: 'vertical'
+                });
+              });
+
+            // Labels (direct or value) in center of segment
+            const isSelected = selectedBarsForComparison.some(bar => bar.barId === barId);
+            const labelWeight = (isSelected || isEmphasized) ? 700 : valueWeight;
+
+            // Show label if: (1) showValueLabels and showMetricLabels are on, OR (2) bar is emphasized (clicked)
+            // In stacked mode, labels appear inside segments and work with both direct and legend modes
+            if (((showValueLabels && showMetricLabels) || isEmphasized) && height > 20) { // Only show if segment is large enough
+              const textColor = getContrastTextColor(effectiveColor);
+              // Single line label
+              // Show label if: (1) showMetricLabels is on, OR (2) bar is emphasized
+              if (showMetricLabels || isEmphasized) {
+                barGroup.append('text')
+                  .attr('x', x + barWidth / 2)
+                  .attr('y', y + height / 2)
+                  .attr('dy', '0.35em')
+                  .attr('text-anchor', 'middle')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', labelWeight)
+                  .attr('fill', textColor)
+                  .text(formatValue(value));
+              }
+            }
+          } else {
+            // Horizontal stacked bars
+            const y = yScale(categoryValue);
+            const barWidth = yScale.bandwidth();
+            // For stacked horizontal bars: stack from cumulative value
+            const startX = xScale(cumulativeValue);
+            const endX = xScale(cumulativeValue + value);
+            const x = Math.min(startX, endX);
+            const width = Math.abs(endX - startX);
+
+            barGroup = g.append('g')
+              .attr('class', 'bar-group');
+
+            barGroup.append('rect')
+              .attr('x', x)
+              .attr('y', y)
+              .attr('width', width)
+              .attr('height', barWidth)
+              .attr('fill', effectiveColor)
+              .attr('opacity', barOpacity)
+              .attr('stroke', barBorderColor)
+              .attr('stroke-width', barBorderWidth)
+              .style('cursor', 'pointer')
+              .on('click', () => {
+                if (onBarClick) onBarClick(d, period, barId);
+                // For stacked bars, label is in the center of the segment
+                const labelX = x + width / 2;
+                const labelY = y + barWidth / 2;
+                handleBarClickForComparison({
+                  category: categoryValue,
+                  period,
+                  value,
+                  barId,
+                  x,
+                  y,
+                  width,
+                  barWidth,
+                  labelX,
+                  labelY,
+                  orientation: 'horizontal'
+                });
+              });
+
+            // Labels (direct or value) in center of segment
+            const isSelected = selectedBarsForComparison.some(bar => bar.barId === barId);
+            const labelWeight = (isSelected || isEmphasized) ? 700 : valueWeight;
+
+            // Show label if: (1) showValueLabels and showMetricLabels are on, OR (2) bar is emphasized (clicked)
+            // In stacked mode, labels appear inside segments and work with both direct and legend modes
+            if (((showValueLabels && showMetricLabels) || isEmphasized) && width > 40) { // Only show if segment is large enough
+              const textColor = getContrastTextColor(effectiveColor);
+              // Single line label
+              // Show label if: (1) showMetricLabels is on, OR (2) bar is emphasized
+              if (showMetricLabels || isEmphasized) {
+                barGroup.append('text')
+                  .attr('x', x + width / 2)
+                  .attr('y', y + barWidth / 2)
+                  .attr('dy', '0.35em')
+                  .attr('text-anchor', 'middle')
+                  .attr('font-family', valueFont)
+                  .attr('font-size', valueFontSize)
+                  .attr('font-weight', labelWeight)
+                  .attr('fill', textColor)
+                  .text(formatValue(value));
+              }
+            }
+          }
+
+          cumulativeValue += value;
+        });
+
+        // Add total label and cap line for stacked bars
+        if (showTotalLabels && barMode === 'stacked') {
+          const totalValue = cumulativeValue;
+          const totalWeight = boldTotal ? 700 : 400;
+
+          if (orientation === 'vertical') {
+            const x = xScale(categoryValue);
+            const barWidth = xScale.bandwidth();
+            const y = yScale(totalValue);
+
+            // Add 2px cap line
+            g.append('line')
+              .attr('x1', x)
+              .attr('y1', y)
+              .attr('x2', x + barWidth)
+              .attr('y2', y)
+              .attr('stroke', themeColors.axisLabelColor)
+              .attr('stroke-width', 2);
+
+            // Create a unique barId for the total
+            const totalBarId = `${categoryValue}-Total`;
+
+            // Add total label with click handler for percent change
+            g.append('text')
+              .attr('x', x + barWidth / 2)
+              .attr('y', y - 5)
+              .attr('text-anchor', 'middle')
+              .attr('font-family', valueFont)
+              .attr('font-size', valueFontSize)
+              .attr('font-weight', totalWeight)
+              .attr('fill', themeColors.axisLabelColor)
+              .style('cursor', percentChangeEnabled ? 'pointer' : 'default')
+              .text(formatValue(totalValue))
+              .on('click', () => {
+                if (!percentChangeEnabled) return;
+                // Calculate label position
+                const labelX = x + barWidth / 2;
+                const labelY = y - 5;
+                handleBarClickForComparison({
+                  category: categoryValue,
+                  period: 'Total',
+                  value: totalValue,
+                  barId: totalBarId,
+                  x,
+                  y,
+                  barWidth,
+                  height: innerHeight - y,
+                  labelX,
+                  labelY,
+                  orientation: 'vertical'
+                });
+              });
+          } else {
+            // Horizontal stacked bars
+            const y = yScale(categoryValue);
+            const barWidth = yScale.bandwidth();
+            const x = xScale(totalValue);
+
+            // Add 2px cap line
+            g.append('line')
+              .attr('x1', x)
+              .attr('y1', y)
+              .attr('x2', x)
+              .attr('y2', y + barWidth)
+              .attr('stroke', themeColors.axisLabelColor)
+              .attr('stroke-width', 2);
+
+            // Create a unique barId for the total
+            const totalBarId = `${categoryValue}-Total`;
+
+            // Add total label with click handler for percent change
+            g.append('text')
+              .attr('x', x + 5)
+              .attr('y', y + barWidth / 2)
+              .attr('dy', '0.35em')
+              .attr('text-anchor', 'start')
+              .attr('font-family', valueFont)
+              .attr('font-size', valueFontSize)
+              .attr('font-weight', totalWeight)
+              .attr('fill', themeColors.axisLabelColor)
+              .style('cursor', percentChangeEnabled ? 'pointer' : 'default')
+              .text(formatValue(totalValue))
+              .on('click', () => {
+                if (!percentChangeEnabled) return;
+                // Calculate label position
+                const labelX = x + 5;
+                const labelY = y + barWidth / 2;
+                handleBarClickForComparison({
+                  category: categoryValue,
+                  period: 'Total',
+                  value: totalValue,
+                  barId: totalBarId,
+                  x: 0,
+                  y,
+                  width: x,
+                  barWidth,
+                  labelX,
+                  labelY,
+                  orientation: 'horizontal'
+                });
+              });
+          }
+        }
+
+        // Add period labels outside stacked bars (only when showPeriodLabels is on and in direct label mode)
+        if (showPeriodLabels && labelMode === 'direct') {
+          const isLastCategory = categoryIndex === data.length - 1; // Last bar in vertical mode
+          const isFirstCategory = categoryIndex === 0; // First bar in horizontal mode
+
+          periods.forEach((period, periodIndex) => {
+            const color = colorScheme[periodIndex % colorScheme.length];
+
+            // Check if this period has any emphasized bars
+            const hasPeriodEmphasized = emphasizedBars && emphasizedBars.some(barId => barId.endsWith(`-${period}`));
+            const periodFontWeight = hasPeriodEmphasized ? 700 : valueWeight;
+
+            if (orientation === 'vertical' && isLastCategory) {
+              // Vertical: place period labels to the right of the LAST bar only
+              const x = xScale(categoryValue);
+              const barWidth = xScale.bandwidth();
+
+              // Calculate Y position for each period label (centered on its segment)
+              let segmentStart = 0;
+              for (let i = 0; i < periodIndex; i++) {
+                segmentStart += d[periods[i]] || 0;
+              }
+              const segmentValue = d[period] || 0;
+              const segmentMiddle = segmentStart + (segmentValue / 2);
+              const yPos = yScale(segmentMiddle);
+
+              g.append('text')
+                .attr('x', x + barWidth + 10) // 10px to the right of the bar
+                .attr('y', yPos)
+                .attr('dy', '0.35em')
+                .attr('text-anchor', 'start')
+                .attr('font-family', valueFont)
+                .attr('font-size', periodLabelFontSize)
+                .attr('font-weight', periodFontWeight)
+                .attr('fill', color)
+                .text(period);
+            } else if (orientation === 'horizontal' && isFirstCategory) {
+              // Horizontal: place period labels at the top of the FIRST bar only
+              const y = yScale(categoryValue);
+              const barWidth = yScale.bandwidth();
+
+              // Calculate X position for each period label (centered on its segment)
+              let segmentStart = 0;
+              for (let i = 0; i < periodIndex; i++) {
+                segmentStart += d[periods[i]] || 0;
+              }
+              const segmentValue = d[period] || 0;
+              const segmentMiddle = segmentStart + (segmentValue / 2);
+              const xPos = xScale(segmentMiddle);
+
+              g.append('text')
+                .attr('x', xPos)
+                .attr('y', y - 10) // 10px above the bar
+                .attr('text-anchor', 'middle')
+                .attr('font-family', valueFont)
+                .attr('font-size', periodLabelFontSize)
+                .attr('font-weight', periodFontWeight)
+                .attr('fill', color)
+                .text(period);
+            }
+          });
+        }
+      });
+    }
+
+    // Draw axes (after bars to ensure axes are always on top)
     if (showXAxis) {
+      // For vertical orientation with negative values, position X-axis at y=0
+      const xAxisPosition = orientation === 'vertical' ? yScale(0) : innerHeight;
       const xAxisGroup = g.append('g')
         .attr('class', 'x-axis')
-        .attr('transform', `translate(0,${innerHeight})`)
+        .attr('transform', `translate(0,${xAxisPosition})`)
         .call(xAxis);
 
       xAxisGroup.selectAll('text')
         .attr('font-family', axisFont)
         .attr('font-size', xAxisFontSize)
         .attr('font-weight', axisWeight)
-        .attr('fill', axisColor)
+        .attr('fill', themeColors.axisLabelColor)
         .attr('opacity', axisOpacity);
+
+      // Make category labels bold if they have emphasized bars (works for both grouped and stacked modes)
+      if (emphasizedBars && emphasizedBars.length > 0 && orientation === 'vertical') {
+        categories.forEach((category) => {
+          // Check if any bar in this category is emphasized
+          const hasEmphasizedBar = emphasizedBars.some(barId => barId.startsWith(`${category}-`));
+
+          if (hasEmphasizedBar) {
+            xAxisGroup.selectAll('.tick')
+              .filter((d) => d === category)
+              .select('text')
+              .attr('font-weight', 700);
+          }
+        });
+      }
 
       xAxisGroup.selectAll('line, path')
-        .attr('stroke', axisColor)
+        .attr('stroke', themeColors.axisLineColor)
         .attr('opacity', axisOpacity);
 
-      // Rotate labels if vertical orientation and many categories
-      if (orientation === 'vertical' && categories.length > 6) {
-        xAxisGroup.selectAll('text')
-          .attr('transform', 'rotate(-45)')
-          .attr('text-anchor', 'end')
-          .attr('dx', '-0.5em')
-          .attr('dy', '0.15em');
+      // Apply X-axis label rotation
+      if (orientation === 'vertical') {
+        if (xAxisLabelRotation > 0) {
+          const rotationAngle = -xAxisLabelRotation;
+          xAxisGroup.selectAll('text')
+            .style('text-anchor', 'end')
+            .attr('dx', '-.8em')
+            .attr('dy', '.15em')
+            .attr('transform', `rotate(${rotationAngle})`);
+        } else {
+          xAxisGroup.selectAll('text')
+            .style('text-anchor', 'middle')
+            .attr('dx', null)
+            .attr('dy', '.71em')
+            .attr('transform', null);
+        }
+
+        // For categories with all negative values, move labels below the bars
+        if (calculatedMinValue < 0) {
+          categories.forEach((category) => {
+            const categoryData = data.find(d => d.Category === category);
+            if (!categoryData) return;
+
+            // Check if all values for this category are negative
+            const allNegative = periods.every(period => (categoryData[period] || 0) < 0);
+
+            if (allNegative) {
+              // Find minimum value for this category
+              let minVal;
+              if (barMode === 'stacked') {
+                minVal = periods.reduce((sum, period) => sum + (categoryData[period] || 0), 0);
+              } else {
+                minVal = d3.min(periods, period => categoryData[period] || 0);
+              }
+
+              const minY = yScale(minVal);
+              const offset = minY - xAxisPosition;
+
+              // Select and reposition the label
+              xAxisGroup.selectAll('.tick')
+                .filter((d) => d === category)
+                .select('text')
+                .attr('dy', offset + categoryFontSize + 10);
+            }
+          });
+        }
       }
 
       // Handle cross tick type for major ticks
@@ -660,49 +1442,40 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
             .attr('opacity', axisOpacity);
         }
       }
-
-      // Add group labels below X-axis for grouped-stacked mode
-      if (isGroupedStackedData && barMode === 'grouped-stacked' && orientation === 'vertical') {
-        const uniqueGroups = window.__barChartGroups || [];
-        const periodWidth = xScale.bandwidth();
-        const groupCount = uniqueGroups.length;
-        const barWidth = periodWidth / groupCount;
-
-        periods.forEach((period, periodIndex) => {
-          const periodX = xScale(period) || 0;
-
-          uniqueGroups.forEach((group, groupIndex) => {
-            const labelX = periodX + groupIndex * barWidth + barWidth / 2;
-
-            g.append('text')
-              .attr('x', labelX)
-              .attr('y', innerHeight + 40) // Below the period labels
-              .attr('text-anchor', 'middle')
-              .attr('font-family', axisFont)
-              .attr('font-size', xAxisFontSize - 2)
-              .attr('font-weight', 400)
-              .attr('fill', axisColor)
-              .attr('opacity', 0.7)
-              .text(group);
-          });
-        });
-      }
     }
 
     if (showYAxis) {
+      // For horizontal orientation with negative values, position Y-axis at x=0
+      const yAxisPosition = orientation === 'horizontal' ? xScale(0) : 0;
       const yAxisGroup = g.append('g')
         .attr('class', 'y-axis')
+        .attr('transform', `translate(${yAxisPosition},0)`)
         .call(yAxis);
 
       yAxisGroup.selectAll('text')
         .attr('font-family', axisFont)
         .attr('font-size', yAxisFontSize)
         .attr('font-weight', axisWeight)
-        .attr('fill', axisColor)
+        .attr('fill', themeColors.axisLabelColor)
         .attr('opacity', axisOpacity);
 
+      // Make category labels bold if they have emphasized bars (works for both grouped and stacked modes)
+      if (emphasizedBars && emphasizedBars.length > 0 && orientation === 'horizontal') {
+        categories.forEach((category) => {
+          // Check if any bar in this category is emphasized
+          const hasEmphasizedBar = emphasizedBars.some(barId => barId.startsWith(`${category}-`));
+
+          if (hasEmphasizedBar) {
+            yAxisGroup.selectAll('.tick')
+              .filter((d) => d === category)
+              .select('text')
+              .attr('font-weight', 700);
+          }
+        });
+      }
+
       yAxisGroup.selectAll('line, path')
-        .attr('stroke', axisColor)
+        .attr('stroke', themeColors.axisLineColor)
         .attr('opacity', axisOpacity);
 
       // Handle cross tick type for major ticks
@@ -783,762 +1556,220 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
         // Vertical orientation: label appears horizontally to the right of Y-axis, inline with top value
         svg
           .append('text')
-          .attr('x', marginLeft + 5)
+          .attr('x', dynamicMarginLeft + 5)
           .attr('y', marginTop + headerHeight)
           .attr('text-anchor', 'start')
           .attr('dy', '0.32em')
           .attr('font-family', axisFont)
           .attr('font-size', axisLabelFontSize)
           .attr('font-weight', 400)
-          .attr('fill', axisColor)
+          .attr('fill', themeColors.axisLabelColor)
           .text(axisLabel);
       } else {
-        // Horizontal orientation: label appears horizontally below the last value, right-aligned with it
+        // Horizontal orientation: label appears horizontally below the last value, centered with it
         const maxTickValue = xScale.domain()[1];
         svg
           .append('text')
-          .attr('x', marginLeft + xScale(maxTickValue))
+          .attr('x', dynamicMarginLeft + xScale(maxTickValue))
           .attr('y', marginTop + headerHeight + innerHeight + 40)
-          .attr('text-anchor', 'end')
+          .attr('text-anchor', 'middle')
           .attr('dy', '0.71em')
           .attr('font-family', axisFont)
           .attr('font-size', axisLabelFontSize)
           .attr('font-weight', 400)
-          .attr('fill', axisColor)
+          .attr('fill', themeColors.axisLabelColor)
           .text(axisLabel);
       }
     }
 
-    // Draw bars
-    if (barMode === 'grouped-stacked') {
-      if (isGroupedStackedData) {
-        // NEW: Grouped-Stacked bars with Group/Period columns
-        // X-axis: Periods (Nov '18, Nov '20, etc.)
-        // Within each period: Multiple groups (All Voters, Rep, Dem) with stacked bars
-
-        const uniqueGroups = window.__barChartGroups || [];
-        const periodWidth = orientation === 'vertical' ? xScale.bandwidth() : yScale.bandwidth();
-        const groupCount = uniqueGroups.length;
-        const barWidth = periodWidth / groupCount * (1 - barPadding);
-        const barOffset = periodWidth / groupCount;
-
-        if (orientation === 'vertical') {
-          // Vertical grouped-stacked bars
-          periods.forEach((period, periodIndex) => {
-            const periodX = xScale(period) || 0;
-
-            uniqueGroups.forEach((group, groupIndex) => {
-              // Find data for this period and group
-              const groupPeriodData = data.filter(d => d.Period === period && d.Group === group);
-              if (groupPeriodData.length === 0) return;
-
-              const dataRow = groupPeriodData[0];
-              const barX = periodX + groupIndex * barOffset;
-              const color = colorScheme[groupIndex % colorScheme.length];
-
-              let cumulativeValue = 0;
-
-              // Stack the values (Very Well, Somewhat Well)
-              stackColumns.forEach((stackCol, stackIndex) => {
-                const value = dataRow[stackCol] || 0;
-                const y = yScale(cumulativeValue + value);
-                const height = yScale(cumulativeValue) - y;
-
-                const barGroup = g.append('g').attr('class', 'bar-group');
-
-                barGroup.append('rect')
-                  .attr('x', barX)
-                  .attr('y', y)
-                  .attr('width', barWidth)
-                  .attr('height', height)
-                  .attr('fill', color)
-                  .attr('opacity', barOpacity * (stackIndex === 0 ? 1 : 0.6)) // First stack column darker
-                  .attr('stroke', barBorderColor)
-                  .attr('stroke-width', barBorderWidth)
-                  .style('cursor', 'pointer');
-
-                // Add value label if there's space
-                if (showValueLabels && height > 15) {
-                  barGroup.append('text')
-                    .attr('x', barX + barWidth / 2)
-                    .attr('y', y + height / 2)
-                    .attr('dy', '0.35em')
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', valueFontSize - 2)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(formatValue(value));
-                }
-
-                cumulativeValue += value;
-              });
-
-              // Add NET total label above the stacked bar
-              if (showValueLabels) {
-                g.append('text')
-                  .attr('x', barX + barWidth / 2)
-                  .attr('y', yScale(cumulativeValue) - 5)
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', 600)
-                  .attr('fill', axisColor)
-                  .text(formatValue(cumulativeValue));
-              }
-            });
-          });
-        } else {
-          // Horizontal grouped-stacked bars
-          periods.forEach((period, periodIndex) => {
-            const periodY = yScale(period) || 0;
-
-            uniqueGroups.forEach((group, groupIndex) => {
-              // Find data for this period and group
-              const groupPeriodData = data.filter(d => d.Period === period && d.Group === group);
-              if (groupPeriodData.length === 0) return;
-
-              const dataRow = groupPeriodData[0];
-              const barY = periodY + groupIndex * barOffset;
-              const color = colorScheme[groupIndex % colorScheme.length];
-
-              let cumulativeValue = 0;
-
-              // Stack the values (Very Well, Somewhat Well)
-              stackColumns.forEach((stackCol, stackIndex) => {
-                const value = dataRow[stackCol] || 0;
-                const x = xScale(cumulativeValue);
-                const width = xScale(cumulativeValue + value) - x;
-
-                const barGroup = g.append('g').attr('class', 'bar-group');
-
-                barGroup.append('rect')
-                  .attr('x', x)
-                  .attr('y', barY)
-                  .attr('width', width)
-                  .attr('height', barWidth)
-                  .attr('fill', color)
-                  .attr('opacity', barOpacity * (stackIndex === 0 ? 1 : 0.6))
-                  .attr('stroke', barBorderColor)
-                  .attr('stroke-width', barBorderWidth)
-                  .style('cursor', 'pointer');
-
-                // Add value label if there's space
-                if (showValueLabels && width > 40) {
-                  barGroup.append('text')
-                    .attr('x', x + width / 2)
-                    .attr('y', barY + barWidth / 2)
-                    .attr('dy', '0.35em')
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', valueFontSize - 2)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(formatValue(value));
-                }
-
-                cumulativeValue += value;
-              });
-
-              // Add NET total label to the right of the stacked bar
-              if (showValueLabels) {
-                g.append('text')
-                  .attr('x', xScale(cumulativeValue) + 5)
-                  .attr('y', barY + barWidth / 2)
-                  .attr('dy', '0.35em')
-                  .attr('text-anchor', 'start')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', 600)
-                  .attr('fill', axisColor)
-                  .text(formatValue(cumulativeValue));
-              }
-            });
-          });
-        }
-      } else {
-        // OLD: Legacy grouped-stacked format (kept for backward compatibility)
-        // Groups are periods (time), each period has multiple stacked bars for different voter types
-        const categoryGroups = {};
-        categories.forEach(cat => {
-          const baseGroup = cat.replace(/ (Very Well|Somewhat Well)$/, '').trim();
-          if (!categoryGroups[baseGroup]) {
-            categoryGroups[baseGroup] = [];
-          }
-          categoryGroups[baseGroup].push(cat);
+    // Render Percent Change Brackets
+    if (percentChangeEnabled && selectedBarsForComparison.length >= 2) {
+      // Build comparison pairs (every 2 clicks = 1 pair)
+      const pairs = [];
+      for (let i = 0; i < selectedBarsForComparison.length - 1; i += 2) {
+        pairs.push({
+          first: selectedBarsForComparison[i],
+          second: selectedBarsForComparison[i + 1]
         });
-
-        const groupNames = Object.keys(categoryGroups);
-        const groupCount = groupNames.length;
-
-        if (orientation === 'vertical') {
-          periods.forEach((period, periodIndex) => {
-            const periodX = xScale(period) || 0;
-            const periodWidth = xScale.bandwidth();
-            const groupWidth = periodWidth / groupCount;
-
-            groupNames.forEach((groupName, groupIndex) => {
-              const groupX = periodX + groupIndex * groupWidth;
-              const groupCategories = categoryGroups[groupName];
-              let cumulativeValue = 0;
-
-              groupCategories.forEach((category, catIndex) => {
-                const dataRow = data.find(d => categories[data.indexOf(d)] === category);
-                if (!dataRow) return;
-
-                const value = dataRow[period] || 0;
-                const color = colorScheme[groupIndex % colorScheme.length];
-                const y = yScale(cumulativeValue + value);
-                const height = yScale(cumulativeValue) - y;
-
-                const barGroup = g.append('g').attr('class', 'bar-group');
-
-                barGroup.append('rect')
-                  .attr('x', groupX)
-                  .attr('y', y)
-                  .attr('width', groupWidth * (1 - barPadding))
-                  .attr('height', height)
-                  .attr('fill', color)
-                  .attr('opacity', barOpacity * (catIndex === 0 ? 1 : 0.7))
-                  .attr('stroke', barBorderColor)
-                  .attr('stroke-width', barBorderWidth)
-                  .style('cursor', 'pointer');
-
-                if (height > 20) {
-                  barGroup.append('text')
-                    .attr('x', groupX + (groupWidth * (1 - barPadding)) / 2)
-                    .attr('y', y + height / 2)
-                    .attr('dy', '0.35em')
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', valueFontSize - 2)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(formatValue(value));
-                }
-
-                cumulativeValue += value;
-              });
-
-              if (showValueLabels) {
-                g.append('text')
-                  .attr('x', groupX + (groupWidth * (1 - barPadding)) / 2)
-                  .attr('y', yScale(cumulativeValue) - 5)
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', 600)
-                  .attr('fill', axisColor)
-                  .text(formatValue(cumulativeValue));
-              }
-            });
-          });
-        } else {
-          periods.forEach((period, periodIndex) => {
-            const periodY = yScale(period) || 0;
-            const periodHeight = yScale.bandwidth();
-            const groupHeight = periodHeight / groupCount;
-
-            groupNames.forEach((groupName, groupIndex) => {
-              const groupY = periodY + groupIndex * groupHeight;
-              const groupCategories = categoryGroups[groupName];
-              let cumulativeValue = 0;
-
-              groupCategories.forEach((category, catIndex) => {
-                const dataRow = data.find(d => categories[data.indexOf(d)] === category);
-                if (!dataRow) return;
-
-                const value = dataRow[period] || 0;
-                const color = colorScheme[groupIndex % colorScheme.length];
-                const x = xScale(cumulativeValue);
-                const width = xScale(cumulativeValue + value) - x;
-
-                const barGroup = g.append('g').attr('class', 'bar-group');
-
-                barGroup.append('rect')
-                  .attr('x', x)
-                  .attr('y', groupY)
-                  .attr('width', width)
-                  .attr('height', groupHeight * (1 - barPadding))
-                  .attr('fill', color)
-                  .attr('opacity', barOpacity * (catIndex === 0 ? 1 : 0.7))
-                  .attr('stroke', barBorderColor)
-                  .attr('stroke-width', barBorderWidth)
-                  .style('cursor', 'pointer');
-
-                if (width > 40) {
-                  barGroup.append('text')
-                    .attr('x', x + width / 2)
-                    .attr('y', groupY + (groupHeight * (1 - barPadding)) / 2)
-                    .attr('dy', '0.35em')
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', valueFontSize - 2)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(formatValue(value));
-                }
-
-                cumulativeValue += value;
-              });
-
-              if (showValueLabels) {
-                g.append('text')
-                  .attr('x', xScale(cumulativeValue) + 5)
-                  .attr('y', groupY + (groupHeight * (1 - barPadding)) / 2)
-                  .attr('dy', '0.35em')
-                  .attr('text-anchor', 'start')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', 600)
-                  .attr('fill', axisColor)
-                  .text(formatValue(cumulativeValue));
-              }
-            });
-          });
-        }
       }
-    } else if (barMode === 'grouped') {
-      // Grouped bars
-      const groupWidth = orientation === 'vertical' ? xScale.bandwidth() : yScale.bandwidth();
-      const barWidth = groupWidth / periods.length * (1 - barPadding);
-      const barOffset = groupWidth / periods.length;
 
-      data.forEach((d, categoryIndex) => {
-        const categoryValue = categories[categoryIndex];
+      pairs.forEach(pair => {
+        const { first, second } = pair;
+        const percentChange = ((second.value - first.value) / first.value) * 100;
+        const isDecrease = percentChange < 0;
 
-        periods.forEach((period, periodIndex) => {
-          const value = d[period] || 0;
-          const color = colorScheme[periodIndex % colorScheme.length];
+        // Format label based on settings
+        const percentSign = percentChange >= 0 ? '+' : '';
+        let label = `${percentSign}${percentChange.toFixed(1)}%`;
+        if (percentChangeLabelFormat === 'percent-volume') {
+          const volumeDiff = second.value - first.value;
+          const volumeSign = volumeDiff >= 0 ? '+' : '';
+          const formattedVolume = formatValue(Math.abs(volumeDiff));
+          label = `${volumeSign}${formattedVolume} (${percentSign}${percentChange.toFixed(1)}%)`;
+        }
 
-          // Calculate bar emphasis
-          const barId = `${categoryValue}-${period}`;
-          const hasEmphasizedBars = emphasizedBars && emphasizedBars.length > 0;
-          const isEmphasized = emphasizedBars && emphasizedBars.includes(barId);
-          const effectiveColor = hasEmphasizedBars && !isEmphasized ? desaturateColor(color) : color;
+        if (orientation === 'horizontal') {
+          // For horizontal bars, draw bracket from RIGHT SIDE of label positions
+          const y1 = first.labelY; // Y position of first bar's label
+          const y2 = second.labelY; // Y position of second bar's label
 
-          let barGroup;
+          // Calculate the right edge of each label (approximate based on text width)
+          // For horizontal bars, labels are positioned at labelX with text-anchor "start"
+          // So we need to add the approximate text width to get the right edge
+          const labelText1 = formatValue(first.value);
+          const labelText2 = formatValue(second.value);
+          // Rough estimate: each character is about 0.6 * fontSize pixels wide
+          const estimatedWidth1 = labelText1.length * valueFontSize * 0.6;
+          const estimatedWidth2 = labelText2.length * valueFontSize * 0.6;
+          const x1 = first.labelX + estimatedWidth1; // Right edge of first label
+          const x2 = second.labelX + estimatedWidth2; // Right edge of second label
 
-          if (orientation === 'vertical') {
-            const x = xScale(categoryValue) + barOffset * periodIndex + (barOffset - barWidth) / 2;
-            const y = yScale(value);
-            const height = innerHeight - y;
+          // Calculate bracket extension based on slider (0-100%)
+          // 100% = full extension to chart edge, 0% = minimal extension
+          const maxExtension = chartWidth - Math.max(x1, x2);
+          const bracketExtension = maxExtension * (percentChangeBracketDistance / 100);
+          const bracketX = Math.max(x1, x2) + bracketExtension;
 
-            barGroup = g.append('g')
-              .attr('class', 'bar-group');
+          // Draw bracket line
+          const bracketGroup = g.append('g').attr('class', 'percent-change-bracket');
 
-            barGroup.append('rect')
-              .attr('x', x)
-              .attr('y', y)
-              .attr('width', barWidth)
-              .attr('height', height)
-              .attr('fill', effectiveColor)
-              .attr('opacity', barOpacity)
-              .attr('stroke', barBorderColor)
-              .attr('stroke-width', barBorderWidth)
-              .style('cursor', 'pointer')
-              .on('click', () => {
-                if (onBarClick) onBarClick(d, period, barId);
-              });
+          // Horizontal line from RIGHT EDGE of first label to right edge of chart
+          bracketGroup.append('line')
+            .attr('x1', x1)
+            .attr('y1', y1)
+            .attr('x2', bracketX)
+            .attr('y2', y1)
+            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke-width', 2);
 
-            // Labels (direct or value)
-            const showLabel = labelMode === 'direct' || (labelMode === 'off' && isEmphasized);
-            if (showLabel) {
-              // Direct labels or labels on emphasized bars when mode is 'off'
-              if (directLabelContent === 'metrics') {
-                barGroup.append('text')
-                  .attr('x', x + barWidth / 2)
-                  .attr('y', y - 5)
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(formatValue(value));
-              } else if (directLabelContent === 'metrics-category') {
-                // Stacked: metric value on top, period below
-                const periodFontSize = valueFontSize - 2;
-                const lineSpacing = 2;
-                const totalHeight = valueFontSize + lineSpacing + periodFontSize;
+          // Vertical line connecting the two horizontal lines
+          bracketGroup.append('line')
+            .attr('x1', bracketX)
+            .attr('y1', y1)
+            .attr('x2', bracketX)
+            .attr('y2', y2)
+            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke-width', 2);
 
-                // Metric value (top)
-                barGroup.append('text')
-                  .attr('x', x + barWidth / 2)
-                  .attr('y', y - 5 - totalHeight / 2)
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(formatValue(value));
+          // Horizontal line from right edge back to RIGHT EDGE of second label
+          bracketGroup.append('line')
+            .attr('x1', bracketX)
+            .attr('y1', y2)
+            .attr('x2', x2)
+            .attr('y2', y2)
+            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke-width', 2);
 
-                // Period name (bottom)
-                barGroup.append('text')
-                  .attr('x', x + barWidth / 2)
-                  .attr('y', y - 5 - totalHeight / 2 + valueFontSize + lineSpacing)
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', periodFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(period);
-              } else if (directLabelContent === 'category') {
-                barGroup.append('text')
-                  .attr('x', x + barWidth / 2)
-                  .attr('y', y - 5)
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(categoryValue);
-              }
-            } else if (labelMode === 'legend' && showValueLabels) {
-              // Traditional value label (when labelMode is 'legend')
-              barGroup.append('text')
-                .attr('x', x + barWidth / 2)
-                .attr('y', y - 5)
-                .attr('text-anchor', 'middle')
-                .attr('font-family', valueFont)
-                .attr('font-size', valueFontSize)
-                .attr('font-weight', valueWeight)
-                .attr('fill', axisColor)
-                .text(formatValue(value));
-            }
-          } else {
-            // Horizontal bars
-            const y = yScale(categoryValue) + barOffset * periodIndex + (barOffset - barWidth) / 2;
-            const width = xScale(value);
+          // Arrow pointing to second bar label
+          const arrowSize = 6;
+          bracketGroup.append('polygon')
+            .attr('points', `
+              ${x2},${y2}
+              ${x2 + arrowSize},${y2 - arrowSize}
+              ${x2 + arrowSize},${y2 + arrowSize}
+            `)
+            .attr('fill', themeColors.axisLabelColor);
 
-            barGroup = g.append('g')
-              .attr('class', 'bar-group');
+          // Label on the vertical connecting line
+          const labelY = (y1 + y2) / 2;
+          // Check if there's enough space to the right of the bracket
+          const labelWidth = label.length * valueFontSize * 0.6; // Estimate label width
+          const spaceToRight = (dynamicMarginLeft + innerWidth + marginRight) - (dynamicMarginLeft + bracketX);
+          const hasSpaceOnRight = spaceToRight > labelWidth + 20; // 20px padding
 
-            barGroup.append('rect')
-              .attr('x', 0)
-              .attr('y', y)
-              .attr('width', width)
-              .attr('height', barWidth)
-              .attr('fill', effectiveColor)
-              .attr('opacity', barOpacity)
-              .attr('stroke', barBorderColor)
-              .attr('stroke-width', barBorderWidth)
-              .style('cursor', 'pointer')
-              .on('click', () => {
-                if (onBarClick) onBarClick(d, period, barId);
-              });
-
-            // Labels (direct or value)
-            const showLabel = labelMode === 'direct' || (labelMode === 'off' && isEmphasized);
-            if (showLabel) {
-              // Direct labels or labels on emphasized bars when mode is 'off'
-              if (directLabelContent === 'metrics') {
-                barGroup.append('text')
-                  .attr('x', width + 5)
-                  .attr('y', y + barWidth / 2)
-                  .attr('dy', '0.35em')
-                  .attr('text-anchor', 'start')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(formatValue(value));
-              } else if (directLabelContent === 'metrics-category') {
-                // Stacked: metric value on top, period below (side by side for horizontal bars)
-                const periodFontSize = valueFontSize - 2;
-                const lineSpacing = 2;
-
-                // Metric value (top line)
-                barGroup.append('text')
-                  .attr('x', width + 5)
-                  .attr('y', y + barWidth / 2 - (valueFontSize / 2 + lineSpacing))
-                  .attr('text-anchor', 'start')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(formatValue(value));
-
-                // Period name (bottom line)
-                barGroup.append('text')
-                  .attr('x', width + 5)
-                  .attr('y', y + barWidth / 2 + (periodFontSize / 2 + lineSpacing))
-                  .attr('text-anchor', 'start')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', periodFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(period);
-              } else if (directLabelContent === 'category') {
-                barGroup.append('text')
-                  .attr('x', width + 5)
-                  .attr('y', y + barWidth / 2)
-                  .attr('dy', '0.35em')
-                  .attr('text-anchor', 'start')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', axisColor)
-                  .text(categoryValue);
-              }
-            } else if (labelMode === 'legend' && showValueLabels) {
-              // Traditional value label (when labelMode is 'legend')
-              barGroup.append('text')
-                .attr('x', width + 5)
-                .attr('y', y + barWidth / 2)
-                .attr('dy', '0.35em')
-                .attr('text-anchor', 'start')
-                .attr('font-family', valueFont)
-                .attr('font-size', valueFontSize)
-                .attr('font-weight', valueWeight)
-                .attr('fill', axisColor)
-                .text(formatValue(value));
-            }
-          }
-        });
-      });
-    } else {
-      // Stacked bars
-      data.forEach((d, categoryIndex) => {
-        const categoryValue = categories[categoryIndex];
-        let cumulativeValue = 0;
-
-        periods.forEach((period, periodIndex) => {
-          const value = d[period] || 0;
-          const color = colorScheme[periodIndex % colorScheme.length];
-
-          // Calculate bar emphasis
-          const barId = `${categoryValue}-${period}`;
-          const hasEmphasizedBars = emphasizedBars && emphasizedBars.length > 0;
-          const isEmphasized = emphasizedBars && emphasizedBars.includes(barId);
-          const effectiveColor = hasEmphasizedBars && !isEmphasized ? desaturateColor(color) : color;
-
-          let barGroup;
-
-          if (orientation === 'vertical') {
-            const x = xScale(categoryValue);
-            const barWidth = xScale.bandwidth();
-            const y = yScale(cumulativeValue + value);
-            const height = yScale(cumulativeValue) - y;
-
-            barGroup = g.append('g')
-              .attr('class', 'bar-group');
-
-            barGroup.append('rect')
-              .attr('x', x)
-              .attr('y', y)
-              .attr('width', barWidth)
-              .attr('height', height)
-              .attr('fill', effectiveColor)
-              .attr('opacity', barOpacity)
-              .attr('stroke', barBorderColor)
-              .attr('stroke-width', barBorderWidth)
-              .style('cursor', 'pointer')
-              .on('click', () => {
-                if (onBarClick) onBarClick(d, period, barId);
-              });
-
-            // Labels (direct or value) in center of segment
-            if ((labelMode === 'direct' || showValueLabels) && height > 20) { // Only show if segment is large enough
-              if (labelMode === 'direct' && directLabelContent === 'metrics-category') {
-                // Stacked: metric value on top, period below
-                const periodFontSize = valueFontSize - 2;
-                const lineSpacing = 2;
-                const totalHeight = valueFontSize + lineSpacing + periodFontSize;
-
-                // Check if there's enough space for stacked text
-                if (height > totalHeight + 10) {
-                  // Metric value (top)
-                  barGroup.append('text')
-                    .attr('x', x + barWidth / 2)
-                    .attr('y', y + height / 2 - (totalHeight / 4))
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', valueFontSize)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(formatValue(value));
-
-                  // Period name (bottom)
-                  barGroup.append('text')
-                    .attr('x', x + barWidth / 2)
-                    .attr('y', y + height / 2 + (totalHeight / 4))
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', periodFontSize)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(period);
-                }
-              } else {
-                // Single line label
-                let labelText = '';
-                if (labelMode === 'direct') {
-                  if (directLabelContent === 'metrics') {
-                    labelText = formatValue(value);
-                  } else if (directLabelContent === 'category') {
-                    labelText = categoryValue;
-                  }
-                } else {
-                  labelText = formatValue(value);
-                }
-
-                barGroup.append('text')
-                  .attr('x', x + barWidth / 2)
-                  .attr('y', y + height / 2)
-                  .attr('dy', '0.35em')
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', '#ffffff')
-                  .text(labelText);
-              }
-            }
-          } else {
-            // Horizontal stacked bars
-            const y = yScale(categoryValue);
-            const barWidth = yScale.bandwidth();
-            const x = xScale(cumulativeValue);
-            const width = xScale(cumulativeValue + value) - x;
-
-            barGroup = g.append('g')
-              .attr('class', 'bar-group');
-
-            barGroup.append('rect')
-              .attr('x', x)
-              .attr('y', y)
-              .attr('width', width)
-              .attr('height', barWidth)
-              .attr('fill', effectiveColor)
-              .attr('opacity', barOpacity)
-              .attr('stroke', barBorderColor)
-              .attr('stroke-width', barBorderWidth)
-              .style('cursor', 'pointer')
-              .on('click', () => {
-                if (onBarClick) onBarClick(d, period, barId);
-              });
-
-            // Labels (direct or value) in center of segment
-            if ((labelMode === 'direct' || showValueLabels) && width > 40) { // Only show if segment is large enough
-              if (labelMode === 'direct' && directLabelContent === 'metrics-category') {
-                // Stacked: metric value on top, period below
-                const periodFontSize = valueFontSize - 2;
-                const lineSpacing = 2;
-                const totalHeight = valueFontSize + lineSpacing + periodFontSize;
-
-                // Check if there's enough vertical space for stacked text
-                if (barWidth > totalHeight + 10) {
-                  // Metric value (top line)
-                  barGroup.append('text')
-                    .attr('x', x + width / 2)
-                    .attr('y', y + barWidth / 2 - (totalHeight / 4))
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', valueFontSize)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(formatValue(value));
-
-                  // Period name (bottom line)
-                  barGroup.append('text')
-                    .attr('x', x + width / 2)
-                    .attr('y', y + barWidth / 2 + (totalHeight / 4))
-                    .attr('text-anchor', 'middle')
-                    .attr('font-family', valueFont)
-                    .attr('font-size', periodFontSize)
-                    .attr('font-weight', valueWeight)
-                    .attr('fill', '#ffffff')
-                    .text(period);
-                }
-              } else {
-                // Single line label
-                let labelText = '';
-                if (labelMode === 'direct') {
-                  if (directLabelContent === 'metrics') {
-                    labelText = formatValue(value);
-                  } else if (directLabelContent === 'category') {
-                    labelText = categoryValue;
-                  }
-                } else {
-                  labelText = formatValue(value);
-                }
-
-                barGroup.append('text')
-                  .attr('x', x + width / 2)
-                  .attr('y', y + barWidth / 2)
-                  .attr('dy', '0.35em')
-                  .attr('text-anchor', 'middle')
-                  .attr('font-family', valueFont)
-                  .attr('font-size', valueFontSize)
-                  .attr('font-weight', valueWeight)
-                  .attr('fill', '#ffffff')
-                  .text(labelText);
-              }
-            }
-          }
-
-          cumulativeValue += value;
-        });
-      });
-    }
-
-    // Render direct labels for grouped-stacked mode (show once on the right side)
-    if (isGroupedStackedData && barMode === 'grouped-stacked' && labelMode === 'direct' && orientation === 'vertical') {
-      // Get the rightmost bars to position labels
-      const lastPeriod = periods[periods.length - 1];
-      const lastPeriodX = xScale(lastPeriod) || 0;
-      const periodWidth = xScale.bandwidth();
-      const labelX = lastPeriodX + periodWidth + 15;
-
-      // Create a reference bar from the last period, first group
-      const uniqueGroups = window.__barChartGroups || [];
-      const firstGroup = uniqueGroups[0];
-      const referenceData = data.find(d => d.Period === lastPeriod && d.Group === firstGroup);
-
-      if (referenceData && stackColumns) {
-        let cumulativeY = 0;
-
-        // Draw labels for each stack segment (bottom to top)
-        stackColumns.forEach((stackCol, stackIndex) => {
-          const value = referenceData[stackCol] || 0;
-          const segmentY = yScale(cumulativeY + value);
-          const segmentHeight = yScale(cumulativeY) - segmentY;
-          const labelY = segmentY + segmentHeight / 2;
-
-          // Use the first group's color with appropriate opacity
-          const color = colorScheme[0 % colorScheme.length];
-
-          g.append('text')
-            .attr('x', labelX)
-            .attr('y', labelY)
+          svg.append('text')
+            .attr('x', dynamicMarginLeft + bracketX + (hasSpaceOnRight ? 10 : -10))
+            .attr('y', marginTop + headerHeight + labelY)
             .attr('dy', '0.35em')
-            .attr('text-anchor', 'start')
-            .attr('font-family', valueFont)
-            .attr('font-size', valueFontSize - 1)
-            .attr('font-weight', 600)
-            .attr('fill', color)
-            .attr('opacity', stackIndex === 0 ? 1 : 0.6)
-            .text(stackCol);
+            .attr('text-anchor', hasSpaceOnRight ? 'start' : 'end')
+            .attr('font-family', fontFamily)
+            .attr('font-size', valueFontSize)
+            .attr('font-weight', 700)
+            .attr('fill', themeColors.axisLabelColor)
+            .text(label);
 
-          cumulativeY += value;
-        });
+        } else {
+          // For vertical bars, draw bracket from TOP SIDE of label positions
+          const x1 = first.labelX; // X position of first bar's label
+          const x2 = second.labelX; // X position of second bar's label
 
-        // Add NET label above all segments
-        g.append('text')
-          .attr('x', labelX)
-          .attr('y', yScale(cumulativeY) - 10)
-          .attr('text-anchor', 'start')
-          .attr('font-family', valueFont)
-          .attr('font-size', valueFontSize)
-          .attr('font-weight', 700)
-          .attr('fill', axisColor)
-          .text('NET');
-      }
+          // For vertical bars, labels are above the bar with y position at baseline
+          // The TOP of the label is approximately fontSize pixels above the baseline
+          const y1 = first.labelY - valueFontSize; // Top edge of first label
+          const y2 = second.labelY - valueFontSize; // Top edge of second label
+
+          // Calculate bracket extension based on slider (0-100%)
+          // 100% = full extension to chart edge, 0% = minimal extension
+          const minY = Math.min(y1, y2);
+          const maxExtension = minY; // Distance from label top to chart top
+          const bracketExtension = maxExtension * (percentChangeBracketDistance / 100);
+          const bracketY = minY - bracketExtension;
+
+          // Draw bracket line
+          const bracketGroup = g.append('g').attr('class', 'percent-change-bracket');
+
+          // Vertical line from TOP EDGE of first label to top edge of chart
+          bracketGroup.append('line')
+            .attr('x1', x1)
+            .attr('y1', y1)
+            .attr('x2', x1)
+            .attr('y2', bracketY)
+            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke-width', 2);
+
+          // Horizontal line connecting the two vertical lines
+          bracketGroup.append('line')
+            .attr('x1', x1)
+            .attr('y1', bracketY)
+            .attr('x2', x2)
+            .attr('y2', bracketY)
+            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke-width', 2);
+
+          // Vertical line from top edge back down to TOP EDGE of second label
+          bracketGroup.append('line')
+            .attr('x1', x2)
+            .attr('y1', bracketY)
+            .attr('x2', x2)
+            .attr('y2', y2)
+            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke-width', 2);
+
+          // Arrow pointing to second bar label
+          const arrowSize = 6;
+          bracketGroup.append('polygon')
+            .attr('points', `
+              ${x2},${y2}
+              ${x2 - arrowSize},${y2 - arrowSize}
+              ${x2 + arrowSize},${y2 - arrowSize}
+            `)
+            .attr('fill', themeColors.axisLabelColor);
+
+          // Label on the horizontal connecting line
+          const labelX = (x1 + x2) / 2;
+          // Check if there's enough space above the bracket
+          const spaceAbove = marginTop + headerHeight + bracketY;
+          const hasSpaceAbove = spaceAbove > valueFontSize + 20; // Need font size + 20px padding
+
+          svg.append('text')
+            .attr('x', dynamicMarginLeft + labelX)
+            .attr('y', marginTop + headerHeight + bracketY + (hasSpaceAbove ? -10 : 20))
+            .attr('text-anchor', 'middle')
+            .attr('font-family', fontFamily)
+            .attr('font-size', valueFontSize)
+            .attr('font-weight', 700)
+            .attr('fill', themeColors.axisLabelColor)
+            .text(label);
+        }
+      });
     }
 
-    // Render Legend (if labelMode is 'legend' and position is 'below')
-    if (labelMode === 'legend' && legendPosition === 'below') {
-      const legendY = marginTop + headerHeight + innerHeight + 25;
+    // Render Legend (if labelMode is 'legend' and position is 'below' and showValueLabels is true and showPeriodLabels is true)
+    if (showPeriodLabels && showValueLabels && labelMode === 'legend' && legendPosition === 'below') {
+      // Position legend below the chart with proper spacing
+      // Chart ends at: marginTop + headerHeight + innerHeight
+      // Add space for X-axis labels (35px) + spacing (15px) = 50px
+      const legendY = marginTop + headerHeight + innerHeight + 50;
       const legendItemWidth = 120;
       const legendItemSpacing = 20;
       const totalLegendWidth = periods.length * legendItemWidth + (periods.length - 1) * legendItemSpacing;
@@ -1567,12 +1798,47 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
           .attr('font-family', fontFamily)
           .attr('font-size', '14px')
           .attr('font-weight', '500')
-          .attr('fill', '#374151')
+          .attr('fill', themeColors.legendTextColor)
           .text(period);
       });
     }
 
-  }, [data, periodNames, dimensions, orientation, barMode, colorScheme, styleSettings]);
+    // Add watermark/attribution for free tier users
+    if (styleSettings.userTier !== 'pro') {
+      const watermarkText = 'Made with Find&Tell | Charts for Data Stories™ | FindandTell.co';
+      const watermarkFontSize = 14; // Match homepage text-sm
+
+      // Always position watermark from the bottom of SVG to avoid clipping
+      const watermarkY = height - 8; // 8px from bottom edge
+
+      // Add clickable link
+      const watermarkLink = svg
+        .append('a')
+        .attr('href', 'https://findandtell.co')
+        .attr('target', '_blank')
+        .attr('rel', 'noopener noreferrer');
+
+      watermarkLink
+        .append('text')
+        .attr('x', dimensions.width / 2)
+        .attr('y', watermarkY)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', fontFamily)
+        .attr('font-size', watermarkFontSize + 'px')
+        .attr('font-weight', '500') // Medium weight to match homepage
+        .attr('fill', darkMode ? '#60a5fa' : '#1e3a8a') // Blue-400 in dark mode, Blue-900 in light mode
+        .attr('opacity', 1.0) // Fully opaque like homepage
+        .style('cursor', 'pointer')
+        .text(watermarkText)
+        .on('mouseover', function() {
+          d3.select(this).attr('fill', '#0891b2'); // Cyan-600 on hover
+        })
+        .on('mouseout', function() {
+          d3.select(this).attr('fill', darkMode ? '#60a5fa' : '#1e3a8a'); // Back to original color
+        });
+    }
+
+  }, [data, periodNames, dimensions, orientation, barMode, colorScheme, styleSettings, selectedBarsForComparison, percentChangeEnabled, percentChangeLabelFormat, percentChangeBracketDistance]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
@@ -1586,4 +1852,4 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick }) => {
   );
 };
 
-export default BarChart;
+export default React.memo(BarChart);

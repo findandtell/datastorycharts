@@ -8,6 +8,8 @@ import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtil
 const getDefaultDatasetKey = (chartType) => {
   if (chartType === 'slope') return 'slopeRevenue';
   if (chartType === 'bar') return 'barSimple';
+  if (chartType === 'grouped-bar') return 'barElectionOpinion';
+  if (chartType === 'line') return 'marketingChannelRevenue';
   return 'generic';
 };
 
@@ -27,15 +29,20 @@ export const useChartData = (chartType = 'funnel') => {
     if (isGroupedStacked) {
       defaultPeriods = [...new Set(defaultChartData.map(d => d.Period))];
     } else {
-      defaultPeriods = Object.keys(defaultChartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+      // For Line charts, metrics are the keys excluding 'date'
+      // For other charts, periods are the keys excluding 'Stage' or 'Category'
+      defaultPeriods = Object.keys(defaultChartData[0]).filter((key) =>
+        key !== "Stage" && key !== "Category" && key !== "date"
+      );
     }
   }
 
   const [data, setData] = useState(defaultChartData);
   const [periodNames, setPeriodNames] = useState(defaultPeriods);
-  const [editableData, setEditableData] = useState(defaultChartData ? JSON.parse(JSON.stringify(defaultChartData)) : []);
+  const [editableData, setEditableData] = useState(defaultChartData ? structuredClone(defaultChartData) : []);
   const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [error, setError] = useState(null);
+  const [hiddenPeriods, setHiddenPeriods] = useState(new Set());
 
   /**
    * Detect if data is in flattened grouped-stacked format
@@ -101,24 +108,29 @@ export const useChartData = (chartType = 'funnel') => {
     }
 
     let chartData = dataset.data;
-    let editableData = JSON.parse(JSON.stringify(chartData));
+    let editableData = structuredClone(chartData);
     let periods;
 
-    // Check if this is flattened grouped-stacked format
-    const isFlattenedGS = isFlattenedGroupedStacked(chartData);
-
-    if (isFlattenedGS) {
-      // Extract periods from the Period column
-      periods = chartData.map(d => d.Period);
-
-      // Transform to Group/Period format for chart rendering
-      chartData = transformFlattenedToGroupPeriod(chartData);
-
-      // Keep flattened format for editing (Datawrapper style!)
-      editableData = JSON.parse(JSON.stringify(dataset.data));
+    // For line charts, use metricNames from the dataset
+    if (dataset.metricNames) {
+      periods = dataset.metricNames;
     } else {
-      // For regular format, filter out Stage/Category columns
-      periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+      // Check if this is flattened grouped-stacked format
+      const isFlattenedGS = isFlattenedGroupedStacked(chartData);
+
+      if (isFlattenedGS) {
+        // Extract periods from the Period column
+        periods = chartData.map(d => d.Period);
+
+        // Transform to Group/Period format for chart rendering
+        chartData = transformFlattenedToGroupPeriod(chartData);
+
+        // Keep flattened format for editing (Datawrapper style!)
+        editableData = structuredClone(dataset.data);
+      } else {
+        // For regular format, filter out Stage/Category columns
+        periods = Object.keys(chartData[0]).filter((key) => key !== "Stage" && key !== "Category");
+      }
     }
 
     setData(chartData);
@@ -152,18 +164,77 @@ export const useChartData = (chartType = 'funnel') => {
       }
 
       // Determine the field name based on chart type
-      const stageFieldName = chartType === 'bar' ? 'Category' : 'Stage';
+      const stageFieldName = chartType === 'line' ? 'date' : (chartType === 'bar' ? 'Category' : 'Stage');
       const { data: chartData, periods } = csvToChartData(results.data, fieldOrder, stageFieldName);
 
       setData(chartData);
       setPeriodNames(periods);
-      setEditableData(JSON.parse(JSON.stringify(chartData)));
+      setEditableData(structuredClone(chartData));
       setIsComparisonMode(false);
       setError(null);
 
       return true;
     } catch (err) {
       setError("Failed to load CSV: " + err.message);
+      return false;
+    }
+  }, [chartType]);
+
+  /**
+   * Load CSV from text string (for copy/paste functionality)
+   */
+  const loadCSVText = useCallback(async (csvText, delimiter = ',') => {
+    try {
+      const Papa = (await import('papaparse')).default;
+
+      // If space-delimited, convert to tab-delimited for better parsing
+      let processedText = csvText;
+      if (delimiter instanceof RegExp) {
+        processedText = csvText.split('\n').map(line =>
+          line.trim().replace(/\s{2,}/g, '\t')
+        ).join('\n');
+        delimiter = '\t';
+      }
+
+      const results = Papa.parse(processedText, {
+        header: true,
+        delimiter: delimiter,
+        dynamicTyping: true,
+        skipEmptyLines: true
+      });
+
+      if (results.errors && results.errors.length > 0) {
+        setError("Error parsing CSV: " + results.errors[0].message);
+        return false;
+      }
+
+      if (!results.data || results.data.length === 0) {
+        setError("No data found in CSV");
+        return false;
+      }
+
+      // Use meta.fields to preserve original column order
+      const fieldOrder = results.meta?.fields || Object.keys(results.data[0]);
+
+      const validation = validateCSVStructure(results.data, fieldOrder);
+      if (!validation.valid) {
+        setError("Invalid CSV structure: " + validation.errors.join(", "));
+        return false;
+      }
+
+      // Determine the field name based on chart type
+      const stageFieldName = chartType === 'line' ? 'date' : (chartType === 'bar' ? 'Category' : 'Stage');
+      const { data: chartData, periods } = csvToChartData(results.data, fieldOrder, stageFieldName);
+
+      setData(chartData);
+      setPeriodNames(periods);
+      setEditableData(structuredClone(chartData));
+      setIsComparisonMode(false);
+      setError(null);
+
+      return true;
+    } catch (err) {
+      setError("Failed to load CSV text: " + err.message);
       return false;
     }
   }, [chartType]);
@@ -211,17 +282,43 @@ export const useChartData = (chartType = 'funnel') => {
   }, []);
 
   /**
+   * Toggle period/metric column visibility
+   */
+  const togglePeriodHidden = useCallback((periodName, hidden) => {
+    setHiddenPeriods((prev) => {
+      const updated = new Set(prev);
+      if (hidden) {
+        updated.add(periodName);
+      } else {
+        updated.delete(periodName);
+      }
+      return updated;
+    });
+  }, []);
+
+  /**
    * Update period name
    */
   const updatePeriodName = useCallback((oldName, newName) => {
     setPeriodNames((prev) => prev.map((name) => (name === oldName ? newName : name)));
-    
+
     setEditableData((prev) =>
       prev.map((row) => {
         const { [oldName]: value, ...rest } = row;
         return { ...rest, [newName]: value };
       })
     );
+
+    // Update hiddenPeriods if the old name was hidden
+    setHiddenPeriods((prev) => {
+      if (prev.has(oldName)) {
+        const updated = new Set(prev);
+        updated.delete(oldName);
+        updated.add(newName);
+        return updated;
+      }
+      return prev;
+    });
   }, []);
 
   /**
@@ -254,13 +351,23 @@ export const useChartData = (chartType = 'funnel') => {
     }
 
     setPeriodNames((prev) => prev.filter((name) => name !== periodName));
-    
+
     setEditableData((prev) =>
       prev.map((row) => {
         const { [periodName]: _, ...rest } = row;
         return rest;
       })
     );
+
+    // Remove from hiddenPeriods if it was hidden
+    setHiddenPeriods((prev) => {
+      if (prev.has(periodName)) {
+        const updated = new Set(prev);
+        updated.delete(periodName);
+        return updated;
+      }
+      return prev;
+    });
 
     return true;
   }, [periodNames]);
@@ -318,14 +425,14 @@ export const useChartData = (chartType = 'funnel') => {
   const applyEdits = useCallback(() => {
     // Filter out rows where hidden is true
     const visibleData = editableData.filter(row => !row.hidden);
-    setData(JSON.parse(JSON.stringify(visibleData)));
+    setData(structuredClone(visibleData));
   }, [editableData]);
 
   /**
    * Reset edits
    */
   const resetEdits = useCallback(() => {
-    setEditableData(JSON.parse(JSON.stringify(data)));
+    setEditableData(structuredClone(data));
   }, [data]);
 
   /**
@@ -390,6 +497,24 @@ export const useChartData = (chartType = 'funnel') => {
     });
   }, []);
 
+  /**
+   * Load snapshot data (for snapshot restoration)
+   */
+  const loadSnapshotData = useCallback((snapshotData, snapshotPeriods, snapshotIsComparison = false) => {
+    if (!snapshotData || !snapshotPeriods) {
+      setError("Invalid snapshot data");
+      return false;
+    }
+
+    setData(snapshotData);
+    setPeriodNames(snapshotPeriods);
+    setEditableData(structuredClone(snapshotData));
+    setIsComparisonMode(snapshotIsComparison);
+    setError(null);
+
+    return true;
+  }, []);
+
   return {
     // State
     data,
@@ -397,13 +522,17 @@ export const useChartData = (chartType = 'funnel') => {
     editableData,
     isComparisonMode,
     error,
+    hiddenPeriods,
 
     // Actions
     loadSampleData,
     loadCSVFile,
+    loadCSVText,
+    loadSnapshotData,
     updateDataValue,
     updateStageName,
     toggleStageHidden,
+    togglePeriodHidden,
     updatePeriodName,
     addPeriod,
     removePeriod,

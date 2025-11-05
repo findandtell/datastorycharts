@@ -6,9 +6,14 @@ A scalable, maintainable React-based data visualization platform for creating pr
 
 **Production URL**: [https://datastorycharts.vercel.app](https://datastorycharts.vercel.app)
 
-## ✨ Latest Features (v2.0)
+## ✨ Latest Features (v3.0)
 
 ### Recent Updates
+- **15 Publication-Inspired Style Templates**: Professional pre-configured themes inspired by Financial Times, The Economist, NYT, WSJ, BBC, The Guardian, Edward Tufte, Bloomberg, Wired, Vox, and more
+- **IBCS Business Report Template**: IBCS standards-inspired design with grey-scale palette, minimal ink ratio, and professional business reporting aesthetics
+- **Chart-Specific Template Settings**: Templates can now configure chart-type-specific properties (line chart thickness, slope chart endpoints, etc.)
+- **Multiple Chart Types**: Funnel Charts, Line Charts, Bar Charts, Grouped Bar Charts, and Slope Charts with shared styling system
+- **Enhanced Tufte Minimalism**: Edward Tufte template includes slope chart settings with minimal ink principles (1px lines, black-only colors, transparent axes)
 - **Direct Labels (In-Stage)**: Period labels displayed directly inside bars as default
 - **Traditional Legend**: Optional top legend for period identification
 - **Enhanced Font Options**:
@@ -16,7 +21,7 @@ A scalable, maintainable React-based data visualization platform for creating pr
   - 2 Condensed fonts: Roboto Condensed, Open Sans Condensed
   - 5 Serif fonts: Merriweather, Playfair Display, Lora, PT Serif, Georgia
 - **Improved Layout**: Fixed scrolling behavior - chart stays centered, only control panel scrolls
-- **Smart Label Positioning**: Dynamic label placement in horizontal mode to avoid conflicts with conversion brackets and legends
+- **Smart Label Positioning**: Dynamic label placement to avoid conflicts with conversion brackets and legends
 - **Responsive UI**: Sticky header and chart area with scrollable configuration panel
 
 ## 🏗️ Architecture Overview
@@ -38,6 +43,13 @@ src/
 ```
 
 ## 🎯 Key Features
+
+### Chart Types
+- **Funnel Charts**: Vertical/horizontal orientations with throughput and fallout emphasis modes
+- **Line Charts**: Time-series visualization with date parsing, aggregation, and trend analysis
+- **Bar Charts**: Categorical comparison with emphasis modes and percent change brackets
+- **Grouped Bar Charts**: Side-by-side comparison across multiple categories
+- **Slope Charts**: Two-period comparison showing directional trends with Tufte-inspired minimalism
 
 ### Chart Visualization
 - **Multiple Orientations**: Vertical and horizontal funnel layouts
@@ -70,6 +82,28 @@ src/
   - Adjustable chart padding and stage gaps
   - Stage label positioning (top/bottom for horizontal, left/right for vertical)
   - Dynamic label positioning to avoid UI conflicts
+
+### Style Templates
+- **15 Publication-Inspired Templates**: One-click professional styling inspired by leading publications and design systems:
+  - **Financial Times**: Classic FT salmon pink background with serif typography and claret brand colors
+  - **The Economist**: Bold red accents with clean presentation and signature Economist aesthetic
+  - **New York Times**: NYT Upshot style with Helvetica and sophisticated data visualization design
+  - **Wall Street Journal**: Newsprint beige with dot-pattern aesthetic and classic typography
+  - **BBC News**: Clean presentation with Reith Sans-inspired typography and BBC brand colors
+  - **The Guardian**: Egyptian-style typography with Guardian blue accents
+  - **Edward Tufte**: Minimalist design emphasizing data-ink ratio with sparse decoration and direct labeling
+  - **Bloomberg**: Terminal-inspired dark theme with high contrast and financial data aesthetics
+  - **Minimal**: Ultra-clean design with maximum readability and minimal decoration
+  - **Vibrant**: Bold, colorful design optimized for presentations and social media
+  - **Wired Magazine**: Tech-forward style with bold sans-serif and vibrant neon accent colors
+  - **Vox Media**: Modern web journalism style with bold headlines and clear color hierarchy
+  - **Corporate Professional**: Conservative business style with navy, grey, and professional typography
+  - **Swiss Style**: International Typographic Style with grid-based layout and geometric precision
+  - **IBCS Business Report**: Professional business reporting inspired by IBCS standards with grey-scale palette and data-focused design
+- **Chart-Specific Settings**: Templates can configure properties specific to each chart type:
+  - Line Chart: Line thickness, point size, area fill
+  - Slope Chart: Color mode, line thickness, endpoint size/style, axis visibility, label format, period spacing
+- **Instant Application**: Apply any template with one click to instantly transform your chart's appearance
 
 ### Export & Sharing
 - **PNG Export**: High-resolution image export (2x scaling)
@@ -108,10 +142,15 @@ Centralized design tokens ensuring consistency:
 
 - **`theme.js`**: Typography, spacing, layout, colors
 - **`colorPalettes.js`**: Color presets and comparison palettes
+- **`styleTemplates.js`**: 15 publication-inspired style templates with chart-specific settings
 
 ```javascript
 import theme from './shared/design-system/theme';
 import { colorPresets, comparisonPalettes } from './shared/design-system/colorPalettes';
+import { styleTemplates, applyTemplate } from './shared/design-system/styleTemplates';
+
+// Apply a template
+applyTemplate(styleSettings, 'financialTimes');
 ```
 
 ### Utilities (`shared/utils/`)
@@ -483,6 +522,37 @@ import ChartRenderer from './ChartRenderer';
 
 ## 📋 Changelog
 
+### v3.0.0 (November 2025)
+**Major New Features:**
+- **Style Templates System**: 15 publication-inspired templates with one-click application
+  - Financial Times, The Economist, NYT, WSJ, BBC, The Guardian
+  - Edward Tufte, Bloomberg, Minimal, Vibrant, Wired, Vox
+  - Corporate Professional, Swiss Style, IBCS Business Report
+- **Chart-Specific Template Settings**: Templates can now configure chart-type-specific properties
+  - Line Chart: Line thickness, point size, area fill settings
+  - Slope Chart: Color mode, line styling, endpoint configuration, axis visibility
+- **IBCS Business Report Template**: Professional business reporting with IBCS standards-inspired design
+  - Grey-scale color palette (8 shades from #4d4d4d to #cccccc)
+  - Minimal ink ratio and clean, data-focused aesthetics
+  - Specific line chart settings (1px lines, 2px points, single-level axis labels)
+- **Enhanced Edward Tufte Template**: Minimalist slope chart configuration
+  - All-black trend lines regardless of direction
+  - 1px line thickness and 1px endpoints for minimal ink
+  - Transparent axis lines (no chartjunk)
+  - Values-only label format with compact spacing
+- **Multiple Chart Types**: Line Charts, Bar Charts, Grouped Bar Charts, Slope Charts with shared styling system
+
+**Code Quality:**
+- Removed all debug console.log statements from production code
+- Cleaned up FunnelChart.jsx (removed overlay watermark debug logs)
+- Cleaned up ChartEditor.jsx (removed state tracking debug logs)
+- Maintained legitimate error handling (console.error, console.warn for actual errors)
+
+**Documentation:**
+- Updated README.md with comprehensive style templates documentation
+- Added chart-specific template settings documentation
+- Updated feature list to reflect all chart types
+
 ### v2.0.0 (January 2025)
 **New Features:**
 - Direct Labels (in-stage) as default legend position
@@ -516,16 +586,17 @@ import ChartRenderer from './ChartRenderer';
 ## 🔮 Future Enhancements
 
 ### Planned Features
-- Additional chart types (bar, line, sankey, pie)
-- Real-time data connections
-- Advanced filtering and drill-down
-- Collaboration features
-- Template library
-- Animation controls
+- Additional chart types (sankey, pie, area, scatter)
+- Real-time data connections and live updates
+- Advanced filtering and drill-down capabilities
+- Collaboration features (shared charts, comments)
+- Animation controls for transitions and reveals
 - Accessibility improvements (WCAG 2.1 AA compliance)
-- Dark mode support
+- Enhanced dark mode support across all templates
 - Mobile-responsive touch controls
 - Data annotations and callouts
+- Template customization and saving
+- Export to additional formats (PDF, PowerPoint)
 
 ### Extension Points
 - Custom renderers

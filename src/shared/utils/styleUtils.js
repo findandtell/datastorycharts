@@ -119,3 +119,27 @@ export const generateStyleName = (title, chartType) => {
   }
   return title;
 };
+
+/**
+ * Load a style file from a URL
+ * @param {string} url - The URL to fetch the style file from
+ * @returns {Promise<Object>} - Parsed style settings
+ */
+export const loadStyleFromURL = async (url) => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch style file: ${response.statusText}`);
+    }
+    const parsed = await response.json();
+
+    // Validate that it's a style file
+    if (!parsed.styleVersion) {
+      throw new Error("Invalid style file: missing styleVersion");
+    }
+
+    return parsed;
+  } catch (error) {
+    throw new Error("Failed to load style file: " + error.message);
+  }
+};

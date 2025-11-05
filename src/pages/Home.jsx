@@ -1,7 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getChartKeys, getChart } from '../charts/registry';
-import FindTellLogo from '../shared/FindTellLogo';
 
 /**
  * Home Page - Chart Gallery
@@ -9,14 +7,40 @@ import FindTellLogo from '../shared/FindTellLogo';
  */
 export default function Home() {
   const navigate = useNavigate();
-  const chartKeys = getChartKeys();
+
+  const charts = [
+    {
+      key: 'line',
+      name: 'Line Chart',
+      description: 'Visualize trends and patterns over time with continuous data points connected by lines, perfect for showing growth, decline, or cyclical patterns.',
+      image: '/Examples/line_chart_marketing_channels.svg',
+    },
+    {
+      key: 'bar',
+      name: 'Bar Chart',
+      description: 'Compare values across different categories or time periods with horizontal or vertical bars, ideal for showing relative sizes and rankings.',
+      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+    },
+    {
+      key: 'slope',
+      name: 'Slope Chart',
+      description: 'Show change between two points in time with connecting lines that emphasize increases, decreases, or stability across multiple categories.',
+      image: '/Examples/slope_chart_tufte.svg',
+    },
+    {
+      key: 'funnel',
+      name: 'Funnel Chart',
+      description: 'Track progression through sequential stages in a process, displaying conversion rates and drop-off points in sales pipelines or user journeys.',
+      image: '/Examples/funnel_chart_ab.svg',
+    },
+  ];
 
   const handleChartSelect = (chartKey) => {
     navigate(`/chart/${chartKey}`);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-8 py-12">
@@ -30,9 +54,8 @@ export default function Home() {
               Data Story Charts
             </h1>
           </div>
-          <p className="text-xl text-findtell-gray max-w-3xl mx-auto text-center">
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto text-center">
             Create clean and clear data visualizations to be used in your data stories.
-
           </p>
         </div>
       </div>
@@ -48,87 +71,35 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {chartKeys.map((chartKey) => {
-            const chart = getChart(chartKey);
-            return (
-              <div
-                key={chartKey}
-                onClick={() => handleChartSelect(chartKey)}
-                className="findtell-card cursor-pointer overflow-hidden group transform hover:-translate-y-1 border-2 hover:border-findtell-blue"
-              >
-                {/* Chart Preview/Thumbnail */}
-                <div className="h-56 bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50 flex items-center justify-center border-b-2 border-gray-100 group-hover:from-cyan-100 group-hover:via-blue-100 group-hover:to-indigo-100 transition-all duration-300 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent"></div>
-                  <div className="text-center relative z-10">
-                    <div className="text-7xl mb-4 group-hover:scale-110 transition-transform duration-300">{chart.icon}</div>
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest bg-white/80 px-3 py-1 rounded-full">
-                      {chart.category}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Chart Info */}
-                <div className="p-7">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-findtell-blue transition-colors">
-                    {chart.name}
-                  </h3>
-                  <p className="text-gray-600 text-base mb-5 leading-relaxed">
-                    {chart.description}
-                  </p>
-
-                  {/* Features */}
-                  <div className="flex flex-wrap gap-2 mb-5">
-                    {chart.supportsComparison && (
-                      <span className="px-3 py-1.5 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 text-xs font-semibold rounded-full border border-green-200">
-                        Comparison Mode
-                      </span>
-                    )}
-                    <span className="px-3 py-1.5 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 text-xs font-semibold rounded-full border border-blue-200">
-                      Interactive
-                    </span>
-                    <span className="px-3 py-1.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs font-semibold rounded-full border border-purple-200">
-                      Customizable
-                    </span>
-                  </div>
-
-                  {/* CTA Button */}
-                  <button className="w-full findtell-btn-primary">
-                    Create Chart →
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Coming Soon Cards for Future Charts */}
-          {[...Array(5)].map((_, index) => (
+        <div className="grid grid-cols-4 gap-8">
+          {charts.map((chart) => (
             <div
-              key={`coming-soon-${index}`}
-              className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden opacity-70 hover:opacity-85 transition-opacity duration-300"
+              key={chart.key}
+              onClick={() => handleChartSelect(chart.key)}
+              className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-cyan-400"
             >
-              <div className="h-56 bg-gradient-to-br from-gray-100 via-gray-150 to-gray-200 flex items-center justify-center border-b-2 border-gray-200 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent"></div>
-                <div className="text-center relative z-10">
-                  <div className="text-7xl mb-4">🔒</div>
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-widest bg-white/70 px-3 py-1 rounded-full">
-                    Coming Soon
-                  </div>
-                </div>
+              {/* Chart Preview Image */}
+              <div className="bg-white border-b border-gray-200 relative h-56 overflow-hidden">
+                <object
+                  data={chart.image}
+                  type="image/svg+xml"
+                  className="pointer-events-none w-full h-full"
+                  aria-label={`${chart.name} Example`}
+                />
               </div>
 
-              <div className="p-7">
-                <h3 className="text-2xl font-bold text-gray-400 mb-3">
-                  More Charts Coming
+              {/* Chart Info */}
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                  {chart.name}
                 </h3>
-                <p className="text-gray-400 text-base mb-5 leading-relaxed">
-                  Bar charts, line charts, pie charts, and more visualization types will be available soon
+                <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+                  {chart.description}
                 </p>
-                <button
-                  disabled
-                  className="w-full px-5 py-3 bg-gray-300 text-gray-500 font-semibold rounded-xl cursor-not-allowed"
-                >
-                  Coming Soon
+
+                {/* CTA Button */}
+                <button className="w-full px-4 py-2 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 transition-colors">
+                  Create Chart
                 </button>
               </div>
             </div>
@@ -138,8 +109,20 @@ export default function Home() {
 
       {/* Footer */}
       <div className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-6 py-6 text-center text-gray-600 text-sm">
-          <p>
+        <div className="max-w-7xl mx-auto px-6 py-8 text-center">
+          {/* Watermark/Attribution */}
+          <p className="text-sm font-medium text-blue-900 mb-3">
+            <a
+              href="https://findandtell.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-cyan-600 transition-colors"
+            >
+              Made with Find&Tell | Charts for Data Stories™ | FindandTell.co
+            </a>
+          </p>
+          {/* Tech stack */}
+          <p className="text-gray-500 text-xs">
             Built with React, D3.js, and Tailwind CSS • Export to PNG, SVG, or D3 code
           </p>
         </div>

@@ -1,0 +1,64 @@
+{
+  "styleVersion": "1.0",
+  "appVersion": "2.0.0",
+  "typography": {
+    "title": "A/B Test Results: 43% Improvement",
+    "subtitle": "Variation A Exceeded Expectations: 4.6% Conversion to Activation",
+    "titleAlignment": "center",
+    "fontFamily": "Inter",
+    "titleFontSize": 27,
+    "subtitleFontSize": 15,
+    "segmentLabelFontSize": 21,
+    "metricLabelFontSize": 15,
+    "periodLabelFontSize": 13,
+    "legendFontSize": 13,
+    "conversionLabelFontSize": 20,
+    "inStageLabelFontSize": 13
+  },
+  "colors": {
+    "barColor": "#0f4c81",
+    "colorTransition": 60,
+    "comparisonPalette": "user",
+    "userCustomColors": [
+      "#0f4c81",
+      "#cc0000",
+      "#008c95",
+      "#f37021",
+      "#7c7c7c",
+      "#006341"
+    ]
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspectRatio": "1:1",
+    "chartPadding": 25,
+    "stageGap": 10,
+    "barWidth": 100,
+    "stageLabelPosition": "bottom"
+  },
+  "visual": {
+    "axisLineWidth": 2,
+    "backgroundOpacity": 50,
+    "darkMode": false,
+    "backgroundColor": "#f4f0e8"
+  },
+  "display": {
+    "emphasis": "throughput",
+    "metricEmphasis": "volume",
+    "normalizeToHundred": true,
+    "compactNumbers": true,
+    "showLegend": true,
+    "legendPosition": "direct",
+    "showSparklines": false,
+    "sparklineType": "volume",
+    "userTier": "free",
+    "percentChangeEnabled": false,
+    "percentChangeLabelFormat": "percent"
+  },
+  "metadata": {
+    "name": "A/B Test WSJ Style",
+    "description": "WSJ-inspired style for A/B test funnel with comparison mode",
+    "chartType": "funnel",
+    "author": "Find&Tell"
+  }
+}

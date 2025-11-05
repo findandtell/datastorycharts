@@ -116,6 +116,10 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
     // Merge provided settings with defaults
     const settings = { ...defaultStyleSettings, ...styleSettings };
 
+    // Add extra canvas height for watermark margin area if user is on free tier
+    // This extends the SVG canvas to create dedicated space for the watermark
+    const watermarkMarginHeight = settings.userTier !== 'pro' ? 50 : 0;
+
     const {
       width,
       height,
@@ -149,6 +153,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       emphasizedLineThickness,
       emphasizedLabelWeight,
       backgroundColor,
+      darkMode = false,
       showAxisLines,
       axisLineColor,
       axisLineWidth,
@@ -158,6 +163,17 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       colorMode,
       lineSaturation,
     } = settings;
+
+    // Define theme-aware colors based on dark mode
+    const themeColors = {
+      // Title and subtitle
+      titleColor: darkMode ? '#f9fafb' : '#111827',
+      subtitleColor: darkMode ? '#d1d5db' : '#6b7280',
+      // Axis labels and text
+      axisLabelColor: darkMode ? '#e5e7eb' : '#374151',
+      // Period labels (if periodColor is not set)
+      defaultPeriodColor: darkMode ? '#e5e7eb' : periodColor,
+    };
 
     // Extract periods (should be exactly 2)
     const periods = periodNames.slice(0, 2);
@@ -189,10 +205,34 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
     const decimalPlaces = detectDecimalPlaces();
 
     /**
-     * Format a number to display with consistent decimal places
+     * Format a number to display with consistent decimal places or compact notation
      */
     const formatValue = (value) => {
       if (value == null) return '';
+
+      // Use compact notation if enabled (1K, 1M, 1B)
+      if (settings.compactNumbers) {
+        const absValue = Math.abs(value);
+        const sign = value < 0 ? '-' : '';
+
+        if (absValue >= 1000000000) {
+          // Billions
+          const formatted = (absValue / 1000000000).toFixed(absValue % 1000000000 === 0 ? 0 : 1);
+          return `${sign}${formatted}B`;
+        } else if (absValue >= 1000000) {
+          // Millions
+          const formatted = (absValue / 1000000).toFixed(absValue % 1000000 === 0 ? 0 : 1);
+          return `${sign}${formatted}M`;
+        } else if (absValue >= 1000) {
+          // Thousands
+          const formatted = (absValue / 1000).toFixed(absValue % 1000 === 0 ? 0 : 1);
+          return `${sign}${formatted}K`;
+        }
+        // Less than 1000 - show as-is with decimal places
+        return value.toFixed(decimalPlaces);
+      }
+
+      // Regular formatting with decimal places
       if (decimalPlaces === 0) return value.toString();
       return value.toFixed(decimalPlaces);
     };
@@ -298,11 +338,12 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       calculatedMarginRight = Math.max(marginRight, maxRightWidth + 30);
     }
 
-    // Create SVG
+    // Create SVG with extended height for watermark margin area
+    const actualHeight = height + watermarkMarginHeight;
     const svg = d3
       .select(svgRef.current)
       .attr('width', width)
-      .attr('height', height)
+      .attr('height', actualHeight)
       .style('background-color', backgroundColor);
 
     // Calculate title and subtitle heights
@@ -326,7 +367,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         .attr('font-family', settings.fontFamily || 'Inter')
         .attr('font-size', titleHeight + 'px')
         .attr('font-weight', '700')
-        .attr('fill', '#111827')
+        .attr('fill', themeColors.titleColor)
         .text(settings.title);
     }
 
@@ -343,7 +384,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         .attr('font-family', settings.fontFamily || 'Inter')
         .attr('font-size', subtitleHeight + 'px')
         .attr('font-weight', '400')
-        .attr('fill', '#6b7280')
+        .attr('fill', themeColors.subtitleColor)
         .text(settings.subtitle);
     }
 
@@ -353,7 +394,9 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
 
     const chartWidth = width - calculatedMarginLeft - calculatedMarginRight;
     // Use periodHeight if provided to control vertical spacing, otherwise use height-based calculation
-    const chartHeight = periodHeight || (height - marginTop - marginBottom);
+    // Chart height uses original height (watermark goes in extended margin area)
+    const baseHeight = height - marginTop - marginBottom - headerHeight;
+    const chartHeight = periodHeight || baseHeight;
 
     // Calculate min and max values for scaling
     const allValues = data.flatMap(d => [d[periods[0]], d[periods[1]]]);
@@ -373,7 +416,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
     const x2 = x1 + effectivePeriodSpacing;
 
     // Draw axis lines
-    if (showAxisLines) {
+    if (showAxisLines && axisLineStyle !== 'none') {
       // Convert axis line style to stroke-dasharray
       const getStrokeDashArray = (style) => {
         switch (style) {
@@ -469,7 +512,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       .attr('font-family', periodFont)
       .attr('font-size', periodFontSize)
       .attr('font-weight', periodFontWeight)
-      .attr('fill', periodColor)
+      .attr('fill', periodColor || themeColors.defaultPeriodColor)
       .text(periods[0]);
 
     chartGroup
@@ -480,7 +523,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       .attr('font-family', periodFont)
       .attr('font-size', periodFontSize)
       .attr('font-weight', periodFontWeight)
-      .attr('fill', periodColor)
+      .attr('fill', periodColor || themeColors.defaultPeriodColor)
       .text(periods[1]);
 
     // Calculate label offsets to prevent overlaps
@@ -666,7 +709,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
         maxRightMetricWidth = Math.max(maxRightMetricWidth, estimatedWidth);
       });
     }
-    const rightCategoryX = maxRightMetricWidth > 0 ? x2 + maxRightMetricWidth + 15 : x2 + 15;
+    const rightCategoryX = maxRightMetricWidth > 0 ? x2 + maxRightMetricWidth + 7 : x2 + 15;
 
     // Draw lines and endpoints for each category
     data.forEach((d, i) => {
@@ -918,6 +961,40 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
       }
     });
 
+    // Add watermark/attribution for free tier users
+    if (styleSettings.userTier !== 'pro') {
+      const watermarkText = 'Made with Find&Tell | Charts for Data Stories™ | FindandTell.co';
+      const watermarkFontSize = 14; // Match homepage text-sm
+      // Position watermark in the dedicated margin area below the chart
+      const watermarkY = height + (watermarkMarginHeight / 2) + 5;
+
+      // Add clickable link
+      const watermarkLink = svg
+        .append('a')
+        .attr('href', 'https://findandtell.co')
+        .attr('target', '_blank')
+        .attr('rel', 'noopener noreferrer');
+
+      watermarkLink
+        .append('text')
+        .attr('x', width / 2)
+        .attr('y', watermarkY)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', styleSettings.fontFamily || 'Inter')
+        .attr('font-size', watermarkFontSize + 'px')
+        .attr('font-weight', '500') // Medium weight to match homepage
+        .attr('fill', '#1e3a8a') // Blue-900 to match homepage
+        .attr('opacity', 1.0) // Fully opaque like homepage
+        .style('cursor', 'pointer')
+        .text(watermarkText)
+        .on('mouseover', function() {
+          d3.select(this).attr('fill', '#0891b2'); // Cyan-600 on hover
+        })
+        .on('mouseout', function() {
+          d3.select(this).attr('fill', '#1e3a8a'); // Back to blue-900
+        });
+    }
+
   }, [data, periodNames, styleSettings, hoveredLine, onLineClick]);
 
   return (
@@ -927,4 +1004,4 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
   );
 };
 
-export default SlopeChart;
+export default React.memo(SlopeChart);

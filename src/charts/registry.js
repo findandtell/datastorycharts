@@ -13,7 +13,8 @@
 import FunnelChart from './FunnelChart/FunnelChart';
 import SlopeChart from './SlopeChart/SlopeChart';
 import BarChart from './BarChart/BarChart';
-// import LineChart from './LineChart/LineChart';
+import GroupedBarChart from './GroupedBarChart/GroupedBarChart';
+import LineChart from './LineChart/LineChart';
 // import SankeyChart from './SankeyChart/SankeyChart';
 
 /**
@@ -68,21 +69,37 @@ export const chartRegistry = {
     },
   },
 
-  // Future chart types:
-  /*
-  
+  'grouped-bar': {
+    name: 'Bar Chart (Grouped)',
+    component: GroupedBarChart,
+    icon: '📊',
+    description: 'Show grouped categories across periods (Datawrapper style)',
+    supportsComparison: false,
+    category: 'comparison',
+    defaultSettings: {
+      barMode: 'grouped',
+      showGrid: true,
+      legendPosition: 'above',
+    },
+  },
+
   line: {
     name: 'Line Chart',
     component: LineChart,
-    icon: '📉',
-    description: 'Show trends over time',
+    icon: '📈',
+    description: 'Visualize time-series data and trends',
     supportsComparison: true,
     category: 'trend',
     defaultSettings: {
       showPoints: true,
-      smoothing: 0,
+      smoothLines: false,
+      showGridLines: true,
+      timeScale: 'month',
     },
   },
+
+  // Future chart types:
+  /*
   
   sankey: {
     name: 'Sankey Diagram',

@@ -168,6 +168,24 @@ const FunnelChart = ({
     const svgElement = d3.select(svgRef.current);
     svgElement.selectAll("*").remove();
 
+    // Define theme-aware colors based on dark mode
+    const themeColors = {
+      // Background
+      backgroundColor: styleSettings.backgroundColor || (styleSettings.darkMode ? '#1f2937' : '#ffffff'),
+      // Title and subtitle
+      titleColor: styleSettings.darkMode ? '#f9fafb' : '#111827',
+      subtitleColor: styleSettings.darkMode ? '#d1d5db' : '#6b7280',
+      // Stage labels and text
+      stageLabelColor: styleSettings.darkMode ? '#e5e7eb' : '#374151',
+      primaryTextColor: styleSettings.darkMode ? '#e5e7eb' : '#374151',
+      secondaryTextColor: styleSettings.darkMode ? '#9ca3af' : '#6b7280',
+      // Legend text
+      legendTextColor: styleSettings.darkMode ? '#d1d5db' : '#4b5563',
+      // Bracket and axis colors
+      bracketColor: styleSettings.darkMode ? '#f9fafb' : '#000000',
+      axisColor: styleSettings.darkMode ? '#f9fafb' : '#000000',
+    };
+
     // Calculate max label width for dynamic margin
     const tempSvg = svgElement.append("g");
     let maxLabelWidth = 0;
@@ -243,12 +261,15 @@ const FunnelChart = ({
             left: 120,
           };
 
-    const width = styleSettings.canvasWidth - margin.left - margin.right;
-    const height = styleSettings.canvasHeight - margin.top - margin.bottom;
+    const width = styleSettings.chartWidth - margin.left - margin.right;
+    const height = styleSettings.chartHeight - margin.top - margin.bottom;
+
+    // Set background color
+    svgElement.style('background-color', themeColors.backgroundColor);
 
     const svg = svgElement
-      .attr("width", styleSettings.canvasWidth)
-      .attr("height", styleSettings.canvasHeight)
+      .attr("width", styleSettings.chartWidth)
+      .attr("height", styleSettings.chartHeight)
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
@@ -293,7 +314,8 @@ const FunnelChart = ({
         selectedStages,
         selectedPeriod,
         handleBarClick,
-        abbreviateNumber
+        abbreviateNumber,
+        themeColors
       );
     } else {
       renderHorizontalFunnel(
@@ -314,7 +336,8 @@ const FunnelChart = ({
         selectedPeriod,
         handleBarClick,
         abbreviateNumber,
-        headerHeight
+        headerHeight,
+        themeColors
       );
     }
 
@@ -326,23 +349,41 @@ const FunnelChart = ({
       periodNames,
       colorShades,
       titleHeight,
-      subtitleHeight
+      subtitleHeight,
+      themeColors
     );
 
-    // Watermark for free tier
-    if (styleSettings.userTier === "free") {
-      svgElement
-        .append("text")
-        .attr("x", styleSettings.canvasWidth / 2)
-        .attr("y", styleSettings.canvasHeight / 2)
-        .attr("text-anchor", "middle")
-        .attr("dominant-baseline", "middle")
-        .attr("font-family", styleSettings.fontFamily)
-        .attr("font-size", "80px")
-        .attr("font-weight", "700")
-        .attr("fill", "#9ca3af")
-        .attr("opacity", 0.1)
-        .text("Find&Tell");
+    // Add watermark/attribution for free tier users
+    if (styleSettings.userTier !== 'pro') {
+      const watermarkText = 'Made with Find&Tell | Charts for Data Stories™ | FindandTell.co';
+      const watermarkFontSize = 14; // Match homepage text-sm
+      const watermarkY = styleSettings.chartHeight - 5; // 5px from bottom edge
+
+      // Add clickable link
+      const watermarkLink = svgElement
+        .append('a')
+        .attr('href', 'https://findandtell.co')
+        .attr('target', '_blank')
+        .attr('rel', 'noopener noreferrer');
+
+      watermarkLink
+        .append('text')
+        .attr('x', styleSettings.chartWidth / 2)
+        .attr('y', watermarkY)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', styleSettings.fontFamily)
+        .attr('font-size', watermarkFontSize + 'px')
+        .attr('font-weight', '500') // Medium weight to match homepage
+        .attr('fill', '#1e3a8a') // Blue-900 to match homepage
+        .attr('opacity', 1.0) // Fully opaque like homepage
+        .style('cursor', 'pointer')
+        .text(watermarkText)
+        .on('mouseover', function() {
+          d3.select(this).attr('fill', '#0891b2'); // Cyan-600 on hover
+        })
+        .on('mouseout', function() {
+          d3.select(this).attr('fill', '#1e3a8a'); // Back to blue-900
+        });
     }
   }, [
     data,
@@ -387,7 +428,8 @@ function renderVerticalFunnel(
   selectedStages,
   selectedPeriod,
   handleBarClick,
-  abbreviateNumber
+  abbreviateNumber,
+  themeColors
 ) {
   const xScale = d3.scaleLinear().domain([0, maxValue]).range([0, width]);
   const barHeight =
@@ -414,8 +456,11 @@ function renderVerticalFunnel(
       const isSelected =
         selectedStages.length === 0 || selectedStages.includes(originalIdx);
       const isPeriodSelected = periodIdx === selectedPeriod;
-      const opacity =
-        isSelected && isPeriodSelected ? 1 : isSelected ? 0.5 : 0.25;
+      // If nothing is selected, show all bars at full opacity
+      // If something is selected, reduce opacity for non-selected bars
+      const opacity = selectedStages.length === 0
+        ? 1
+        : (isSelected && isPeriodSelected ? 1 : isSelected ? 0.5 : 0.25);
 
       if (styleSettings.emphasis === "throughput") {
         renderThroughputBar(
@@ -437,7 +482,8 @@ function renderVerticalFunnel(
           abbreviateNumber,
           allLabelsInside,
           visibleData,
-          periods
+          periods,
+          themeColors
         );
       } else {
         renderFalloutBar(
@@ -457,7 +503,8 @@ function renderVerticalFunnel(
           handleBarClick,
           abbreviateNumber,
           visibleData,
-          periods
+          periods,
+          themeColors
         );
       }
     });
@@ -469,7 +516,7 @@ function renderVerticalFunnel(
       .attr("y", yPos + barHeight / 2)
       .attr("dy", "0.35em")
       .attr("text-anchor", "end")
-      .attr("fill", "#374151")
+      .attr("fill", themeColors.stageLabelColor)
       .attr("font-family", styleSettings.fontFamily)
       .attr("font-size", styleSettings.segmentLabelFontSize + "px")
       .attr("font-weight", "500")
@@ -488,7 +535,8 @@ function renderVerticalFunnel(
       styleSettings,
       colorShades,
       width,
-      selectedStages
+      selectedStages,
+      themeColors
     );
   }
 
@@ -504,12 +552,13 @@ function renderVerticalFunnel(
       periods,
       selectedPeriod,
       width,
-      styleSettings
+      styleSettings,
+      themeColors
     );
   }
 
   // Axis
-  renderVerticalAxis(svg, height, width, styleSettings);
+  renderVerticalAxis(svg, height, width, styleSettings, themeColors);
 }
 
 /**
@@ -533,7 +582,8 @@ function renderHorizontalFunnel(
   selectedPeriod,
   handleBarClick,
   abbreviateNumber,
-  headerHeight
+  headerHeight,
+  themeColors
 ) {
   const yScale = d3
     .scaleLinear()
@@ -565,8 +615,11 @@ function renderHorizontalFunnel(
       const isSelected =
         selectedStages.length === 0 || selectedStages.includes(originalIdx);
       const isPeriodSelected = periodIdx === selectedPeriod;
-      const opacity =
-        isSelected && isPeriodSelected ? 1 : isSelected ? 0.5 : 0.25;
+      // If nothing is selected, show all bars at full opacity
+      // If something is selected, reduce opacity for non-selected bars
+      const opacity = selectedStages.length === 0
+        ? 1
+        : (isSelected && isPeriodSelected ? 1 : isSelected ? 0.5 : 0.25);
 
       if (styleSettings.emphasis === "throughput") {
         renderHorizontalThroughputBar(
@@ -588,7 +641,8 @@ function renderHorizontalFunnel(
           abbreviateNumber,
           allLabelsInside,
           visibleData,
-          periods
+          periods,
+          themeColors
         );
       } else {
         renderHorizontalFalloutBar(
@@ -607,7 +661,8 @@ function renderHorizontalFunnel(
           handleBarClick,
           abbreviateNumber,
           visibleData,
-          periods
+          periods,
+          themeColors
         );
       }
     });
@@ -623,7 +678,7 @@ function renderHorizontalFunnel(
         .attr("x", xPos + barWidth / 2)
         .attr("y", labelY)
         .attr("text-anchor", "middle")
-        .attr("fill", "#374151")
+        .attr("fill", themeColors.stageLabelColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.segmentLabelFontSize + "px")
         .attr("font-weight", "500")
@@ -634,7 +689,7 @@ function renderHorizontalFunnel(
         .attr("x", xPos + barWidth / 2)
         .attr("y", height + 25)
         .attr("text-anchor", "middle")
-        .attr("fill", "#374151")
+        .attr("fill", themeColors.stageLabelColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.segmentLabelFontSize + "px")
         .attr("font-weight", "500")
@@ -654,7 +709,8 @@ function renderHorizontalFunnel(
       styleSettings,
       colorShades,
       margin,
-      headerHeight
+      headerHeight,
+      themeColors
     );
   }
 
@@ -670,12 +726,13 @@ function renderHorizontalFunnel(
       periods,
       selectedPeriod,
       height,
-      styleSettings
+      styleSettings,
+      themeColors
     );
   }
 
   // Axis
-  renderHorizontalAxis(svg, height, width, styleSettings);
+  renderHorizontalAxis(svg, height, width, styleSettings, themeColors);
 }
 
 /**
@@ -700,7 +757,8 @@ function renderThroughputBar(
   abbreviateNumber,
   allLabelsInside,
   visibleData,
-  periods
+  periods,
+  themeColors
 ) {
   // Background
   if (styleSettings.backgroundOpacity > 0) {
@@ -789,7 +847,7 @@ function renderThroughputBar(
 
     textGroup
       .append("tspan")
-      .attr("fill", "#374151")
+      .attr("fill", themeColors.primaryTextColor)
       .attr("font-family", styleSettings.fontFamily)
       .attr("font-size", styleSettings.metricLabelFontSize + "px")
       .attr("font-weight", "700")
@@ -797,7 +855,7 @@ function renderThroughputBar(
 
     textGroup
       .append("tspan")
-      .attr("fill", "#6b7280")
+      .attr("fill", themeColors.secondaryTextColor)
       .attr("font-family", styleSettings.fontFamily)
       .attr("font-size", styleSettings.metricLabelFontSize - 1 + "px")
       .attr("font-weight", "400")
@@ -805,12 +863,7 @@ function renderThroughputBar(
   }
 
   // Direct labels for first stage
-  if (visibleIdx === 0) {
-    console.log('🔍 First stage check: showLegend=' + styleSettings.showLegend + ', legendPosition="' + styleSettings.legendPosition + '", periodIdx=' + periodIdx);
-  }
-
   if (visibleIdx === 0 && styleSettings.showLegend && styleSettings.legendPosition === "direct") {
-    console.log('✅ YES! Rendering direct label for vertical mode, period=' + periods[periodIdx]);
     const periodName = periods[periodIdx] || `Period ${periodIdx + 1}`;
     const textColor = getContrastTextColor(colorShades[periodIdx]);
 
@@ -849,7 +902,8 @@ function renderFalloutBar(
   handleBarClick,
   abbreviateNumber,
   visibleData,
-  periods
+  periods,
+  themeColors
 ) {
   if (visibleIdx === 0) {
     // First stage - full bar
@@ -986,7 +1040,7 @@ function renderFalloutBar(
 
       textGroup
         .append("tspan")
-        .attr("fill", "#374151")
+        .attr("fill", themeColors.primaryTextColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.metricLabelFontSize + "px")
         .attr("font-weight", "700")
@@ -994,7 +1048,7 @@ function renderFalloutBar(
 
       textGroup
         .append("tspan")
-        .attr("fill", "#6b7280")
+        .attr("fill", themeColors.secondaryTextColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.metricLabelFontSize - 1 + "px")
         .attr("font-weight", "400")
@@ -1004,7 +1058,6 @@ function renderFalloutBar(
 
   // Direct labels for first stage (fallout mode)
   if (visibleIdx === 0 && styleSettings.showLegend && styleSettings.legendPosition === "direct") {
-    console.log('Rendering direct label for vertical fallout mode');
     const periodName = periods[periodIdx] || `Period ${periodIdx + 1}`;
     const textColor = getContrastTextColor(colorShades[periodIdx]);
 
@@ -1045,7 +1098,8 @@ function renderHorizontalThroughputBar(
   abbreviateNumber,
   allLabelsInside,
   visibleData,
-  periods
+  periods,
+  themeColors
 ) {
   // Background
   if (styleSettings.backgroundOpacity > 0) {
@@ -1133,7 +1187,7 @@ function renderHorizontalThroughputBar(
       .attr("x", periodX + periodBarWidth / 2)
       .attr("y", labelY)
       .attr("text-anchor", "middle")
-      .attr("fill", "#374151")
+      .attr("fill", themeColors.primaryTextColor)
       .attr("font-family", styleSettings.fontFamily)
       .attr("font-size", styleSettings.metricLabelFontSize + "px")
       .attr("font-weight", "700")
@@ -1145,7 +1199,7 @@ function renderHorizontalThroughputBar(
       .attr("x", periodX + periodBarWidth / 2)
       .attr("y", labelY - 16)
       .attr("text-anchor", "middle")
-      .attr("fill", "#6b7280")
+      .attr("fill", themeColors.secondaryTextColor)
       .attr("font-family", styleSettings.fontFamily)
       .attr("font-size", styleSettings.metricLabelFontSize - 1 + "px")
       .attr("font-weight", "400")
@@ -1192,7 +1246,8 @@ function renderHorizontalFalloutBar(
   handleBarClick,
   abbreviateNumber,
   visibleData,
-  periods
+  periods,
+  themeColors
 ) {
   if (visibleIdx === 0) {
     // First stage - full bar
@@ -1254,7 +1309,7 @@ function renderHorizontalFalloutBar(
         .attr("x", periodX + periodBarWidth / 2)
         .attr("y", labelY)
         .attr("text-anchor", "middle")
-        .attr("fill", "#374151")
+        .attr("fill", themeColors.primaryTextColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.metricLabelFontSize + "px")
         .attr("font-weight", "700")
@@ -1266,7 +1321,7 @@ function renderHorizontalFalloutBar(
         .attr("x", periodX + periodBarWidth / 2)
         .attr("y", labelY - 16)
         .attr("text-anchor", "middle")
-        .attr("fill", "#6b7280")
+        .attr("fill", themeColors.secondaryTextColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.metricLabelFontSize - 1 + "px")
         .attr("font-weight", "400")
@@ -1359,7 +1414,7 @@ function renderHorizontalFalloutBar(
         .attr("x", periodX + periodBarWidth / 2)
         .attr("y", labelY)
         .attr("text-anchor", "middle")
-        .attr("fill", "#374151")
+        .attr("fill", themeColors.primaryTextColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.metricLabelFontSize + "px")
         .attr("font-weight", "700")
@@ -1371,7 +1426,7 @@ function renderHorizontalFalloutBar(
         .attr("x", periodX + periodBarWidth / 2)
         .attr("y", labelY - 16)
         .attr("text-anchor", "middle")
-        .attr("fill", "#6b7280")
+        .attr("fill", themeColors.secondaryTextColor)
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.metricLabelFontSize - 1 + "px")
         .attr("font-weight", "400")
@@ -1382,7 +1437,6 @@ function renderHorizontalFalloutBar(
 
   // Direct labels for first stage (horizontal fallout mode)
   if (visibleIdx === 0 && styleSettings.showLegend && styleSettings.legendPosition === "direct") {
-    console.log('Rendering direct label for horizontal fallout mode');
     const periodName = periods[periodIdx] || `Period ${periodIdx + 1}`;
     const textColor = getContrastTextColor(colorShades[periodIdx]);
 
@@ -1414,7 +1468,8 @@ function renderVerticalSparklines(
   styleSettings,
   colorShades,
   width,
-  selectedStages
+  selectedStages,
+  themeColors
 ) {
   const sparkWidth = 90;
   const sparkHeight = 45;
@@ -1511,7 +1566,7 @@ function renderVerticalSparklines(
     .attr("text-anchor", "middle")
     .attr("font-family", styleSettings.fontFamily)
     .attr("font-size", "10px")
-    .attr("fill", "#6b7280")
+    .attr("fill", themeColors.secondaryTextColor)
     .text(
       styleSettings.sparklineType === "volume"
         ? "Volume Trend"
@@ -1532,7 +1587,8 @@ function renderHorizontalSparklines(
   styleSettings,
   colorShades,
   margin,
-  headerHeight
+  headerHeight,
+  themeColors
 ) {
   const sparkWidth = 90;
   const sparkHeight = 40;
@@ -1629,7 +1685,7 @@ function renderHorizontalSparklines(
     .attr("text-anchor", "middle")
     .attr("font-family", styleSettings.fontFamily)
     .attr("font-size", "11px")
-    .attr("fill", "#6b7280")
+    .attr("fill", themeColors.secondaryTextColor)
     .text(
       styleSettings.sparklineType === "volume"
         ? "Volume Trend"
@@ -1650,7 +1706,8 @@ function renderVerticalConversionBracket(
   periods,
   selectedPeriod,
   width,
-  styleSettings
+  styleSettings,
+  themeColors
 ) {
   const visibleSelectedStages = selectedStages.filter(
     (idx) => !chartData[idx].hidden
@@ -1680,7 +1737,7 @@ function renderVerticalConversionBracket(
     .attr("y1", y1)
     .attr("x2", bracketX)
     .attr("y2", y2)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.bracketColor)
     .attr("stroke-width", 2);
 
   svg
@@ -1689,7 +1746,7 @@ function renderVerticalConversionBracket(
     .attr("y1", y1)
     .attr("x2", bracketX - 15)
     .attr("y2", y1)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.bracketColor)
     .attr("stroke-width", 2);
 
   svg
@@ -1698,7 +1755,7 @@ function renderVerticalConversionBracket(
     .attr("y1", y2)
     .attr("x2", bracketX - 15)
     .attr("y2", y2)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.bracketColor)
     .attr("stroke-width", 2);
 
   const val1 = chartData[idx1].periods[selectedPeriod];
@@ -1720,7 +1777,7 @@ function renderVerticalConversionBracket(
     .attr("font-family", styleSettings.fontFamily)
     .attr("font-size", styleSettings.conversionLabelFontSize + "px")
     .attr("font-weight", "700")
-    .attr("fill", "#000000")
+    .attr("fill", themeColors.bracketColor)
     .text(conversionRate + "%");
 }
 
@@ -1737,7 +1794,8 @@ function renderHorizontalConversionBracket(
   periods,
   selectedPeriod,
   height,
-  styleSettings
+  styleSettings,
+  themeColors
 ) {
   const visibleSelectedStages = selectedStages.filter(
     (idx) => !chartData[idx].hidden
@@ -1767,7 +1825,7 @@ function renderHorizontalConversionBracket(
     .attr("y1", bracketY)
     .attr("x2", x2)
     .attr("y2", bracketY)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.bracketColor)
     .attr("stroke-width", 2);
 
   svg
@@ -1776,7 +1834,7 @@ function renderHorizontalConversionBracket(
     .attr("y1", bracketY)
     .attr("x2", x1)
     .attr("y2", bracketY + 15)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.bracketColor)
     .attr("stroke-width", 2);
 
   svg
@@ -1785,7 +1843,7 @@ function renderHorizontalConversionBracket(
     .attr("y1", bracketY)
     .attr("x2", x2)
     .attr("y2", bracketY + 15)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.bracketColor)
     .attr("stroke-width", 2);
 
   const val1 = chartData[idx1].periods[selectedPeriod];
@@ -1806,14 +1864,14 @@ function renderHorizontalConversionBracket(
     .attr("font-family", styleSettings.fontFamily)
     .attr("font-size", styleSettings.conversionLabelFontSize + "px")
     .attr("font-weight", "700")
-    .attr("fill", "#000000")
+    .attr("fill", themeColors.bracketColor)
     .text(conversionRate + "%");
 }
 
 /**
  * Render vertical axis
  */
-function renderVerticalAxis(svg, height, width, styleSettings) {
+function renderVerticalAxis(svg, height, width, styleSettings, themeColors) {
   svg
     .append("line")
     .attr(
@@ -1826,7 +1884,7 @@ function renderVerticalAxis(svg, height, width, styleSettings) {
       styleSettings.emphasis === "throughput" ? 0 : width
     )
     .attr("y2", height + 20)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.axisColor)
     .attr("stroke-width", styleSettings.axisLineWidth);
 
   const arrowSize = Math.max(6, styleSettings.axisLineWidth * 2);
@@ -1845,7 +1903,7 @@ function renderVerticalAxis(svg, height, width, styleSettings) {
           "," +
           (height + 20)
       )
-      .attr("fill", "#000000");
+      .attr("fill", themeColors.axisColor);
   } else {
     svg
       .append("polygon")
@@ -1864,21 +1922,21 @@ function renderVerticalAxis(svg, height, width, styleSettings) {
           "," +
           (height + 20)
       )
-      .attr("fill", "#000000");
+      .attr("fill", themeColors.axisColor);
   }
 }
 
 /**
  * Render horizontal axis
  */
-function renderHorizontalAxis(svg, height, width, styleSettings) {
+function renderHorizontalAxis(svg, height, width, styleSettings, themeColors) {
   svg
     .append("line")
     .attr("x1", 0)
     .attr("y1", height)
     .attr("x2", width + 20)
     .attr("y2", height)
-    .attr("stroke", "#000000")
+    .attr("stroke", themeColors.axisColor)
     .attr("stroke-width", styleSettings.axisLineWidth);
 
   const arrowSize = Math.max(6, styleSettings.axisLineWidth * 2);
@@ -1899,7 +1957,7 @@ function renderHorizontalAxis(svg, height, width, styleSettings) {
         "," +
         (height + arrowSize)
     )
-    .attr("fill", "#000000");
+    .attr("fill", themeColors.axisColor);
 }
 
 /**
@@ -1912,7 +1970,8 @@ function renderHeader(
   periods,
   colorShades,
   titleHeight,
-  subtitleHeight
+  subtitleHeight,
+  themeColors
 ) {
   const headerStartY = -margin.top + 40;
 
@@ -1924,7 +1983,7 @@ function renderHeader(
     .attr("font-family", styleSettings.fontFamily)
     .attr("font-size", styleSettings.titleFontSize + "px")
     .attr("font-weight", "700")
-    .attr("fill", "#111827")
+    .attr("fill", themeColors.titleColor)
     .text(styleSettings.title);
 
   let currentY = headerStartY + titleHeight;
@@ -1939,17 +1998,13 @@ function renderHeader(
       .attr("font-family", styleSettings.fontFamily)
       .attr("font-size", styleSettings.subtitleFontSize + "px")
       .attr("font-weight", "400")
-      .attr("fill", "#6b7280")
+      .attr("fill", themeColors.subtitleColor)
       .text(styleSettings.subtitle);
     currentY += subtitleHeight;
   }
 
   // Legend (only show traditional legend when legendPosition is "legend")
-  console.log('🔍 Legend check: showLegend=' + styleSettings.showLegend + ', legendPosition="' + styleSettings.legendPosition + '", periodsLength=' + periods.length);
-  console.log('🔍 Periods array:', periods);
-
   if (styleSettings.showLegend && styleSettings.legendPosition === "legend" && periods.length > 0) {
-    console.log('✅ YES! Rendering traditional legend');
     currentY += 24;
     let legendX = 0;
     periods.forEach((period, idx) => {
@@ -1967,7 +2022,7 @@ function renderHeader(
         .attr("dy", "0.35em")
         .attr("font-family", styleSettings.fontFamily)
         .attr("font-size", styleSettings.legendFontSize + "px")
-        .attr("fill", "#4b5563")
+        .attr("fill", themeColors.legendTextColor)
         .text(period);
 
       legendX += 15 + text.node().getBBox().width + 20;
@@ -1975,4 +2030,4 @@ function renderHeader(
   }
 }
 
-export default FunnelChart;
+export default React.memo(FunnelChart);

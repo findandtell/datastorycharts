@@ -1,14 +1,38 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useChartData } from '../shared/hooks/useChartData';
 import { useStyleSettings } from '../shared/hooks/useStyleSettings';
 import { getChart } from '../charts/registry';
 import { colorPresets, comparisonPalettes } from '../shared/design-system/colorPalettes';
 import { exportAsPNG, exportAsSVG } from '../shared/utils/exportHelpers';
-import { downloadStyleFile, uploadStyleFile, generateStyleName } from '../shared/utils/styleUtils';
+import { downloadStyleFile, uploadStyleFile, generateStyleName, loadStyleFromURL } from '../shared/utils/styleUtils';
+import { getSampleDataset } from '../shared/data/sampleDatasets';
+import { getAllTemplates, applyTemplate } from '../shared/design-system/styleTemplates';
+import { throttle } from '../shared/utils/performanceUtils';
+import { loadGoogleSheetsData, isGoogleSheetsUrl, getPublicSharingInstructions } from '../shared/utils/googleSheetsLoader';
 import FunnelChart from '../charts/FunnelChart/FunnelChart';
 import SlopeChart from '../charts/SlopeChart/SlopeChart';
 import BarChart from '../charts/BarChart/BarChart';
+import GroupedBarChart from '../charts/GroupedBarChart/GroupedBarChart';
+import LineChart from '../charts/LineChart/LineChart';
+import SnapshotGallery from '../components/SnapshotGallery';
+import SnapshotModal from '../components/SnapshotModal';
+import { getSectionOrder, getSectionMetadata } from '../config/chartStylingConfig';
+
+/**
+ * InfoTooltip Component
+ * Reusable info icon with hover tooltip
+ */
+const InfoTooltip = ({ text }) => (
+  <span className="group relative inline-block">
+    <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+    </svg>
+    <span className="invisible group-hover:visible absolute left-0 top-5 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-10 whitespace-normal">
+      {text}
+    </span>
+  </span>
+);
 
 /**
  * Chart Editor Page
@@ -23,18 +47,34 @@ export default function ChartEditor() {
   const [showPanel, setShowPanel] = useState(true);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDataTable, setShowDataTable] = useState(false);
+  const [showPasteCSV, setShowPasteCSV] = useState(false);
+  const [pastedCSV, setPastedCSV] = useState('');
+  const [showGoogleSheets, setShowGoogleSheets] = useState(false);
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState('');
+  const [googleSheetsLoading, setGoogleSheetsLoading] = useState(false);
+  const [googleSheetsError, setGoogleSheetsError] = useState('');
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshInterval, setAutoRefreshInterval] = useState(5); // minutes
+
+  // Ref to track if we're currently loading a style preset
+  const isLoadingPresetRef = useRef(false);
   const [expandedSections, setExpandedSections] = useState({
-    chartType: true,
-    chartSettings: true,
-    barEmphasis: false,
-    axisOptions: false,
+    theme: false,
+    chartStructure: false,
+    dataLabels: false,
+    axesGridlines: false,
+    colorsStyling: false,
     typography: false,
-    colors: false,
-    background: false,
-    layout: false,
-    displayOptions: false,
-    sparklines: false,
-    watermark: false,
+    layoutCanvas: false,
+    exportBranding: false,
+    // Slope-specific
+    colorMode: false,
+    lineStyling: false,
+    labelsText: false,
+    axesSpacing: false,
+    // Funnel-specific
+    displayLabels: false,
+    visualEffects: false,
   });
 
   const chartData = useChartData(chartType);
@@ -42,10 +82,90 @@ export default function ChartEditor() {
   const svgRef = useRef(null);
   const exportMenuRef = useRef(null);
   const styleFileInputRef = useRef(null);
+  const clearEmphasisRef = useRef(null);
+
+  // Collapse all sections when switching tabs
+  useEffect(() => {
+    setExpandedSections({
+      theme: false,
+      chartStructure: false,
+      dataLabels: false,
+      axesGridlines: false,
+      colorsStyling: false,
+      typography: false,
+      layoutCanvas: false,
+      exportBranding: false,
+      // Slope-specific
+      colorMode: false,
+      lineStyling: false,
+      labelsText: false,
+      axesSpacing: false,
+      // Funnel-specific
+      displayLabels: false,
+      visualEffects: false,
+    });
+  }, [activeTab]);
+
+  // Create throttled versions of frequently-called setters for performance
+  // This prevents chart re-renders on every pixel of slider drag
+  // Using 100ms throttle for responsive feel while maintaining performance with large datasets
+  const throttledSetters = useMemo(() => ({
+    setLineThickness: throttle((value) => styleSettings.setLineThickness(value), 100),
+    setLineSaturation: throttle((value) => styleSettings.setLineSaturation(value), 100),
+    setPointSize: throttle((value) => styleSettings.setPointSize(value), 100),
+    setPointBorderWidth: throttle((value) => styleSettings.setPointBorderWidth(value), 100),
+    setChartWidth: throttle((value) => styleSettings.setChartWidth(value), 100),
+    setChartHeight: throttle((value) => styleSettings.setChartHeight(value), 100),
+    setCanvasWidth: throttle((value) => styleSettings.setCanvasWidth(value), 100),
+    setCanvasHeight: throttle((value) => styleSettings.setCanvasHeight(value), 100),
+    setBackgroundOpacity: throttle((value) => styleSettings.setBackgroundOpacity(value), 100),
+    setPeriodSpacing: throttle((value) => styleSettings.setPeriodSpacing(value), 100),
+    setEndpointSize: throttle((value) => styleSettings.setEndpointSize(value), 100),
+    setColorTransition: throttle((value) => styleSettings.setColorTransition(value), 100),
+  }), [styleSettings]);
 
   // Save Style modal state
   const [showSaveStyleModal, setShowSaveStyleModal] = useState(false);
   const [styleName, setStyleName] = useState('');
+
+  // Snapshot Gallery state
+  const [snapshots, setSnapshots] = useState([]);
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null);
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
+
+  // Zoom and Pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const chartContainerRef = useRef(null);
+
+  // Resize state
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState(null); // 'tl' or 'br'
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+
+  // Track current sample dataset for Reset View
+  const [currentSampleDatasetKey, setCurrentSampleDatasetKey] = useState(null);
+
+  // Track last clicked bar for double-click detection (use ref to avoid stale closures)
+  const lastClickedBarIdRef = useRef(null);
+
+  // Setup wheel event listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const delta = e.deltaY * -0.001;
+      const newZoom = Math.min(Math.max(0.5, zoom + delta), 3);
+      setZoom(newZoom);
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [zoom]);
 
   // Handle slope chart line clicks for emphasis
   const handleSlopeLineClick = useCallback((lineIndex, lineData) => {
@@ -69,36 +189,264 @@ export default function ChartEditor() {
   const handleBarClick = useCallback((d, period, barId) => {
     const currentEmphasized = styleSettings.emphasizedBars || [];
 
-    // If this bar is already emphasized, clear ALL emphasis
-    if (currentEmphasized.includes(barId)) {
+    // If clicking the same bar twice in a row, clear ALL emphasis
+    if (lastClickedBarIdRef.current === barId) {
+      // Clear immediately
       styleSettings.setEmphasizedBars([]);
+      lastClickedBarIdRef.current = null;
+
+      // Clear percent change comparisons immediately
+      if (clearEmphasisRef?.current) {
+        clearEmphasisRef.current();
+      }
+
+      // Also clear after a brief delay to catch any additions from BarChart's handler
+      setTimeout(() => {
+        if (clearEmphasisRef?.current) {
+          clearEmphasisRef.current();
+        }
+      }, 10);
     } else {
-      // Add this bar to emphasis (max 3 bars)
-      if (currentEmphasized.length < 3) {
-        styleSettings.setEmphasizedBars([...currentEmphasized, barId]);
+      // Update last clicked bar
+      lastClickedBarIdRef.current = barId;
+
+      // If this bar is already emphasized (but wasn't the last click), remove it
+      if (currentEmphasized.includes(barId)) {
+        styleSettings.setEmphasizedBars(
+          currentEmphasized.filter(id => id !== barId)
+        );
       } else {
-        // If already 3 bars, replace the oldest one
-        styleSettings.setEmphasizedBars([currentEmphasized[1], currentEmphasized[2], barId]);
+        // Add this bar to emphasis (max 4 bars)
+        if (currentEmphasized.length < 4) {
+          styleSettings.setEmphasizedBars([...currentEmphasized, barId]);
+        } else {
+          // If already 4 bars, replace the oldest one
+          styleSettings.setEmphasizedBars([currentEmphasized[1], currentEmphasized[2], currentEmphasized[3], barId]);
+        }
       }
     }
   }, [styleSettings]);
 
-  // Load default sample data on mount
+  // Handle line chart point clicks for emphasis
+  const handleLineChartPointClick = useCallback((metric, pointData) => {
+    const currentEmphasized = styleSettings.emphasizedPoints || [];
+    const pointIndex = pointData._pointIndex;
+
+    // Check if this point is already emphasized
+    const isAlreadyEmphasized = currentEmphasized.some(p =>
+      p.metric === metric && p.index === pointIndex
+    );
+
+    if (isAlreadyEmphasized) {
+      // Remove this point from emphasis
+      styleSettings.setEmphasizedPoints(
+        currentEmphasized.filter(p => !(p.metric === metric && p.index === pointIndex))
+      );
+    } else {
+      // Add this point to emphasis (max 4 points)
+      // Toggle point style to opposite of global setting
+      const globalPointStyle = styleSettings.pointStyle || 'filled';
+      const customPointStyle = globalPointStyle === 'filled' ? 'outlined' : 'filled';
+
+      const newPoint = {
+        metric,
+        index: pointIndex,
+        value: pointData[metric],
+        date: pointData.date,
+        customPointStyle: customPointStyle, // Toggle to opposite style
+      };
+
+      if (currentEmphasized.length < 4) {
+        styleSettings.setEmphasizedPoints([...currentEmphasized, newPoint]);
+      } else {
+        // If already 4 points, replace the oldest one
+        styleSettings.setEmphasizedPoints([
+          currentEmphasized[1],
+          currentEmphasized[2],
+          currentEmphasized[3],
+          newPoint
+        ]);
+      }
+    }
+  }, [styleSettings]);
+
+  // Handle line chart metric emphasis (clicking on legend or direct label)
+  const handleLineChartMetricClick = useCallback((metric) => {
+    const currentEmphasized = styleSettings.emphasizedMetric;
+
+    if (currentEmphasized === metric) {
+      // If clicking the already emphasized metric, de-emphasize it
+      styleSettings.setEmphasizedMetric(null);
+    } else {
+      // Emphasize the clicked metric
+      styleSettings.setEmphasizedMetric(metric);
+    }
+  }, [styleSettings]);
+
+  // Handle line chart label drag to update position
+  const handleLineChartLabelDrag = useCallback((metric, index, offsetX, offsetY) => {
+    const currentEmphasized = styleSettings.emphasizedPoints || [];
+
+    const updatedPoints = currentEmphasized.map(p => {
+      if (p.metric === metric && p.index === index) {
+        return { ...p, labelOffsetX: offsetX, labelOffsetY: offsetY };
+      }
+      return p;
+    });
+
+    styleSettings.setEmphasizedPoints(updatedPoints);
+  }, [styleSettings]);
+
+  /**
+   * Load default sample data and styles on mount
+   *
+   * IMPORTANT: This useEffect ensures that each chart type loads with its default dataset and styling
+   * when first opened. This is critical for maintaining consistent defaults across the application.
+   *
+   * Why we check !currentSampleDatasetKey:
+   * - When navigating to a chart for the first time, currentSampleDatasetKey is null
+   * - React state may persist data from previous sessions, causing hasData to be true
+   * - Without this check, stale data would display instead of the intended default
+   * - This pattern ensures Bar Chart, Line Chart, and Slope Chart ALWAYS load their defaults on first open
+   *
+   * How default styles are loaded:
+   * 1. Sample datasets (in sampleDatasets.js) can include a stylePreset property
+   * 2. stylePreset points to a JSON file (e.g., /Examples/affiliate-revenue-...-style.json)
+   * 3. The applyStylePreset function loads and applies ALL settings from that file
+   * 4. This includes title, subtitle, fonts, colors, layout, and all chart-specific settings
+   *
+   * Example:
+   * - Line Chart default: marketingChannelRevenue dataset with Lora font and custom styling
+   * - Bar Chart default: barRegionalSales dataset with its associated style
+   * - Slope Chart default: tufteSlope dataset with PT Serif font and classic Tufte styling
+   */
   useEffect(() => {
-    if (!chartData.hasData) {
+    // Check if current data is compatible with the chart type
+    let needsNewData = !chartData.hasData;
+
+    // For Line Chart, check if data has date fields
+    if (chartType === 'line' && chartData.hasData && chartData.data && chartData.data.length > 0) {
+      const firstRow = chartData.data[0];
+      const hasDateField = firstRow && (firstRow.date || firstRow.Date || firstRow.time || firstRow.Time);
+      if (!hasDateField) {
+        needsNewData = true;
+      }
+    }
+
+    // CRITICAL: Always load default sample data when first opening Bar Chart
+    // This ensures the correct default dataset and styling, even if React state has stale data
+    if (chartType === 'bar' && !currentSampleDatasetKey) {
+      needsNewData = true;
+    }
+
+    // CRITICAL: Always load default sample data when first opening Line Chart
+    // This ensures marketingChannelRevenue dataset and its style preset load correctly
+    // Without this, stale data from React state would prevent the default from loading
+    if (chartType === 'line' && !currentSampleDatasetKey) {
+      needsNewData = true;
+    }
+
+    // CRITICAL: Always load default sample data when first opening Slope Chart
+    // This ensures tufteSlope dataset and its style preset load correctly
+    // Without this, stale data from React state would prevent the default from loading
+    if (chartType === 'slope' && !currentSampleDatasetKey) {
+      needsNewData = true;
+    }
+
+    // CRITICAL: Always load default sample data when first opening Funnel Chart
+    // This ensures abTest dataset and its style preset load correctly
+    // Without this, stale data from React state would prevent the default from loading
+    if (chartType === 'funnel' && !currentSampleDatasetKey) {
+      needsNewData = true;
+    }
+
+    if (needsNewData) {
       // Load appropriate sample data based on chart type
       let sampleDataKey;
       if (chartType === 'slope') {
-        sampleDataKey = 'slopeDefault';
+        sampleDataKey = 'tufteSlope';
       } else if (chartType === 'bar') {
-        sampleDataKey = 'barSimple';
+        sampleDataKey = 'barRegionalSales';
+      } else if (chartType === 'grouped-bar') {
+        sampleDataKey = 'barElectionOpinion';
+      } else if (chartType === 'line') {
+        sampleDataKey = 'marketingChannelRevenue';
       } else {
-        sampleDataKey = 'mobileApp';
+        // Default for funnel chart
+        sampleDataKey = 'abTest';
       }
       chartData.loadSampleData(sampleDataKey);
+
+      // Store the current sample dataset key
+      setCurrentSampleDatasetKey(sampleDataKey);
+
+      // Get the dataset
+      const dataset = getSampleDataset(sampleDataKey);
+      if (dataset) {
+        // Load title and subtitle from the sample dataset
+        if (dataset.title) styleSettings.setTitle(dataset.title);
+        if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
+
+        // Load timeScale for line charts
+        if (dataset.timeScale) styleSettings.setTimeScale(dataset.timeScale);
+
+        // Apply style preset if available (will override title/subtitle if present in style)
+        if (dataset.stylePreset) {
+          applyStylePreset(dataset.stylePreset);
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartType]);
+
+  // Set initial chart size based on viewport dimensions (only on mount)
+  useEffect(() => {
+    applyViewportBasedSizing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run on mount
+
+  // Auto-adjust canvas dimensions for Bar and Line charts
+  // Bar and Line charts ALWAYS calculate canvas from chartWidth/chartHeight
+  // This means presets should NOT include canvasWidth/canvasHeight - they are derived
+  useEffect(() => {
+    // Only auto-calculate for Bar and Line charts
+    if (chartType !== 'bar' && chartType !== 'line') return;
+
+    // BarChart includes margins inside SVG
+    // BarChart defaults: marginLeft=180, marginRight=60, marginTop=60, marginBottom=80
+    const isBarChart = chartType === 'bar';
+
+    const canvasWidth = isBarChart
+      ? styleSettings.chartWidth + 240  // 180 left + 60 right
+      : styleSettings.chartWidth;
+    const canvasHeight = isBarChart
+      ? styleSettings.chartHeight + 140  // 60 top + 80 bottom
+      : styleSettings.chartHeight;
+
+    styleSettings.setCanvasWidth(canvasWidth);
+    styleSettings.setCanvasHeight(canvasHeight);
+  }, [styleSettings.chartWidth, styleSettings.chartHeight, chartType, styleSettings]);
+
+  // Auto-adjust canvas dimensions for Slope Chart
+  // Slope chart ALWAYS calculates canvas dimensions from periodSpacing and periodHeight
+  // This means presets should NOT include canvasWidth/canvasHeight - they are derived
+  useEffect(() => {
+    if (chartType !== 'slope') return;
+
+    // Slope chart dimensions are based on:
+    // - periodHeight: vertical space for the chart
+    // - periodSpacing: horizontal distance between the two columns
+    // - Label space: approximately 250px on each side for category/value labels
+    // - Margins: 120 left, 60 right, 80 top, 60 bottom (from slopeChartDefaults)
+
+    const labelSpace = 250 * 2; // Space for left and right labels
+    const margins = 120 + 60; // left + right margins
+    const canvasWidth = styleSettings.periodSpacing + labelSpace + margins;
+    const canvasHeight = styleSettings.periodHeight + 140; // 80 top + 60 bottom margins
+
+    styleSettings.setCanvasWidth(Math.round(canvasWidth));
+    styleSettings.setCanvasHeight(Math.round(canvasHeight));
+  }, [styleSettings.periodSpacing, styleSettings.periodHeight, chartType, styleSettings]);
 
   // Close export menu when clicking outside
   useEffect(() => {
@@ -135,7 +483,8 @@ export default function ChartEditor() {
   };
 
   const handleExportPNG = async () => {
-    const svgElement = document.querySelector('svg');
+    // Get the SVG element directly (same as SVG export)
+    const svgElement = svgRef.current?.querySelector('svg');
     if (svgElement) {
       await exportAsPNG(svgElement, `${styleSettings.title}.png`);
     }
@@ -143,7 +492,8 @@ export default function ChartEditor() {
   };
 
   const handleExportSVG = () => {
-    const svgElement = document.querySelector('svg');
+    // Use svgRef to get the actual chart SVG, not UI icons
+    const svgElement = svgRef.current?.querySelector('svg');
     if (svgElement) {
       exportAsSVG(svgElement, `${styleSettings.title}.svg`);
     }
@@ -194,14 +544,464 @@ export default function ChartEditor() {
     }
   };
 
+  // Handle paste CSV data
+  const handlePasteCSV = async () => {
+    if (!pastedCSV.trim()) {
+      alert('Please paste CSV data first');
+      return;
+    }
+
+    try {
+      // Auto-detect delimiter
+      const lines = pastedCSV.trim().split('\n');
+      if (lines.length < 2) {
+        alert('CSV data must have at least a header row and one data row');
+        return;
+      }
+
+      const firstLine = lines[0];
+      let delimiter = ',';
+
+      // Count occurrences of common delimiters
+      const commas = (firstLine.match(/,/g) || []).length;
+      const tabs = (firstLine.match(/\t/g) || []).length;
+      const semicolons = (firstLine.match(/;/g) || []).length;
+      const spaces = (firstLine.match(/\s{2,}/g) || []).length; // Multiple spaces
+
+      // Choose the most common delimiter
+      if (tabs > commas && tabs > semicolons && tabs > spaces) {
+        delimiter = '\t';
+      } else if (semicolons > commas && semicolons > tabs && semicolons > spaces) {
+        delimiter = ';';
+      } else if (spaces > commas && spaces > tabs && spaces > semicolons && spaces > 0) {
+        // Use regex to split by multiple spaces for space-delimited data
+        delimiter = /\s{2,}/;
+      }
+
+      // Use the loadCSVText method from chartData hook
+      const csvText = pastedCSV.trim();
+      const success = await chartData.loadCSVText(csvText, delimiter);
+
+      if (success) {
+        // Close the paste area
+        setShowPasteCSV(false);
+        setPastedCSV('');
+        alert('CSV data loaded successfully!');
+      } else {
+        // Error message is already set in chartData.error
+        alert('Error loading CSV data: ' + (chartData.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error parsing CSV:', error);
+      alert('Error parsing CSV data: ' + error.message);
+    }
+  };
+
+  // Helper function to clear all emphasis
+  const clearEmphasis = () => {
+    // Clear percent change comparisons
+    if (clearEmphasisRef?.current) {
+      clearEmphasisRef.current();
+    }
+
+    // Clear bar emphasis (desaturation)
+    styleSettings.setEmphasizedBars([]);
+
+    // Clear line emphasis for slope charts
+    styleSettings.setEmphasizedLines([]);
+
+    // Reset last clicked bar tracking
+    lastClickedBarIdRef.current = null;
+  };
+
+  // Snapshot handlers
+  const handleCaptureSnapshot = () => {
+    if (!svgRef.current) return;
+
+    const svgElement = svgRef.current.querySelector('svg');
+    if (!svgElement) return;
+
+    // Clone the SVG to capture current state
+    const svgClone = svgElement.cloneNode(true);
+
+    // Helper function to copy computed styles to inline styles
+    const copyComputedStyles = (sourceNode, targetNode) => {
+      const computedStyle = window.getComputedStyle(sourceNode);
+      const criticalStyles = [
+        'fill', 'stroke', 'stroke-width', 'font-family', 'font-size',
+        'font-weight', 'text-anchor', 'opacity', 'transform',
+        'dominant-baseline', 'alignment-baseline'
+      ];
+
+      criticalStyles.forEach(style => {
+        const value = computedStyle.getPropertyValue(style);
+        if (value && value !== 'none' && value !== 'normal') {
+          targetNode.style[style] = value;
+        }
+      });
+    };
+
+    // Recursively copy styles from original to clone
+    const copyStylesToClone = (original, clone) => {
+      copyComputedStyles(original, clone);
+
+      const originalChildren = original.children;
+      const cloneChildren = clone.children;
+
+      for (let i = 0; i < originalChildren.length; i++) {
+        if (cloneChildren[i]) {
+          copyStylesToClone(originalChildren[i], cloneChildren[i]);
+        }
+      }
+    };
+
+    // Copy all computed styles to the clone
+    copyStylesToClone(svgElement, svgClone);
+
+    // Ensure SVG has proper namespace
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+    // Serialize the styled SVG
+    const svgString = new XMLSerializer().serializeToString(svgClone);
+
+    // Export settings properly using the exportSettings method
+    const exportedSettings = styleSettings.exportSettings();
+
+    // Create snapshot object with SVG, settings, and data
+    const snapshot = {
+      id: `snapshot-${Date.now()}`,
+      timestamp: Date.now(),
+      chartType: chart.name,
+      svgContent: svgString,
+      // Store configuration for restoration
+      data: {
+        data: chartData.data,
+        periodNames: chartData.periodNames,
+        isComparisonMode: chartData.isComparisonMode,
+      },
+      settings: exportedSettings,
+    };
+
+    setSnapshots(prev => [...prev, snapshot]);
+  };
+
+  const handleSnapshotClick = (snapshot) => {
+    setSelectedSnapshot(snapshot);
+    setShowSnapshotModal(true);
+  };
+
+  const handleDeleteSnapshot = (snapshotId) => {
+    setSnapshots(prev => prev.filter(s => s.id !== snapshotId));
+  };
+
+  const handleLoadChart = (snapshot) => {
+    // Restore the data FIRST so it's available when settings are applied
+    if (snapshot.data) {
+      chartData.loadSnapshotData(
+        snapshot.data.data,
+        snapshot.data.periodNames,
+        snapshot.data.isComparisonMode
+      );
+    }
+
+    // Then restore the settings (including emphasis state)
+    if (snapshot.settings) {
+      // Use setTimeout to ensure the data is rendered before applying settings
+      setTimeout(() => {
+        styleSettings.importSettings(snapshot.settings, chartType);
+
+        // Sync toggles with emphasized bars state
+        const hasEmphasizedBars = styleSettings.emphasizedBars && styleSettings.emphasizedBars.length > 0;
+
+        // Force Emphasis toggle to match emphasized bars state
+        styleSettings.setEmphasis(hasEmphasizedBars);
+
+        // Force Percent Change toggle to match emphasized bars state
+        styleSettings.setPercentChangeEnabled(hasEmphasizedBars);
+      }, 100);
+    }
+
+    // Scroll to top to show the restored chart
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Zoom and Pan handlers
+  const handleMouseDown = (e) => {
+    // Don't pan if clicking on SVG elements (the chart) or buttons
+    const target = e.target;
+    const isSVG = target.tagName === 'svg' || target.closest('svg');
+    const isButton = target.tagName === 'BUTTON' || target.closest('button');
+
+    // Only pan if clicking on the background (not the chart or buttons)
+    if (!isSVG && !isButton && (e.button === 0 || e.button === 1)) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    if (isPanning) {
+      setPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+    setIsResizing(false);
+    setResizeHandle(null);
+  };
+
+  // Resize handlers
+  const handleResizeStart = (e, handle) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    setResizeHandle(handle);
+    setResizeStart({
+      x: e.clientX,
+      y: e.clientY,
+      width: styleSettings.chartWidth,
+      height: styleSettings.chartHeight,
+    });
+  };
+
+  const handleResizeMove = (e) => {
+    if (!isResizing || !resizeHandle) return;
+
+    const deltaX = e.clientX - resizeStart.x;
+    const deltaY = e.clientY - resizeStart.y;
+
+    // Minimum and maximum dimensions for chart
+    const MIN_WIDTH = 300;
+    const MIN_HEIGHT = 200;
+    const MAX_WIDTH = 1800;
+    const MAX_HEIGHT = 1800;
+
+    // Bottom-right: increasing width/height moves the corner down-right
+    const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, resizeStart.width + deltaX));
+    const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, resizeStart.height + deltaY));
+
+    // Update dimensions based on chart type
+    if (chartType === 'slope') {
+      // For Slope Chart: update periodHeight and derive periodSpacing from width
+      // Canvas height = periodHeight + margins (80 top + 60 bottom = 140)
+      // Canvas width = periodSpacing + label space (500) + margins (180)
+      const periodHeight = Math.max(200, newHeight - 140);
+      const periodSpacing = Math.max(100, newWidth - 680); // 680 = 500 label space + 180 margins
+
+      styleSettings.setPeriodHeight(periodHeight);
+      styleSettings.setPeriodSpacing(periodSpacing);
+    } else if (chartType === 'funnel') {
+      // For Funnel Chart: update canvasWidth and canvasHeight directly
+      styleSettings.setCanvasWidth(newWidth);
+      styleSettings.setCanvasHeight(newHeight);
+    } else {
+      // For Bar and Line charts: update chartWidth and chartHeight
+      // (canvas dimensions will auto-update via useEffect)
+      styleSettings.setChartWidth(newWidth);
+      styleSettings.setChartHeight(newHeight);
+    }
+  };
+
+  // Add resize move handler to document
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isResizing, resizeHandle, resizeStart.x, resizeStart.y, resizeStart.width, resizeStart.height]);
+
+  const handleZoomIn = () => {
+    setZoom(Math.min(zoom + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(Math.max(zoom - 0.25, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // Apply style preset from sample dataset
+  const applyStylePreset = useCallback(async (preset) => {
+    if (!preset) return;
+
+    // Set flag to prevent auto-calculation during preset loading
+    isLoadingPresetRef.current = true;
+
+    // If preset is a string (URL), fetch it
+    if (typeof preset === 'string') {
+      try {
+        const response = await fetch(preset);
+        if (!response.ok) {
+          console.error('Failed to load style preset:', preset);
+          isLoadingPresetRef.current = false;
+          return;
+        }
+        const styleData = await response.json();
+        // Use the importSettings function from useStyleSettings
+        styleSettings.importSettings(styleData, chartType);
+        // Reset flag after a short delay to allow all state updates to complete
+        setTimeout(() => {
+          isLoadingPresetRef.current = false;
+        }, 100);
+      } catch (error) {
+        console.error('Error loading style preset:', error);
+        isLoadingPresetRef.current = false;
+      }
+    } else {
+      // If preset is already an object, apply directly (legacy support)
+      // Apply all style settings from the preset
+      if (preset.darkMode !== undefined) styleSettings.setDarkMode(preset.darkMode);
+      if (preset.fontFamily) styleSettings.setFontFamily(preset.fontFamily);
+      if (preset.titleFontSize) styleSettings.setTitleFontSize(preset.titleFontSize);
+      if (preset.subtitleFontSize) styleSettings.setSubtitleFontSize(preset.subtitleFontSize);
+      if (preset.segmentLabelFontSize) styleSettings.setSegmentLabelFontSize(preset.segmentLabelFontSize);
+      if (preset.metricLabelFontSize) styleSettings.setMetricLabelFontSize(preset.metricLabelFontSize);
+      if (preset.periodLabelFontSize) styleSettings.setPeriodLabelFontSize(preset.periodLabelFontSize);
+      if (preset.emphasizedLines !== undefined) styleSettings.setEmphasizedLines(preset.emphasizedLines);
+
+      // Slope chart line styling
+      if (preset.lineThickness) styleSettings.setLineThickness(preset.lineThickness);
+      if (preset.lineOpacity !== undefined) styleSettings.setLineOpacity(preset.lineOpacity);
+      if (preset.lineSaturation !== undefined) styleSettings.setLineSaturation(preset.lineSaturation);
+      if (preset.endpointSize) styleSettings.setEndpointSize(preset.endpointSize);
+      if (preset.endpointStyle) styleSettings.setEndpointStyle(preset.endpointStyle);
+      if (preset.labelPosition) styleSettings.setLabelPosition(preset.labelPosition);
+      if (preset.showCategoryLabels !== undefined) styleSettings.setShowCategoryLabels(preset.showCategoryLabels);
+      if (preset.showValueLabels !== undefined) styleSettings.setShowValueLabels(preset.showValueLabels);
+      if (preset.labelFormat) styleSettings.setLabelFormat(preset.labelFormat);
+      if (preset.periodSpacing) styleSettings.setPeriodSpacing(preset.periodSpacing);
+      if (preset.periodLabelPosition) styleSettings.setPeriodLabelPosition(preset.periodLabelPosition);
+
+      // Color settings
+      if (preset.colorMode) styleSettings.setColorMode(preset.colorMode);
+      if (preset.userCustomColors) styleSettings.setUserCustomColors(preset.userCustomColors);
+      if (preset.startColor) styleSettings.setStartColor(preset.startColor);
+      if (preset.endColor) styleSettings.setEndColor(preset.endColor);
+      if (preset.increaseColor) styleSettings.setIncreaseColor(preset.increaseColor);
+      if (preset.decreaseColor) styleSettings.setDecreaseColor(preset.decreaseColor);
+      if (preset.noChangeColor) styleSettings.setNoChangeColor(preset.noChangeColor);
+
+      // Title alignment
+      if (preset.titleAlignment) styleSettings.setTitleAlignment(preset.titleAlignment);
+
+      // Axis settings
+      if (preset.axisEnds) styleSettings.setAxisEnds(preset.axisEnds);
+      if (preset.slopeAxisLineColor) styleSettings.setSlopeAxisLineColor(preset.slopeAxisLineColor);
+      if (preset.slopeAxisLineWidth) styleSettings.setSlopeAxisLineWidth(preset.slopeAxisLineWidth);
+      if (preset.slopeAxisLineStyle) styleSettings.setSlopeAxisLineStyle(preset.slopeAxisLineStyle);
+
+      // Layout settings
+      if (preset.periodHeight) styleSettings.setPeriodHeight(preset.periodHeight);
+      if (preset.chartWidth) styleSettings.setChartWidth(preset.chartWidth);
+      if (preset.chartHeight) styleSettings.setChartHeight(preset.chartHeight);
+      if (preset.canvasWidth) styleSettings.setCanvasWidth(preset.canvasWidth);
+      if (preset.canvasHeight) styleSettings.setCanvasHeight(preset.canvasHeight);
+
+      // Reset flag after a short delay to allow all state updates to complete
+      setTimeout(() => {
+        isLoadingPresetRef.current = false;
+      }, 100);
+    }
+  }, [styleSettings, chartType]);
+
+  // Calculate and apply viewport-based chart sizing
+  const applyViewportBasedSizing = useCallback(() => {
+    // Configurable viewport percentage - adjust this to change initial sizing
+    const VIEWPORT_HEIGHT_PERCENTAGE = 0.70; // 70% of viewport height
+    const VIEWPORT_WIDTH_PERCENTAGE = 0.65;  // 65% of viewport width
+
+    // Calculate dimensions based on viewport
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    // Reserve space for header/controls (~200px) and padding
+    const availableHeight = viewportHeight - 200;
+    const availableWidth = viewportWidth - 400; // Reserve space for sidebar
+
+    const targetHeight = Math.floor(availableHeight * VIEWPORT_HEIGHT_PERCENTAGE);
+    const targetWidth = Math.floor(availableWidth * VIEWPORT_WIDTH_PERCENTAGE);
+
+    // Adjust chart dimensions based on chart type to ensure consistent canvas size
+    // Bar Chart adds margins to canvas, so we need to subtract them from chart dimensions
+    const isBarChart = chartType === 'bar';
+    const finalChartWidth = isBarChart ? targetWidth - 240 : targetWidth;  // 180 left + 60 right
+    const finalChartHeight = isBarChart ? targetHeight - 140 : targetHeight; // 60 top + 80 bottom
+
+    // Set chart dimensions
+    styleSettings.setChartHeight(finalChartHeight);
+    styleSettings.setChartWidth(finalChartWidth);
+  }, [styleSettings, chartType]);
+
+  // Handle Reset View
+  const handleResetView = () => {
+    // Clear all emphasis
+    clearEmphasis();
+
+    // Reset zoom and pan
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+
+    // Reload the current sample dataset to reset everything to defaults
+    if (currentSampleDatasetKey) {
+      // Reload the same dataset, which will apply its default stylePreset and settings
+      chartData.loadSampleData(currentSampleDatasetKey);
+
+      // Get the dataset to restore its default title and subtitle
+      const dataset = getSampleDataset(currentSampleDatasetKey);
+      if (dataset) {
+        if (dataset.title) styleSettings.setTitle(dataset.title);
+        if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
+
+        // Apply the default style preset after a brief delay to ensure data is loaded
+        setTimeout(() => {
+          if (dataset.stylePreset) {
+            applyStylePreset(dataset.stylePreset);
+          }
+          // Restore viewport-based sizing
+          applyViewportBasedSizing();
+        }, 100);
+      }
+    } else {
+      // If no sample dataset is loaded, just reset settings
+      styleSettings.resetToDefaults();
+      setTimeout(() => {
+        applyViewportBasedSizing();
+      }, 0);
+    }
+  };
+
   // Create settings object for chart component
-  const chartStyleSettings = {
+  // Common settings for all chart types
+  const commonSettings = {
     title: styleSettings.title,
     subtitle: styleSettings.subtitle,
     titleAlignment: styleSettings.titleAlignment,
     fontFamily: styleSettings.fontFamily,
     titleFontSize: styleSettings.titleFontSize,
     subtitleFontSize: styleSettings.subtitleFontSize,
+    canvasWidth: styleSettings.canvasWidth,
+    canvasHeight: styleSettings.canvasHeight,
+    chartPadding: styleSettings.chartPadding,
+    backgroundOpacity: styleSettings.backgroundOpacity,
+    darkMode: styleSettings.darkMode,
+    userTier: styleSettings.userTier,
+  };
+
+  // Funnel Chart specific settings
+  const funnelSettings = chartType === 'funnel' ? {
     segmentLabelFontSize: styleSettings.segmentLabelFontSize,
     metricLabelFontSize: styleSettings.metricLabelFontSize,
     legendFontSize: styleSettings.legendFontSize,
@@ -212,13 +1012,9 @@ export default function ChartEditor() {
     userCustomColors: styleSettings.userCustomColors,
     orientation: styleSettings.orientation,
     aspectRatio: styleSettings.aspectRatio,
-    canvasWidth: styleSettings.canvasWidth,
-    canvasHeight: styleSettings.canvasHeight,
-    chartPadding: styleSettings.chartPadding,
     stageGap: styleSettings.stageGap,
     stageLabelPosition: styleSettings.stageLabelPosition,
-    axisLineWidth: chartType === 'slope' ? styleSettings.slopeAxisLineWidth : styleSettings.axisLineWidth,
-    backgroundOpacity: styleSettings.backgroundOpacity,
+    axisLineWidth: styleSettings.axisLineWidth,
     emphasis: styleSettings.emphasis,
     metricEmphasis: styleSettings.metricEmphasis,
     normalizeToHundred: styleSettings.normalizeToHundred,
@@ -228,9 +1024,15 @@ export default function ChartEditor() {
     inStageLabelFontSize: styleSettings.inStageLabelFontSize,
     showSparklines: styleSettings.showSparklines,
     sparklineType: styleSettings.sparklineType,
-    userTier: styleSettings.userTier,
+    backgroundOpacity: styleSettings.backgroundOpacity,
+    backgroundColor: styleSettings.backgroundColor,
+    // Layout for Funnel Chart - uses canvas dimensions directly
+    chartWidth: styleSettings.canvasWidth,
+    chartHeight: styleSettings.canvasHeight,
+  } : {};
 
-    // Slope Chart specific settings
+  // Slope Chart specific settings
+  const slopeSettings = chartType === 'slope' ? {
     colorMode: styleSettings.colorMode,
     lineThickness: styleSettings.lineThickness,
     lineOpacity: styleSettings.lineOpacity,
@@ -241,13 +1043,13 @@ export default function ChartEditor() {
     showCategoryLabels: styleSettings.showCategoryLabels,
     showValueLabels: styleSettings.showValueLabels,
     labelFormat: styleSettings.labelFormat,
+    compactNumbers: styleSettings.compactNumbers,
     emphasizedLines: styleSettings.emphasizedLines,
     increaseColor: styleSettings.increaseColor,
     decreaseColor: styleSettings.decreaseColor,
     noChangeColor: styleSettings.noChangeColor,
     startColor: styleSettings.startColor,
     endColor: styleSettings.endColor,
-
     // Typography for Slope Chart
     categoryFont: styleSettings.fontFamily,
     categoryFontSize: styleSettings.segmentLabelFontSize,
@@ -262,39 +1064,54 @@ export default function ChartEditor() {
     periodLabelPosition: styleSettings.periodLabelPosition,
     emphasizedLineThickness: 5,
     emphasizedLabelWeight: 700,
-
     // Layout for Slope Chart
     width: styleSettings.canvasWidth,
     height: styleSettings.canvasHeight,
-    periodHeight: styleSettings.periodHeight || 700, // Controls vertical spacing of chart content
+    // Use periodHeight directly from settings (not calculated from chartHeight)
+    periodHeight: styleSettings.periodHeight,
     marginTop: 60,
     marginRight: 160,
     marginBottom: 140,
     marginLeft: 160,
-
     // Visual for Slope Chart
-    backgroundColor: styleSettings.darkMode ? '#1f2937' : '#ffffff',
+    backgroundColor: styleSettings.backgroundColor,
     showAxisLines: true,
     periodSpacing: styleSettings.periodSpacing,
     axisLineColor: styleSettings.darkMode ? '#6b7280' : styleSettings.slopeAxisLineColor,
+    axisLineWidth: styleSettings.slopeAxisLineWidth,
     axisLineStyle: styleSettings.slopeAxisLineStyle,
     axisEnds: styleSettings.axisEnds,
     darkMode: styleSettings.darkMode,
+  } : {};
 
-    // Bar Chart specific settings
+  // Bar Chart specific settings (applies to both 'bar' and 'grouped-bar')
+  const barSettings = (chartType === 'bar' || chartType === 'grouped-bar') ? {
     barMode: styleSettings.barMode,
     labelMode: styleSettings.labelMode,
+    legendPosition: styleSettings.legendPosition,
     directLabelContent: styleSettings.directLabelContent,
     emphasizedBars: styleSettings.emphasizedBars,
     colorPalette: styleSettings.comparisonPalette,
     customColors: styleSettings.userCustomColors,
+    orientation: styleSettings.orientation,
+    showValueLabels: styleSettings.showValueLabels,
+    showMetricLabels: styleSettings.showMetricLabels,
+    showPeriodLabels: styleSettings.showPeriodLabels,
+    metricLabelPosition: styleSettings.metricLabelPosition,
+    periodLabelDisplay: styleSettings.periodLabelDisplay,
+    // Typography for Bar Chart
+    categoryFont: styleSettings.fontFamily,
+    categoryFontSize: styleSettings.segmentLabelFontSize,
     categoryWeight: 500,
+    valueFont: styleSettings.fontFamily,
+    valueFontSize: styleSettings.metricLabelFontSize,
     valueWeight: 600,
     axisFont: styleSettings.fontFamily,
     xAxisFontSize: styleSettings.xAxisFontSize,
     yAxisFontSize: styleSettings.yAxisFontSize,
     axisLabel: styleSettings.axisLabel,
     axisLabelFontSize: styleSettings.axisLabelFontSize,
+    xAxisLabelRotation: styleSettings.xAxisLabelRotation,
     axisWeight: 400,
     axisMinimum: styleSettings.axisMinimum,
     axisMinimumAuto: styleSettings.axisMinimumAuto,
@@ -308,7 +1125,13 @@ export default function ChartEditor() {
     axisMinorTickType: styleSettings.axisMinorTickType,
     showHorizontalGridlines: styleSettings.showHorizontalGridlines,
     showVerticalGridlines: styleSettings.showVerticalGridlines,
+    valuePrefix: styleSettings.valuePrefix,
+    valueSuffix: styleSettings.valueSuffix,
+    valueDecimalPlaces: styleSettings.valueDecimalPlaces,
+    valueFormat: styleSettings.valueFormat,
+    periodLabelFontSize: styleSettings.periodLabelFontSize,
     compactAxisNumbers: styleSettings.compactAxisNumbers,
+    compactNumbers: styleSettings.compactNumbers,
     setCalculatedAxisMinimum: styleSettings.setCalculatedAxisMinimum,
     setCalculatedAxisMaximum: styleSettings.setCalculatedAxisMaximum,
     setCalculatedAxisMajorUnit: styleSettings.setCalculatedAxisMajorUnit,
@@ -318,13 +1141,169 @@ export default function ChartEditor() {
     showYAxis: true,
     axisColor: '#000000',
     axisOpacity: 1,
-    barPadding: 0.2,
+    barWidthPercent: styleSettings.barWidth,
     groupPadding: styleSettings.stageGap / 100,
     barOpacity: 1,
     barBorderWidth: 0,
     barBorderColor: '#ffffff',
     chartHeight: styleSettings.chartHeight || 400,
     chartWidth: styleSettings.chartWidth || 600,
+    percentChangeEnabled: styleSettings.percentChangeEnabled,
+    percentChangeLabelFormat: styleSettings.percentChangeLabelFormat,
+    percentChangeBracketDistance: styleSettings.percentChangeBracketDistance,
+    darkMode: styleSettings.darkMode,
+    backgroundColor: styleSettings.backgroundColor,
+    showTotalLabels: styleSettings.showTotalLabels,
+    boldTotal: styleSettings.boldTotal,
+  } : {};
+
+  // Line Chart specific settings
+  const lineSettings = chartType === 'line' ? {
+    // Time settings
+    timeScale: styleSettings.timeScale || 'month',
+    dateField: 'date',
+
+    // Time aggregation
+    aggregationLevel: styleSettings.aggregationLevel || 'day',
+    aggregationMethod: styleSettings.aggregationMethod || 'sum',
+    fiscalYearStartMonth: styleSettings.fiscalYearStartMonth || 1,
+    xAxisTimeGrouping: styleSettings.xAxisTimeGrouping || 'auto',
+    xAxisLabelLevels: styleSettings.xAxisLabelLevels || 2,
+    dateRangeFilter: styleSettings.dateRangeFilter || [0, 100],
+    xAxisPrimaryLabel: styleSettings.xAxisPrimaryLabel || 'auto',
+    xAxisSecondaryLabel: styleSettings.xAxisSecondaryLabel || 'auto',
+    dateFormatPreset: styleSettings.dateFormatPreset || 'MM/dd/yy',
+    dateFormatCustom: styleSettings.dateFormatCustom || '',
+
+    // Line styling
+    lineThickness: styleSettings.lineThickness || 2,
+    lineStyle: styleSettings.lineStyle || 'solid',
+    lineOpacity: styleSettings.lineOpacity || 1.0,
+    smoothLines: styleSettings.smoothLines || false,
+    lineSaturation: styleSettings.lineSaturation || 100,
+
+    // Color mode
+    colorMode: styleSettings.colorMode || 'category',
+    comparisonPalette: styleSettings.comparisonPalette || 'observable10',
+    userCustomColors: styleSettings.userCustomColors || ['#1e40af', '#0d9488', '#991b1b'],
+
+    // Point styling
+    showPoints: styleSettings.showPoints !== undefined ? styleSettings.showPoints : true,
+    pointSize: styleSettings.pointSize || 4,
+    pointStyle: styleSettings.pointStyle || 'filled',
+    pointBorderWidth: styleSettings.pointBorderWidth || 2,
+    excludeZeroValues: styleSettings.excludeZeroValues !== undefined ? styleSettings.excludeZeroValues : true,
+
+    // Area fill
+    showAreaFill: styleSettings.showAreaFill || false,
+    areaOpacity: styleSettings.areaOpacity || 0.2,
+    areaGradient: styleSettings.areaGradient || false,
+
+    // Emphasis
+    emphasizedLines: styleSettings.emphasizedLines || [],
+    emphasizedLineThickness: styleSettings.emphasizedLineThickness || 4,
+    emphasizedPointSize: styleSettings.emphasizedPointSize || 6,
+    emphasizedPoints: styleSettings.emphasizedPoints || [],
+    emphasizedMetric: styleSettings.emphasizedMetric || null,
+    emphasisLabelPosition: styleSettings.emphasisLabelPosition || 'above',
+    emphasisLabelFontSize: styleSettings.emphasisLabelFontSize || 12,
+    showEmphasisDate: styleSettings.showEmphasisDate || false,
+    showEmphasisVerticalLine: styleSettings.showEmphasisVerticalLine || false,
+    emphasisCompactNumbers: styleSettings.emphasisCompactNumbers || false,
+    emphasisValuePrefix: styleSettings.emphasisValuePrefix || '',
+    emphasisValueSuffix: styleSettings.emphasisValueSuffix || '',
+    emphasisDecimalPlaces: styleSettings.emphasisDecimalPlaces ?? 0,
+
+    // Labels
+    showValueLabels: styleSettings.showValueLabels || false,
+    showDirectLabels: styleSettings.showDirectLabels !== undefined ? styleSettings.showDirectLabels : true,
+    labelFontSize: styleSettings.labelFontSize || 12,
+    directLabelFontSize: styleSettings.directLabelFontSize || 14,
+    compactNumbers: styleSettings.compactNumbers !== undefined ? styleSettings.compactNumbers : true,
+
+    // Axes
+    showXAxis: styleSettings.showXAxis !== undefined ? styleSettings.showXAxis : true,
+    showYAxis: styleSettings.showYAxis !== undefined ? styleSettings.showYAxis : true,
+    xAxisPosition: styleSettings.xAxisPosition || 'bottom',
+    yAxisPosition: styleSettings.yAxisPosition || 'left',
+    xAxisLabelRotation: styleSettings.xAxisLabelRotation || 0,
+    yAxisFormat: styleSettings.yAxisFormat || 'auto',
+    xAxisFontSize: styleSettings.xAxisFontSize || 12,
+    xAxisSecondaryFontSize: styleSettings.xAxisSecondaryFontSize || 12,
+    yAxisFontSize: styleSettings.yAxisFontSize || 20,
+    axisLabel: styleSettings.axisLabel || '',
+    axisLabelFontSize: styleSettings.axisLabelFontSize || 17,
+
+    // Axis bounds and units
+    axisMinimum: styleSettings.axisMinimum || 0,
+    axisMinimumAuto: styleSettings.axisMinimumAuto !== undefined ? styleSettings.axisMinimumAuto : true,
+    axisMaximum: styleSettings.axisMaximum || 50000,
+    axisMaximumAuto: styleSettings.axisMaximumAuto !== undefined ? styleSettings.axisMaximumAuto : true,
+    axisMajorUnit: styleSettings.axisMajorUnit || 10000,
+    axisMajorUnitAuto: styleSettings.axisMajorUnitAuto !== undefined ? styleSettings.axisMajorUnitAuto : true,
+    axisMinorUnit: styleSettings.axisMinorUnit || 5,
+    axisMinorUnitAuto: styleSettings.axisMinorUnitAuto !== undefined ? styleSettings.axisMinorUnitAuto : true,
+    calculatedAxisMinimum: styleSettings.calculatedAxisMinimum || 0,
+    calculatedAxisMaximum: styleSettings.calculatedAxisMaximum || 100,
+    calculatedAxisMajorUnit: styleSettings.calculatedAxisMajorUnit || 10,
+
+    // Tick marks
+    axisMajorTickType: styleSettings.axisMajorTickType || 'outside',
+    axisMinorTickType: styleSettings.axisMinorTickType || 'none',
+
+    // Grid
+    showGridLines: styleSettings.showGridLines !== undefined ? styleSettings.showGridLines : true,
+    gridDirection: styleSettings.gridDirection || 'horizontal',
+    gridLineColor: styleSettings.darkMode ? '#4b5563' : '#e5e7eb',
+    gridLineStyle: styleSettings.gridLineStyle || 'solid',
+    gridLineOpacity: styleSettings.gridLineOpacity || 0.5,
+    showHorizontalGridlines: styleSettings.showHorizontalGridlines !== undefined ? styleSettings.showHorizontalGridlines : false,
+    showVerticalGridlines: styleSettings.showVerticalGridlines !== undefined ? styleSettings.showVerticalGridlines : false,
+    compactAxisNumbers: styleSettings.compactAxisNumbers !== undefined ? styleSettings.compactAxisNumbers : true,
+
+    // Number formatting
+    valuePrefix: styleSettings.valuePrefix || '',
+    valueSuffix: styleSettings.valueSuffix || '',
+    valueDecimalPlaces: styleSettings.valueDecimalPlaces || 0,
+    valueFormat: styleSettings.valueFormat || 'number',
+
+    // Legend
+    showLegend: styleSettings.showLegend !== undefined ? styleSettings.showLegend : true,
+    legendPosition: styleSettings.legendPosition || 'top',
+    legendFontSize: styleSettings.legendFontSize || 12,
+
+    // Advanced features
+    baselines: styleSettings.baselines || [],
+    showMovingAverage: styleSettings.showMovingAverage || false,
+    movingAveragePeriod: styleSettings.movingAveragePeriod || 3,
+    movingAverageColor: styleSettings.movingAverageColor || '#6b7280',
+    showPercentChangeBrackets: styleSettings.showPercentChangeBrackets || false,
+    percentChangeBracketPairs: styleSettings.percentChangeBracketPairs || [],
+
+    // Tooltips
+    showTooltips: styleSettings.showTooltips !== undefined ? styleSettings.showTooltips : true,
+    tooltipFormat: styleSettings.tooltipFormat || 'auto',
+
+    // Layout
+    width: styleSettings.chartWidth,
+    height: styleSettings.chartHeight,
+    marginTop: 80,
+    marginRight: 100,
+    marginBottom: 80,
+    marginLeft: 80,
+
+    // Background
+    backgroundColor: styleSettings.backgroundColor,
+    darkMode: styleSettings.darkMode,
+  } : {};
+
+  // Combine all settings based on chart type
+  const chartStyleSettings = {
+    ...commonSettings,
+    ...funnelSettings,
+    ...slopeSettings,
+    ...barSettings,
+    ...lineSettings,
   };
 
   // Render chart component based on type
@@ -333,30 +1312,71 @@ export default function ChartEditor() {
 
     switch (chartType) {
       case 'funnel':
+        // Filter out hidden periods
+        const visibleFunnelPeriods = (chartData.periodNames || []).filter(
+          period => !chartData.hiddenPeriods?.has(period)
+        );
         return (
           <FunnelChart
             data={chartData.data}
-            periodNames={chartData.periodNames}
+            periodNames={visibleFunnelPeriods}
             isComparisonMode={chartData.isComparisonMode}
             styleSettings={chartStyleSettings}
           />
         );
       case 'slope':
+        // Filter out hidden periods
+        const visibleSlopePeriods = (chartData.periodNames || []).filter(
+          period => !chartData.hiddenPeriods?.has(period)
+        );
         return (
           <SlopeChart
             data={chartData.data}
-            periodNames={chartData.periodNames}
+            periodNames={visibleSlopePeriods}
             styleSettings={chartStyleSettings}
             onLineClick={handleSlopeLineClick}
           />
         );
       case 'bar':
+        // Filter out hidden periods
+        const visibleBarPeriods = (chartData.periodNames || []).filter(
+          period => !chartData.hiddenPeriods?.has(period)
+        );
         return (
           <BarChart
             data={chartData.data}
-            periodNames={chartData.periodNames}
+            periodNames={visibleBarPeriods}
             styleSettings={chartStyleSettings}
             onBarClick={handleBarClick}
+            onClearEmphasis={(clearFn) => { clearEmphasisRef.current = clearFn; }}
+          />
+        );
+      case 'grouped-bar':
+        // Filter out hidden periods
+        const visibleGroupedBarPeriods = (chartData.periodNames || []).filter(
+          period => !chartData.hiddenPeriods?.has(period)
+        );
+        return (
+          <GroupedBarChart
+            data={chartData.data}
+            periodNames={visibleGroupedBarPeriods}
+            styleSettings={chartStyleSettings}
+            onBarClick={handleBarClick}
+          />
+        );
+      case 'line':
+        // Filter out hidden metrics
+        const visibleMetrics = (chartData.periodNames || []).filter(
+          metric => !chartData.hiddenPeriods?.has(metric)
+        );
+        return (
+          <LineChart
+            data={chartData.data}
+            metricNames={visibleMetrics}
+            styleSettings={chartStyleSettings}
+            onPointClick={handleLineChartPointClick}
+            onMetricClick={handleLineChartMetricClick}
+            onLabelDrag={handleLineChartLabelDrag}
           />
         );
       default:
@@ -383,6 +1403,13 @@ export default function ChartEditor() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Find&Tell Logo */}
+            <img
+              src="/findandtell_logo.png"
+              alt="Find&Tell"
+              className="h-12"
+            />
+
             {!showPanel && (
               <button
                 onClick={() => setShowPanel(true)}
@@ -432,14 +1459,71 @@ export default function ChartEditor() {
 
       {/* Main Content Area - Two Column Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chart Display Area - Fixed, No Scroll */}
-        <div className="flex-1 flex items-center justify-center overflow-hidden p-8">
+        {/* Chart Display Area - Scrollable when needed */}
+        <div
+          className="flex-1 flex items-center justify-center overflow-auto"
+          style={{
+            cursor: isPanning ? 'grabbing' : 'grab',
+          }}
+          ref={chartContainerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
+          {/* Zoom Controls - Fixed Position */}
+          {chartData.hasData && !showDataTable && (
+            <div className="absolute bottom-8 left-8 flex flex-col gap-2 z-50" style={{ pointerEvents: 'auto' }}>
+              <button
+                onClick={handleZoomIn}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="w-12 h-12 bg-white border-2 border-gray-300 rounded-lg shadow-lg hover:bg-gray-50 hover:border-cyan-500 flex items-center justify-center transition-all"
+                title="Zoom In"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+              <button
+                onClick={handleZoomOut}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="w-12 h-12 bg-white border-2 border-gray-300 rounded-lg shadow-lg hover:bg-gray-50 hover:border-cyan-500 flex items-center justify-center transition-all"
+                title="Zoom Out"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </button>
+              <button
+                onClick={handleResetZoom}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="w-12 h-12 bg-white border-2 border-gray-300 rounded-lg shadow-lg hover:bg-gray-50 hover:border-cyan-500 flex items-center justify-center transition-all"
+                title="Reset Zoom & Pan"
+              >
+                <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <div className="px-3 py-2 bg-white border-2 border-gray-300 rounded-lg shadow-lg text-sm font-semibold text-gray-700 text-center">
+                {Math.round(zoom * 100)}%
+              </div>
+            </div>
+          )}
+
           {chartData.hasData ? (
-            <div className="flex flex-col items-center gap-4 flex-shrink-0">
+            <div
+              className="flex flex-col items-center gap-4 flex-shrink-0 p-8"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: 'center center',
+                transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+                minWidth: 'min-content',
+              }}
+            >
               {/* Action Buttons - Fixed above chart */}
               <div className="flex justify-center gap-4 flex-shrink-0">
                 <button
-                  onClick={styleSettings.resetToDefaults}
+                  onClick={handleResetView}
                   className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
                 >
                   Reset View
@@ -457,7 +1541,8 @@ export default function ChartEditor() {
                 className="relative flex-shrink-0"
                 style={{
                   width: chartStyleSettings.canvasWidth + chartStyleSettings.chartPadding * 2,
-                  height: chartStyleSettings.canvasHeight + chartStyleSettings.chartPadding * 2,
+                  // Add 50px extra height for watermark margin when on free tier
+                  height: chartStyleSettings.canvasHeight + chartStyleSettings.chartPadding * 2 + (styleSettings.userTier !== 'pro' ? 50 : 0),
                   perspective: '1000px',
                 }}
               >
@@ -499,7 +1584,68 @@ export default function ChartEditor() {
                     />
                   </div>
                 </div>
+
+                {/* Resize Handle on Chart Corner - Only show when not in data table mode */}
+                {!showDataTable && (
+                  <div
+                    className="absolute cursor-se-resize"
+                    style={{
+                      bottom: 6,
+                      right: 6,
+                      width: 16,
+                      height: 16,
+                      transform: `scale(${1 / zoom})`,
+                      transformOrigin: 'bottom right',
+                      pointerEvents: 'auto',
+                      zIndex: 100,
+                    }}
+                    onMouseDown={(e) => handleResizeStart(e, 'br')}
+                    title="Resize chart"
+                  >
+                    <div className="w-full h-full bg-cyan-500 border-2 border-white rounded-full shadow-lg hover:bg-cyan-600 transition-colors" />
+                  </div>
+                )}
               </div>
+
+              {/* Capture Snapshot Button */}
+              {!showDataTable && (
+                <button
+                  onClick={handleCaptureSnapshot}
+                  className="px-6 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  Capture Snapshot
+                </button>
+              )}
+
+              {/* Snapshot Gallery */}
+              {!showDataTable && (
+                <div style={{ maxWidth: chartStyleSettings.canvasWidth + chartStyleSettings.chartPadding * 2 }}>
+                  <SnapshotGallery
+                    snapshots={snapshots}
+                    onSnapshotClick={handleSnapshotClick}
+                    onDeleteSnapshot={handleDeleteSnapshot}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-16">
@@ -521,7 +1667,7 @@ export default function ChartEditor() {
             <div className="flex border-b border-gray-200 flex-shrink-0">
               <button
                 onClick={() => setActiveTab('style')}
-                className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                className={`flex-1 px-4 py-2 font-medium text-sm transition-colors ${
                   activeTab === 'style'
                     ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -531,7 +1677,7 @@ export default function ChartEditor() {
               </button>
               <button
                 onClick={() => setActiveTab('data')}
-                className={`flex-1 px-4 py-3 font-medium transition-colors ${
+                className={`flex-1 px-4 py-2 font-medium text-sm transition-colors ${
                   activeTab === 'data'
                     ? 'text-cyan-600 border-b-2 border-cyan-600 bg-cyan-50'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -542,7 +1688,7 @@ export default function ChartEditor() {
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
               {/* Style Tab Content */}
               {activeTab === 'style' && (
                 <StyleTabContent
@@ -551,8 +1697,11 @@ export default function ChartEditor() {
                   toggleSection={toggleSection}
                   chartData={chartData}
                   chartType={chartType}
+                  clearEmphasisRef={clearEmphasisRef}
+                  clearEmphasis={clearEmphasis}
                   onSaveStyle={handleSaveStyle}
                   onImportStyle={handleImportStyle}
+                  throttledSetters={throttledSetters}
                 />
               )}
 
@@ -561,6 +1710,27 @@ export default function ChartEditor() {
                 <DataTabContent
                   chartData={chartData}
                   chartType={chartType}
+                  onEditData={() => setShowDataTable(true)}
+                  styleSettings={styleSettings}
+                  setCurrentSampleDatasetKey={setCurrentSampleDatasetKey}
+                  applyStylePreset={applyStylePreset}
+                  showPasteCSV={showPasteCSV}
+                  setShowPasteCSV={setShowPasteCSV}
+                  pastedCSV={pastedCSV}
+                  setPastedCSV={setPastedCSV}
+                  handlePasteCSV={handlePasteCSV}
+                  showGoogleSheets={showGoogleSheets}
+                  setShowGoogleSheets={setShowGoogleSheets}
+                  googleSheetsUrl={googleSheetsUrl}
+                  setGoogleSheetsUrl={setGoogleSheetsUrl}
+                  googleSheetsLoading={googleSheetsLoading}
+                  setGoogleSheetsLoading={setGoogleSheetsLoading}
+                  googleSheetsError={googleSheetsError}
+                  setGoogleSheetsError={setGoogleSheetsError}
+                  autoRefreshEnabled={autoRefreshEnabled}
+                  setAutoRefreshEnabled={setAutoRefreshEnabled}
+                  autoRefreshInterval={autoRefreshInterval}
+                  setAutoRefreshInterval={setAutoRefreshInterval}
                 />
               )}
             </div>
@@ -611,6 +1781,18 @@ export default function ChartEditor() {
         onChange={handleStyleFileSelect}
         className="hidden"
       />
+
+      {/* Snapshot Modal */}
+      {showSnapshotModal && selectedSnapshot && (
+        <SnapshotModal
+          snapshot={selectedSnapshot}
+          onClose={() => {
+            setShowSnapshotModal(false);
+            setSelectedSnapshot(null);
+          }}
+          onLoadChart={handleLoadChart}
+        />
+      )}
     </div>
   );
 }
@@ -618,102 +1800,112 @@ export default function ChartEditor() {
 /**
  * Style Tab Component
  */
-function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, onSaveStyle, onImportStyle }) {
+function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, clearEmphasisRef, clearEmphasis, onSaveStyle, onImportStyle, throttledSetters }) {
   const isSlopeChart = chartType === 'slope';
   const isBarChart = chartType === 'bar';
+  const isLineChart = chartType === 'line';
 
   return (
-    <div className="space-y-4">
-      {/* Chart Type Section - Only for Funnel Chart */}
-      {!isSlopeChart && !isBarChart && (
+    <div className="space-y-3">
+      {/* 1. THEME - Only for Funnel Chart (Slope, Bar Chart, and Line Chart have their own) */}
+      {!isSlopeChart && !isBarChart && !isLineChart && (
         <CollapsibleSection
-          title="Chart Type"
-          isExpanded={expandedSections.chartType}
-          onToggle={() => toggleSection('chartType')}
+          title="Theme"
+          isExpanded={expandedSections.theme}
+          onToggle={() => toggleSection('theme')}
         >
-          <div className="space-y-3">
-          {/* Data Mode Toggle */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data Mode
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => chartData.isComparisonMode && chartData.toggleComparisonMode()}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  !chartData.isComparisonMode
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Time Series
-              </button>
-              <button
-                onClick={() => !chartData.isComparisonMode && chartData.toggleComparisonMode()}
-                className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                  chartData.isComparisonMode
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Comparison
-              </button>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Chart Background
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    styleSettings.setDarkMode(false);
+                    styleSettings.setBackgroundColor('#ffffff');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    !styleSettings.darkMode
+                      ? 'bg-white text-gray-900 border-2 border-gray-400 shadow-md'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  Light Mode
+                </button>
+                <button
+                  onClick={() => {
+                    styleSettings.setDarkMode(true);
+                    styleSettings.setBackgroundColor('#1f2937');
+                  }}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                    styleSettings.darkMode
+                      ? 'bg-gray-800 text-white border-2 border-gray-600 shadow-md'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                  }`}
+                >
+                  Dark Mode
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Toggle between light and dark background themes
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {chartData.isComparisonMode
-                ? 'Multiple colors for comparing different groups/periods'
-                : 'Monochrome gradient showing progression over time'}
-            </p>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Orientation
-            </label>
-            <select
-              value={styleSettings.orientation}
-              onChange={(e) => styleSettings.setOrientation(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="vertical">Vertical</option>
-              <option value="horizontal">Horizontal</option>
-            </select>
-          </div>
+            {/* Background Color */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Background Color
+              </label>
+              <input
+                type="color"
+                value={styleSettings.backgroundColor}
+                onChange={(e) => styleSettings.setBackgroundColor(e.target.value)}
+                className="w-full h-10 rounded border border-gray-300 cursor-pointer"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Emphasis Mode
-            </label>
-            <select
-              value={styleSettings.emphasis}
-              onChange={(e) => styleSettings.setEmphasis(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="throughput">Throughput (Volume Flow)</option>
-              <option value="fallout">Fallout (Drop-offs)</option>
-            </select>
-          </div>
+            {/* Background Opacity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Background Opacity: {styleSettings.backgroundOpacity}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={styleSettings.backgroundOpacity}
+                onChange={(e) => throttledSetters.setBackgroundOpacity(Number(e.target.value))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Adjusts the transparency of the chart background
+              </p>
+            </div>
           </div>
         </CollapsibleSection>
       )}
 
-      {/* Slope Chart Specific Sections */}
+      {/* Slope Chart Specific Sections (relocated) */}
       {isSlopeChart && (
         <>
-          {/* Theme Section for Dark Mode */}
+          {/* Theme Section for Slope Chart */}
           <CollapsibleSection
             title="Theme"
             isExpanded={expandedSections.theme}
             onToggle={() => toggleSection('theme')}
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Chart Background
                 </label>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => styleSettings.setDarkMode(false)}
+                    onClick={() => {
+                    styleSettings.setDarkMode(false);
+                    styleSettings.setBackgroundColor('#ffffff');
+                  }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                       !styleSettings.darkMode
                         ? 'bg-white text-gray-900 border-2 border-gray-400 shadow-md'
@@ -723,7 +1915,10 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                     Light Mode
                   </button>
                   <button
-                    onClick={() => styleSettings.setDarkMode(true)}
+                    onClick={() => {
+                    styleSettings.setDarkMode(true);
+                    styleSettings.setBackgroundColor('#1f2937');
+                  }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.darkMode
                         ? 'bg-gray-800 text-white border-2 border-gray-600 shadow-md'
@@ -734,16 +1929,148 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </button>
                 </div>
               </div>
+
+              {/* Background Color */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Background Color
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={styleSettings.backgroundColor}
+                    onChange={(e) => styleSettings.setBackgroundColor(e.target.value)}
+                    className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={styleSettings.backgroundColor}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                        styleSettings.setBackgroundColor(value);
+                      }
+                    }}
+                    placeholder="#ffffff"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Background Opacity */}
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Background Opacity: {styleSettings.backgroundOpacity}%
+                  <InfoTooltip text="Adjusts the transparency of the chart background" />
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={styleSettings.backgroundOpacity}
+                  onChange={(e) => throttledSetters.setBackgroundOpacity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
             </div>
           </CollapsibleSection>
 
-          {/* Color Mode Section for Slope Chart */}
+          {/* Canvas & Layout Section for Slope Chart */}
           <CollapsibleSection
-            title="Color Mode"
+            title="Canvas & Layout"
+            isExpanded={expandedSections.layoutCanvas}
+            onToggle={() => toggleSection('layoutCanvas')}
+          >
+            <div className="space-y-2">
+              {/* Aspect Ratio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Aspect Ratio
+                </label>
+                <select
+                  value={styleSettings.aspectRatio}
+                  onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="16:9">16:9 (Widescreen)</option>
+                  <option value="4:3">4:3 (Standard)</option>
+                  <option value="1:1">1:1 (Square)</option>
+                  <option value="3:4">3:4 (Portrait)</option>
+                  <option value="9:16">9:16 (Mobile)</option>
+                </select>
+              </div>
+
+              {/* Canvas Width */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canvas Width: {styleSettings.canvasWidth}px
+                </label>
+                <input
+                  type="range"
+                  min="600"
+                  max="2000"
+                  value={styleSettings.canvasWidth}
+                  onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Canvas Height */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canvas Height: {styleSettings.canvasHeight}px
+                </label>
+                <input
+                  type="range"
+                  min="400"
+                  max="2000"
+                  value={styleSettings.canvasHeight}
+                  onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Chart Width */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Width: {styleSettings.chartWidth}px
+                </label>
+                <input
+                  type="range"
+                  min="200"
+                  max="1500"
+                  value={styleSettings.chartWidth}
+                  onChange={(e) => throttledSetters.setChartWidth(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setChartWidth(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Chart Height */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Height: {styleSettings.chartHeight}px
+                </label>
+                <input
+                  type="range"
+                  min="400"
+                  max="2000"
+                  value={styleSettings.chartHeight}
+                  onChange={(e) => throttledSetters.setChartHeight(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setChartHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Colors & Styling Section for Slope Chart */}
+          <CollapsibleSection
+            title="Colors & Styling"
             isExpanded={expandedSections.colorMode}
             onToggle={() => toggleSection('colorMode')}
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Color Strategy
@@ -904,7 +2231,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               {/* Custom Colors */}
               {(styleSettings.colorMode === 'custom' || (styleSettings.colorMode === 'category' && styleSettings.comparisonPalette === 'user')) && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Custom Colors (up to 8)
                   </label>
                   <div className="grid grid-cols-4 gap-3">
@@ -938,13 +2265,190 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             </div>
           </CollapsibleSection>
 
+          {/* Typography Section for Slope Chart */}
+          <CollapsibleSection
+            title="Typography"
+            isExpanded={expandedSections.typography}
+            onToggle={() => toggleSection('typography')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={styleSettings.title}
+                  onChange={(e) => styleSettings.setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subtitle
+                </label>
+                <input
+                  type="text"
+                  value={styleSettings.subtitle}
+                  onChange={(e) => styleSettings.setSubtitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title Alignment
+                </label>
+                <select
+                  value={styleSettings.titleAlignment}
+                  onChange={(e) => styleSettings.setTitleAlignment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Font Family
+                </label>
+                <select
+                  value={styleSettings.fontFamily}
+                  onChange={(e) => styleSettings.setFontFamily(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <optgroup label="Sans-Serif">
+                    <option value="Inter">Inter</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                  </optgroup>
+                  <optgroup label="Condensed">
+                    <option value="Roboto Condensed">Roboto Condensed</option>
+                    <option value="Open Sans Condensed">Open Sans Condensed</option>
+                    <option value="Economica">Economica</option>
+                  </optgroup>
+                  <optgroup label="Serif">
+                    <option value="Merriweather">Merriweather</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Lora">Lora</option>
+                    <option value="PT Serif">PT Serif</option>
+                    <option value="Newsreader">Newsreader</option>
+                    <option value="Georgia">Georgia</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title Font Size: {styleSettings.titleFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="16"
+                  max="48"
+                  value={styleSettings.titleFontSize}
+                  onChange={(e) => styleSettings.setTitleFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subtitle Font Size: {styleSettings.subtitleFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="12"
+                  max="32"
+                  value={styleSettings.subtitleFontSize}
+                  onChange={(e) => styleSettings.setSubtitleFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Segment Label Font Size: {styleSettings.segmentLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="12"
+                  max="32"
+                  value={styleSettings.segmentLabelFontSize}
+                  onChange={(e) => styleSettings.setSegmentLabelFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Metric Label Font Size: {styleSettings.metricLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="24"
+                  value={styleSettings.metricLabelFontSize}
+                  onChange={(e) => styleSettings.setMetricLabelFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Period Font Label: {styleSettings.periodLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="14"
+                  max="32"
+                  value={styleSettings.periodLabelFontSize}
+                  onChange={(e) => styleSettings.setPeriodLabelFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Period Label Position
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => styleSettings.setPeriodLabelPosition('above')}
+                    className={`flex-1 px-4 py-2 rounded-lg ${
+                      styleSettings.periodLabelPosition === 'above'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Above
+                  </button>
+                  <button
+                    onClick={() => styleSettings.setPeriodLabelPosition('below')}
+                    className={`flex-1 px-4 py-2 rounded-lg ${
+                      styleSettings.periodLabelPosition === 'below'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Below
+                  </button>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
           {/* Labels Section for Slope Chart */}
           <CollapsibleSection
             title="Labels"
             isExpanded={expandedSections.labels}
             onToggle={() => toggleSection('labels')}
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Category Label Position
@@ -1004,20 +2508,33 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               </label>
 
               {styleSettings.showValueLabels && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Label Format
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Label Format
+                    </label>
+                    <select
+                      value={styleSettings.labelFormat}
+                      onChange={(e) => styleSettings.setLabelFormat(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value="value">Values Only</option>
+                      <option value="percentage">Percentage Change Only</option>
+                      <option value="both">Values & Percentage</option>
+                    </select>
+                  </div>
+
+                  {/* Compact Numbers for Slope Chart */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={styleSettings.compactNumbers}
+                      onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
+                      className="w-4 h-4 text-cyan-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">Compact numbers (1K, 1M)</span>
                   </label>
-                  <select
-                    value={styleSettings.labelFormat}
-                    onChange={(e) => styleSettings.setLabelFormat(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  >
-                    <option value="value">Values Only</option>
-                    <option value="percentage">Percentage Change Only</option>
-                    <option value="both">Values & Percentage</option>
-                  </select>
-                </div>
+                </>
               )}
             </div>
           </CollapsibleSection>
@@ -1028,7 +2545,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             isExpanded={expandedSections.lineStyling}
             onToggle={() => toggleSection('lineStyling')}
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Line Thickness: {styleSettings.lineThickness}px
@@ -1038,14 +2555,15 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   min="1"
                   max="7"
                   value={styleSettings.lineThickness}
-                  onChange={(e) => styleSettings.setLineThickness(Number(e.target.value))}
+                  onChange={(e) => throttledSetters.setLineThickness(Number(e.target.value))}
                   className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
                   Line Saturation: {styleSettings.lineSaturation}%
+                  <InfoTooltip text="100% = Full vibrant colors, 0% = Grey" />
                 </label>
                 <input
                   type="range"
@@ -1053,12 +2571,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   max="100"
                   step="5"
                   value={styleSettings.lineSaturation}
-                  onChange={(e) => styleSettings.setLineSaturation(Number(e.target.value))}
+                  onChange={(e) => throttledSetters.setLineSaturation(Number(e.target.value))}
                   className="w-full"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  100% = Full vibrant colors, 0% = Grey
-                </p>
               </div>
 
               <div>
@@ -1070,7 +2585,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   min="0"
                   max="12"
                   value={styleSettings.endpointSize}
-                  onChange={(e) => styleSettings.setEndpointSize(Number(e.target.value))}
+                  onChange={(e) => throttledSetters.setEndpointSize(Number(e.target.value))}
                   className="w-full"
                 />
               </div>
@@ -1104,38 +2619,18 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
                   Period Spacing: {styleSettings.periodSpacing}px
+                  <InfoTooltip text="Distance between the two vertical axis lines" />
                 </label>
                 <input
                   type="range"
                   min="100"
                   max="600"
                   value={styleSettings.periodSpacing}
-                  onChange={(e) => styleSettings.setPeriodSpacing(Number(e.target.value))}
+                  onChange={(e) => throttledSetters.setPeriodSpacing(Number(e.target.value))}
                   className="w-full"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Distance between the two vertical axis lines
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Period Height: {styleSettings.periodHeight}px
-                </label>
-                <input
-                  type="range"
-                  min="200"
-                  max="1200"
-                  step="50"
-                  value={styleSettings.periodHeight}
-                  onChange={(e) => styleSettings.setPeriodHeight(Number(e.target.value))}
-                  className="w-full"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Vertical spacing of chart content
-                </p>
               </div>
 
               <div>
@@ -1147,6 +2642,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   onChange={(e) => styleSettings.setSlopeAxisLineStyle(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
+                  <option value="none">No Line</option>
                   <option value="solid">Solid</option>
                   <option value="dashed">Dashed</option>
                   <option value="dotted">Dotted</option>
@@ -1203,9 +2699,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             </div>
           </CollapsibleSection>
 
-          {/* Line Emphasis Section for Slope Chart */}
+          {/* Emphasis Section for Slope Chart */}
           <CollapsibleSection
-            title="Line Emphasis"
+            title="Emphasis"
             isExpanded={expandedSections.lineEmphasis}
             onToggle={() => toggleSection('lineEmphasis')}
           >
@@ -1228,26 +2724,855 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               )}
             </div>
           </CollapsibleSection>
+
+          {/* Watermark Section for Slope Chart */}
+          <CollapsibleSection
+            title="Watermark"
+            isExpanded={expandedSections.watermark}
+            onToggle={() => toggleSection('watermark')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  User Tier
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => styleSettings.setUserTier('free')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.userTier === 'free'
+                        ? 'bg-gray-500 text-white border-2 border-gray-600 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    Free (with watermark)
+                  </button>
+                  <button
+                    onClick={() => styleSettings.setUserTier('pro')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.userTier === 'pro'
+                        ? 'bg-cyan-600 text-white border-2 border-cyan-700 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    Pro (no watermark)
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Free tier displays Find&Tell watermark on charts
+                </p>
+              </div>
+            </div>
+          </CollapsibleSection>
         </>
       )}
 
       {/* Bar Chart Specific Sections */}
       {isBarChart && (
         <>
-          {/* Bar Chart Settings */}
+          {/* 1. THEME */}
           <CollapsibleSection
-            title="Chart Settings"
-            isExpanded={expandedSections.chartSettings}
-            onToggle={() => toggleSection('chartSettings')}
+            title="Theme"
+            isExpanded={expandedSections.theme}
+            onToggle={() => toggleSection('theme')}
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Background
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                    styleSettings.setDarkMode(false);
+                    styleSettings.setBackgroundColor('#ffffff');
+                  }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      !styleSettings.darkMode
+                        ? 'bg-white text-gray-900 border-2 border-gray-400 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    Light Mode
+                  </button>
+                  <button
+                    onClick={() => {
+                    styleSettings.setDarkMode(true);
+                    styleSettings.setBackgroundColor('#1f2937');
+                  }}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.darkMode
+                        ? 'bg-gray-800 text-white border-2 border-gray-600 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    Dark Mode
+                  </button>
+                </div>
+              </div>
+
+              {/* Background Color */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Background Color
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={styleSettings.backgroundColor}
+                    onChange={(e) => styleSettings.setBackgroundColor(e.target.value)}
+                    className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={styleSettings.backgroundColor}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                        styleSettings.setBackgroundColor(value);
+                      }
+                    }}
+                    placeholder="#ffffff"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Background Opacity */}
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Background Opacity: {styleSettings.backgroundOpacity}%
+                  <InfoTooltip text="Adjusts the transparency of the chart background" />
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={styleSettings.backgroundOpacity}
+                  onChange={(e) => throttledSetters.setBackgroundOpacity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 2. CANVAS & LAYOUT */}
+          <CollapsibleSection
+            title="Canvas & Layout"
+            isExpanded={expandedSections.layoutCanvas}
+            onToggle={() => toggleSection('layoutCanvas')}
+          >
+            <div className="space-y-2">
+              {/* Aspect Ratio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Aspect Ratio
+                </label>
+                <select
+                  value={styleSettings.aspectRatio}
+                  onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="16:9">16:9 (Widescreen)</option>
+                  <option value="4:3">4:3 (Standard)</option>
+                  <option value="1:1">1:1 (Square)</option>
+                  <option value="3:4">3:4 (Portrait)</option>
+                  <option value="9:16">9:16 (Mobile)</option>
+                </select>
+              </div>
+
+              {/* Canvas Width */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canvas Width: {styleSettings.canvasWidth}px
+                </label>
+                <input
+                  type="range"
+                  min="600"
+                  max="2000"
+                  value={styleSettings.canvasWidth}
+                  onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Canvas Height */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canvas Height: {styleSettings.canvasHeight}px
+                </label>
+                <input
+                  type="range"
+                  min="400"
+                  max="2000"
+                  value={styleSettings.canvasHeight}
+                  onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Chart Width */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Width: {styleSettings.chartWidth}px
+                </label>
+                <input
+                  type="range"
+                  min="200"
+                  max="1500"
+                  value={styleSettings.chartWidth}
+                  onChange={(e) => throttledSetters.setChartWidth(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setChartWidth(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Chart Height */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Height: {styleSettings.chartHeight}px
+                </label>
+                <input
+                  type="range"
+                  min="200"
+                  max="1000"
+                  value={styleSettings.chartHeight}
+                  onChange={(e) => throttledSetters.setChartHeight(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setChartHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Category Spacing */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category Spacing: {styleSettings.stageGap}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={styleSettings.stageGap}
+                  onChange={(e) => styleSettings.setStageGap(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setStageGap(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Bar Width (only for Bar Chart in grouped mode) */}
+              {isBarChart && styleSettings.barMode === 'grouped' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bar Width: {styleSettings.barWidth}%
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="150"
+                    value={styleSettings.barWidth}
+                    onChange={(e) => styleSettings.setBarWidth(Number(e.target.value))}
+                    onInput={(e) => styleSettings.setBarWidth(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
+          {/* 3. COLORS & STYLING */}
+          <CollapsibleSection
+            title="Colors & Styling"
+            isExpanded={expandedSections.colorsStyling}
+            onToggle={() => toggleSection('colorsStyling')}
+          >
+            <div className="space-y-2">
+              {/* Color Strategy Selection */}
+              {/* For bar charts, show palette options when there are multiple periods */}
+              {((chartType === 'bar' && chartData.periodNames && chartData.periodNames.length > 1) || chartData.isComparisonMode) ? (
+                <>
+                  {/* Comparison Mode - Color Strategy */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Color Strategy
+                    </label>
+                    <select
+                      value={styleSettings.colorMode}
+                      onChange={(e) => {
+                        styleSettings.setColorMode(e.target.value);
+                        // When switching to custom mode, set palette to 'user' to use custom colors
+                        if (e.target.value === 'custom') {
+                          styleSettings.setComparisonPalette('user');
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value="category">Category (Different color per series)</option>
+                      <option value="custom">Custom (Manual colors)</option>
+                    </select>
+                  </div>
+
+                  {/* Category Palette */}
+                  {styleSettings.colorMode === 'category' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Palette
+                      </label>
+                      <select
+                        value={styleSettings.comparisonPalette}
+                        onChange={(e) => styleSettings.setComparisonPalette(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                      >
+                        {Object.entries(comparisonPalettes).map(([key, palette]) => (
+                          <option key={key} value={key}>
+                            {palette.name}
+                          </option>
+                        ))}
+                      </select>
+                      {styleSettings.comparisonPalette !== 'user' && (
+                        <div className="mt-2">
+                          <div className="flex flex-wrap gap-2">
+                            {comparisonPalettes[styleSettings.comparisonPalette].colors.slice(0, 8).map((color, index) => (
+                              <div
+                                key={index}
+                                className="w-10 h-10 rounded border-2 border-gray-300"
+                                style={{ backgroundColor: color }}
+                                title={color}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Custom Colors */}
+                  {(styleSettings.colorMode === 'custom' || (styleSettings.colorMode === 'category' && styleSettings.comparisonPalette === 'user')) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Custom Colors (up to 8)
+                      </label>
+                      <div className="grid grid-cols-4 gap-3">
+                        {styleSettings.userCustomColors.map((color, index) => (
+                          <div key={index} className="flex flex-col gap-1">
+                            <input
+                              type="color"
+                              value={color}
+                              onChange={(e) => {
+                                const newColors = [...styleSettings.userCustomColors];
+                                newColors[index] = e.target.value;
+                                styleSettings.setUserCustomColors(newColors);
+                              }}
+                              className="w-full h-12 rounded-lg cursor-pointer border-2 border-gray-300"
+                            />
+                            <input
+                              type="text"
+                              value={color}
+                              onChange={(e) => {
+                                const newColors = [...styleSettings.userCustomColors];
+                                newColors[index] = e.target.value;
+                                styleSettings.setUserCustomColors(newColors);
+                              }}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 font-mono"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Single Color Mode */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bar Color
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="color"
+                        value={styleSettings.barColor}
+                        onChange={(e) => styleSettings.setBarColor(e.target.value)}
+                        className="w-16 h-10 rounded-lg cursor-pointer border border-gray-300"
+                      />
+                      <input
+                        type="text"
+                        value={styleSettings.barColor}
+                        onChange={(e) => styleSettings.setBarColor(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Palette Selection for Single Color Mode */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Palette
+                    </label>
+                    <select
+                      value={styleSettings.comparisonPalette}
+                      onChange={(e) => {
+                        styleSettings.setComparisonPalette(e.target.value);
+                        // Set bar color to first color in selected palette
+                        const palette = comparisonPalettes[e.target.value];
+                        if (palette && palette.colors && palette.colors.length > 0) {
+                          styleSettings.setBarColor(palette.colors[0]);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      {Object.entries(comparisonPalettes)
+                        .filter(([key]) => key !== 'user')
+                        .map(([key, palette]) => (
+                          <option key={key} value={key}>
+                            {palette.name}
+                          </option>
+                        ))}
+                    </select>
+                    {styleSettings.comparisonPalette !== 'user' && (
+                      <div className="mt-2">
+                        <div className="flex flex-wrap gap-2">
+                          {comparisonPalettes[styleSettings.comparisonPalette].colors.slice(0, 8).map((color, index) => (
+                            <div
+                              key={index}
+                              className="w-10 h-10 rounded border-2 border-gray-300"
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Color Presets
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {colorPresets.map((preset) => (
+                        <button
+                          key={preset.name}
+                          onClick={() => styleSettings.setBarColor(preset.color)}
+                          className="group relative"
+                          title={preset.name}
+                        >
+                          <div
+                            className="w-full h-10 rounded border-2 border-gray-300 hover:border-cyan-500 transition-colors"
+                            style={{ backgroundColor: preset.color }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-xs font-medium text-white bg-black bg-opacity-75 px-2 py-1 rounded">
+                              {preset.name}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                      Color Transition: {styleSettings.colorTransition}%
+                      <InfoTooltip text="Controls the gradient intensity from dark to light across periods" />
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={styleSettings.colorTransition}
+                      onChange={(e) => throttledSetters.setColorTransition(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </CollapsibleSection>
+          {/* 4. TYPOGRAPHY */}
+          <CollapsibleSection
+            title="Typography"
+            isExpanded={expandedSections.typography}
+            onToggle={() => toggleSection('typography')}
+          >
+            <div className="space-y-2">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={styleSettings.title}
+                  onChange={(e) => styleSettings.setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              {/* Subtitle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subtitle
+                </label>
+                <input
+                  type="text"
+                  value={styleSettings.subtitle}
+                  onChange={(e) => styleSettings.setSubtitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              {/* Title Alignment */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title Alignment
+                </label>
+                <select
+                  value={styleSettings.titleAlignment}
+                  onChange={(e) => styleSettings.setTitleAlignment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                </select>
+              </div>
+
+              {/* Font Family */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Font Family
+                </label>
+                <select
+                  value={styleSettings.fontFamily}
+                  onChange={(e) => styleSettings.setFontFamily(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <optgroup label="Sans-Serif">
+                    <option value="Inter">Inter</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                  </optgroup>
+                  <optgroup label="Condensed">
+                    <option value="Roboto Condensed">Roboto Condensed</option>
+                    <option value="Open Sans Condensed">Open Sans Condensed</option>
+                    <option value="Economica">Economica</option>
+                  </optgroup>
+                  <optgroup label="Serif">
+                    <option value="Merriweather">Merriweather</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Lora">Lora</option>
+                    <option value="PT Serif">PT Serif</option>
+                    <option value="Newsreader">Newsreader</option>
+                    <option value="Georgia">Georgia</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* Title Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title Font Size: {styleSettings.titleFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="16"
+                  max="48"
+                  value={styleSettings.titleFontSize}
+                  onChange={(e) => styleSettings.setTitleFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Subtitle Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subtitle Font Size: {styleSettings.subtitleFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="12"
+                  max="32"
+                  value={styleSettings.subtitleFontSize}
+                  onChange={(e) => styleSettings.setSubtitleFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* X-Axis Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  X-Axis Font Size: {styleSettings.xAxisFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="12"
+                  max="32"
+                  value={styleSettings.xAxisFontSize}
+                  onChange={(e) => styleSettings.setXAxisFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Y-Axis Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Y-Axis Font Size: {styleSettings.yAxisFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="12"
+                  max="32"
+                  value={styleSettings.yAxisFontSize}
+                  onChange={(e) => styleSettings.setYAxisFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Metric Label Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Metric Label Font Size: {styleSettings.metricLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="24"
+                  value={styleSettings.metricLabelFontSize}
+                  onChange={(e) => styleSettings.setMetricLabelFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Period Label Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Period Label Font Size: {styleSettings.periodLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="24"
+                  value={styleSettings.periodLabelFontSize}
+                  onChange={(e) => styleSettings.setPeriodLabelFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Legend Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Legend Font Size: {styleSettings.legendFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="8"
+                  max="20"
+                  value={styleSettings.legendFontSize}
+                  onChange={(e) => styleSettings.setLegendFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+          {/* 5. LABELS */}
+          <CollapsibleSection
+            title="Labels"
+            isExpanded={expandedSections.dataLabels}
+            onToggle={() => toggleSection('dataLabels')}
+          >
+            <div className="space-y-2">
+              {/* Metric Labels Toggle */}
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showMetricLabels}
+                    onChange={(e) => styleSettings.setShowMetricLabels(e.target.checked)}
+                    className="w-4 h-4 text-cyan-600 rounded"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    Metric Labels
+                    <InfoTooltip text="Toggle to show or hide metric values (e.g., &quot;1250&quot;)" />
+                  </span>
+                </label>
+              </div>
+
+              {/* Metric Label Position - appears when Metric Labels is ON */}
+              {styleSettings.showMetricLabels && (
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    Metric Label Position
+                    <InfoTooltip text="Position metric labels at the end of bars (inside or outside)" />
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => styleSettings.setMetricLabelPosition('inside')}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        styleSettings.metricLabelPosition === 'inside'
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Inside
+                    </button>
+                    <button
+                      onClick={() => styleSettings.setMetricLabelPosition('outside')}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        styleSettings.metricLabelPosition === 'outside'
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Outside
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Period Labels Toggle */}
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showPeriodLabels}
+                    onChange={(e) => styleSettings.setShowPeriodLabels(e.target.checked)}
+                    className="w-4 h-4 text-cyan-600 rounded"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    Period Labels
+                    <InfoTooltip text="Toggle to show or hide period names (e.g., &quot;Jan&quot;, &quot;Feb&quot;)" />
+                  </span>
+                </label>
+              </div>
+
+              {(styleSettings.showMetricLabels || styleSettings.showPeriodLabels) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Label Mode
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => styleSettings.setLabelMode('legend')}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          styleSettings.labelMode === 'legend'
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        Legend
+                      </button>
+                      <button
+                        onClick={() => styleSettings.setLabelMode('direct')}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          styleSettings.labelMode === 'direct'
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        Direct Labels
+                      </button>
+                    </div>
+                  </div>
+
+              {/* Legend Placement (shown when labelMode is 'legend') */}
+              {styleSettings.labelMode === 'legend' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Legend Placement
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => styleSettings.setLegendPosition('above')}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        styleSettings.legendPosition === 'above'
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Top
+                    </button>
+                    <button
+                      onClick={() => styleSettings.setLegendPosition('below')}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        styleSettings.legendPosition === 'below'
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Bottom
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {styleSettings.labelMode === 'direct' && styleSettings.barMode === 'grouped' && (
+                <>
+                  {/* Period Label Display (First Group/All Groups) */}
+                  {styleSettings.showPeriodLabels && (
+                    <div>
+                      <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                        Period Label Display
+                        <InfoTooltip text="Show period labels in first group only or all groups" />
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => styleSettings.setPeriodLabelDisplay('first')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            styleSettings.periodLabelDisplay === 'first'
+                              ? 'bg-cyan-600 text-white shadow-md'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          First Group
+                        </button>
+                        <button
+                          onClick={() => styleSettings.setPeriodLabelDisplay('all')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            styleSettings.periodLabelDisplay === 'all'
+                              ? 'bg-cyan-600 text-white shadow-md'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          All Groups
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+                </>
+              )}
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.compactNumbers !== undefined ? styleSettings.compactNumbers : true}
+                  onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Compact Numbers (1K, 1M, 1B)</span>
+              </label>
+            </div>
+          </CollapsibleSection>
+          {/* 6. CHART STRUCTURE */}
+          <CollapsibleSection
+            title="Chart Structure"
+            isExpanded={expandedSections.chartStructure}
+            onToggle={() => toggleSection('chartStructure')}
+          >
+            <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Orientation
                 </label>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => styleSettings.setOrientation('vertical')}
+                    onClick={() => {
+                      styleSettings.setOrientation('vertical');
+                      clearEmphasis();
+                    }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.orientation === 'vertical'
                         ? 'bg-cyan-600 text-white shadow-md'
@@ -1257,7 +3582,10 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                     Vertical
                   </button>
                   <button
-                    onClick={() => styleSettings.setOrientation('horizontal')}
+                    onClick={() => {
+                      styleSettings.setOrientation('horizontal');
+                      clearEmphasis();
+                    }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.orientation === 'horizontal'
                         ? 'bg-cyan-600 text-white shadow-md'
@@ -1271,12 +3599,15 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Bar Display Mode
+                  Display Mode
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex gap-2">
                   <button
-                    onClick={() => styleSettings.setBarMode('grouped')}
-                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                    onClick={() => {
+                      styleSettings.setBarMode('grouped');
+                      clearEmphasis();
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.barMode === 'grouped'
                         ? 'bg-cyan-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1285,8 +3616,11 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                     Grouped
                   </button>
                   <button
-                    onClick={() => styleSettings.setBarMode('stacked')}
-                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
+                    onClick={() => {
+                      styleSettings.setBarMode('stacked');
+                      clearEmphasis();
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-lg font-medium text-sm transition-all ${
                       styleSettings.barMode === 'stacked'
                         ? 'bg-cyan-600 text-white shadow-md'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1294,93 +3628,65 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   >
                     Stacked
                   </button>
-                  <button
-                    onClick={() => styleSettings.setBarMode('grouped-stacked')}
-                    className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
-                      styleSettings.barMode === 'grouped-stacked'
-                        ? 'bg-cyan-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Grouped+Stacked
-                  </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
                   {styleSettings.barMode === 'grouped'
                     ? 'Display bars side by side for each category'
-                    : styleSettings.barMode === 'stacked'
-                    ? 'Stack bars on top of each other for cumulative values'
-                    : 'Group categories with stacked bars within each time period'}
+                    : 'Stack bars on top of each other for cumulative values'}
                 </p>
               </div>
-            </div>
-          </CollapsibleSection>
 
-          {/* Bar Emphasis Section for Bar Chart */}
-          <CollapsibleSection
-            title="Bar Emphasis"
-            isExpanded={expandedSections.barEmphasis}
-            onToggle={() => toggleSection('barEmphasis')}
-          >
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Click on bars in the chart to emphasize them (up to 3 bars). Click an emphasized bar to clear all selections.
-              </p>
+              {/* Total Labels - Only visible in Stacked mode */}
+              {styleSettings.barMode === 'stacked' && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="showTotalLabels"
+                      checked={styleSettings.showTotalLabels}
+                      onChange={(e) => styleSettings.setShowTotalLabels(e.target.checked)}
+                      className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500"
+                    />
+                    <label htmlFor="showTotalLabels" className="text-sm font-medium text-gray-700">
+                      Show Total Labels
+                    </label>
+                  </div>
 
-              {styleSettings.emphasizedBars && styleSettings.emphasizedBars.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">
-                    Selected Bars ({styleSettings.emphasizedBars.length}/3):
-                  </div>
-                  <div className="space-y-1">
-                    {styleSettings.emphasizedBars.map((barId, index) => (
-                      <div
-                        key={barId}
-                        className="flex items-center gap-2 px-3 py-2 bg-cyan-50 rounded-lg border border-cyan-200"
-                      >
-                        <span className="flex-1 text-sm text-gray-700 font-medium">
-                          {barId}
-                        </span>
-                        <button
-                          onClick={() => {
-                            const newEmphasized = styleSettings.emphasizedBars.filter(id => id !== barId);
-                            styleSettings.setEmphasizedBars(newEmphasized);
-                          }}
-                          className="text-cyan-600 hover:text-cyan-800 text-sm font-medium"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => styleSettings.setEmphasizedBars([])}
-                    className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm transition-colors"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500 italic">
-                  No bars selected. Click on bars in the chart to emphasize them.
-                </div>
+                  {styleSettings.showTotalLabels && (
+                    <div className="flex items-center gap-2 ml-6">
+                      <input
+                        type="checkbox"
+                        id="boldTotal"
+                        checked={styleSettings.boldTotal}
+                        onChange={(e) => styleSettings.setBoldTotal(e.target.checked)}
+                        className="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500"
+                      />
+                      <label htmlFor="boldTotal" className="text-sm font-medium text-gray-700">
+                        Bold Total
+                      </label>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </CollapsibleSection>
-
-          {/* Axis Options Section */}
+          {/* 7. AXES & GRIDLINES */}
           <CollapsibleSection
-            title="Axis Options"
-            isExpanded={expandedSections.axisOptions}
-            onToggle={() => toggleSection('axisOptions')}
+            title="Axes & Gridlines"
+            isExpanded={expandedSections.axesGridlines}
+            onToggle={() => toggleSection('axesGridlines')}
           >
-            <div className="space-y-4">
+            <div className="space-y-2">
               {/* Bounds */}
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-800">Bounds</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bounds
+                  </label>
+                </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Minimum
                   </label>
                   <input
@@ -1406,7 +3712,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Maximum
                   </label>
                   <input
@@ -1434,10 +3740,14 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
 
               {/* Units */}
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-800">Units</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Units
+                  </label>
+                </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Major
                   </label>
                   <input
@@ -1463,7 +3773,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Minor
                   </label>
                   <input
@@ -1487,10 +3797,14 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
 
               {/* Tick Marks */}
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-800">Tick Marks</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tick Marks
+                  </label>
+                </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Major Type
                   </label>
                   <select
@@ -1506,7 +3820,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Minor Type
                   </label>
                   <select
@@ -1524,10 +3838,14 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
 
               {/* Gridlines */}
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-800">Gridlines</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gridlines
+                  </label>
+                </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Horizontal
                   </label>
                   <button
@@ -1543,7 +3861,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
+                  <label className="w-24 text-sm font-medium text-gray-700">
                     Vertical
                   </label>
                   <button
@@ -1561,11 +3879,15 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
 
               {/* Compact Numbers */}
               <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-gray-800">Compact Numbers</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number Format
+                  </label>
+                </div>
 
                 <div className="flex items-center gap-2">
-                  <label className="flex-1 text-sm font-medium text-gray-700">
-                    Display axis values in compact format (e.g., 1.5K instead of 1500)
+                  <label className="flex-1 text-sm text-gray-700">
+                    Compact axis values (1.5K vs 1500)
                   </label>
                   <button
                     onClick={() => styleSettings.setCompactAxisNumbers(!styleSettings.compactAxisNumbers)}
@@ -1579,18 +3901,415 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </button>
                 </div>
               </div>
+
+              {/* X-Axis Label Rotation */}
+              <div className="space-y-3">
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    X-Axis Label Rotation
+                    <InfoTooltip text="Rotate category labels (0° = horizontal, 90° = vertical)" />
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 text-sm text-gray-700">
+                    Rotation Angle
+                  </label>
+                  <span className="text-sm text-gray-600 w-12 text-right">
+                    {styleSettings.xAxisLabelRotation}°
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="90"
+                  value={styleSettings.xAxisLabelRotation}
+                  onChange={(e) => styleSettings.setXAxisLabelRotation(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Axis Label */}
+              <div className="space-y-3">
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    Axis Label
+                    <InfoTooltip text="Optional label at the end of the value axis" />
+                  </label>
+                </div>
+
+                <input
+                  type="text"
+                  value={styleSettings.axisLabel}
+                  onChange={(e) => styleSettings.setAxisLabel(e.target.value)}
+                  placeholder="e.g., Revenue ($)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              {/* Number Styling (Values) */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number Styling (Values)
+                  </label>
+                </div>
+
+                {/* Value Format */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    Value Format
+                    <InfoTooltip text="Percentage multiplies values by 100 and adds % symbol" />
+                  </label>
+                  <select
+                    value={styleSettings.valueFormat}
+                    onChange={(e) => styleSettings.setValueFormat(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  >
+                    <option value="number">Number</option>
+                    <option value="percentage">Percentage</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Prefix */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={styleSettings.valuePrefix}
+                      onChange={(e) => styleSettings.setValuePrefix(e.target.value)}
+                      placeholder="$"
+                      maxLength={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    />
+                  </div>
+
+                  {/* Suffix */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Suffix
+                    </label>
+                    <input
+                      type="text"
+                      value={styleSettings.valueSuffix}
+                      onChange={(e) => styleSettings.setValueSuffix(e.target.value)}
+                      placeholder="%"
+                      maxLength={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    />
+                  </div>
+
+                  {/* Decimal Places */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Decimal places
+                    </label>
+                    <input
+                      type="number"
+                      value={styleSettings.valueDecimalPlaces}
+                      onChange={(e) => styleSettings.setValueDecimalPlaces(Math.max(0, Math.min(5, parseInt(e.target.value) || 0)))}
+                      min="0"
+                      max="5"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 8. EMPHASIS */}
+          <CollapsibleSection
+            title="Emphasis"
+            isExpanded={expandedSections.emphasis}
+            onToggle={() => toggleSection('emphasis')}
+          >
+              <div className="space-y-2">
+                {/* Percent Change Toggle */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Percent Change
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => styleSettings.setPercentChangeEnabled(false)}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        !styleSettings.percentChangeEnabled
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Off
+                    </button>
+                    <button
+                      onClick={() => styleSettings.setPercentChangeEnabled(true)}
+                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                        styleSettings.percentChangeEnabled
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      On
+                    </button>
+                  </div>
+                </div>
+
+                {/* Label Format (only shown when Percent Change is enabled) */}
+                {styleSettings.percentChangeEnabled && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Label Format
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => styleSettings.setPercentChangeLabelFormat('percent')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            styleSettings.percentChangeLabelFormat === 'percent'
+                              ? 'bg-cyan-600 text-white shadow-md'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Percent Only
+                        </button>
+                        <button
+                          onClick={() => styleSettings.setPercentChangeLabelFormat('percent-volume')}
+                          className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                            styleSettings.percentChangeLabelFormat === 'percent-volume'
+                              ? 'bg-cyan-600 text-white shadow-md'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          Percent / Volume
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bracket Distance Slider */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Bracket Distance: {styleSettings.percentChangeBracketDistance}%
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={styleSettings.percentChangeBracketDistance}
+                        onChange={(e) => styleSettings.setPercentChangeBracketDistance(Number(e.target.value))}
+                        onInput={(e) => styleSettings.setPercentChangeBracketDistance(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Clear Emphasis Button */}
+                    <div>
+                      <button
+                        onClick={clearEmphasis}
+                        className="w-full px-4 py-2 rounded-lg font-medium text-sm transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                      >
+                        Clear Emphasis
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </CollapsibleSection>
+
+          {/* 10. WATERMARK */}
+          <CollapsibleSection
+            title="Watermark"
+            isExpanded={expandedSections.exportBranding}
+            onToggle={() => toggleSection('exportBranding')}
+          >
+            <div className="space-y-2">
+              {/* Watermark Toggle */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Watermark
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => styleSettings.setShowWatermark(true)}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.showWatermark
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Show
+                  </button>
+                  <button
+                    onClick={() => styleSettings.setShowWatermark(false)}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      !styleSettings.showWatermark
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Hide
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Show or hide the Find&Tell watermark on exported charts
+                </p>
+              </div>
+
+              {/* Watermark Text (conditional) */}
+              {styleSettings.showWatermark && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Watermark Text
+                  </label>
+                  <input
+                    type="text"
+                    value={styleSettings.watermarkText}
+                    onChange={(e) => styleSettings.setWatermarkText(e.target.value)}
+                    placeholder="Find&Tell"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  />
+                </div>
+              )}
             </div>
           </CollapsibleSection>
         </>
       )}
 
-      {/* Typography Section */}
-      <CollapsibleSection
-        title="Typography"
-        isExpanded={expandedSections.typography}
-        onToggle={() => toggleSection('typography')}
-      >
-        <div className="space-y-4">
+      {/* 2. CANVAS & LAYOUT - For Funnel Chart only (Bar, Slope, and Line Charts have their own) */}
+      {!isBarChart && !isSlopeChart && !isLineChart && (
+        <CollapsibleSection
+          title="Canvas & Layout"
+          isExpanded={expandedSections.layout}
+          onToggle={() => toggleSection('layout')}
+        >
+        <div className="space-y-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Aspect Ratio
+            </label>
+            <select
+              value={styleSettings.aspectRatio}
+              onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="16:9">16:9 (Widescreen)</option>
+              <option value="4:3">4:3 (Standard)</option>
+              <option value="1:1">1:1 (Square)</option>
+              <option value="3:4">3:4 (Portrait)</option>
+              <option value="9:16">9:16 (Mobile)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Canvas Width: {styleSettings.canvasWidth}px
+            </label>
+            <input
+              type="range"
+              min="600"
+              max="2000"
+              value={styleSettings.canvasWidth}
+              onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Canvas Height: {styleSettings.canvasHeight}px
+            </label>
+            <input
+              type="range"
+              min="400"
+              max="2000"
+              value={styleSettings.canvasHeight}
+              onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
+              className="w-full"
+            />
+          </div>
+
+          {isBarChart && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Width: {styleSettings.chartWidth}px
+                </label>
+                <input
+                  type="range"
+                  min="200"
+                  max="1500"
+                  value={styleSettings.chartWidth}
+                  onChange={(e) => throttledSetters.setChartWidth(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setChartWidth(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chart Height: {styleSettings.chartHeight}px
+                </label>
+                <input
+                  type="range"
+                  min="200"
+                  max="1000"
+                  value={styleSettings.chartHeight}
+                  onChange={(e) => throttledSetters.setChartHeight(Number(e.target.value))}
+                  onInput={(e) => styleSettings.setChartHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </>
+          )}
+
+          {!isSlopeChart && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {isBarChart ? 'Category Spacing' : 'Stage Gap'}: {styleSettings.stageGap}{isBarChart ? '' : 'px'}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max={isBarChart ? 100 : 50}
+                value={styleSettings.stageGap}
+                onChange={(e) => styleSettings.setStageGap(Number(e.target.value))}
+                onInput={(e) => styleSettings.setStageGap(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+
+          {chartType === 'funnel' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Stage Label Position
+              </label>
+              <select
+                value={styleSettings.stageLabelPosition}
+                onChange={(e) => styleSettings.setStageLabelPosition(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+      )}
+
+      {/* 4. TYPOGRAPHY - For Funnel Chart only (Bar, Slope, and Line Charts have their own) */}
+      {!isBarChart && !isSlopeChart && !isLineChart && (
+        <CollapsibleSection
+          title="Typography"
+          isExpanded={expandedSections.typography}
+          onToggle={() => toggleSection('typography')}
+        >
+        <div className="space-y-2">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Title
@@ -1853,15 +4572,16 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
           )}
         </div>
       </CollapsibleSection>
+      )}
 
-      {/* Colors Section - For Funnel Chart and Bar Chart */}
-      {!isSlopeChart && (
+      {/* 3. COLORS & STYLING - For Funnel Chart only (Bar, Slope, and Line Charts have their own) */}
+      {!isSlopeChart && !isBarChart && !isLineChart && (
         <CollapsibleSection
-          title="Colors"
+          title="Colors & Styling"
           isExpanded={expandedSections.colors}
           onToggle={() => toggleSection('colors')}
         >
-          <div className="space-y-4">
+          <div className="space-y-2">
           {(chartData.isComparisonMode || isBarChart) ? (
             <>
               {/* Comparison Mode Colors */}
@@ -1885,7 +4605,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               {/* Custom Color Swatches for Comparison */}
               {styleSettings.comparisonPalette === 'user' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Custom Colors (up to 8)
                   </label>
                   <div className="grid grid-cols-4 gap-3">
@@ -1959,7 +4679,7 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Color Presets
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1985,20 +4705,18 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
                   Color Transition: {styleSettings.colorTransition}%
+                  <InfoTooltip text="Controls the gradient intensity from dark to light across periods" />
                 </label>
                 <input
                   type="range"
                   min="0"
                   max="100"
                   value={styleSettings.colorTransition}
-                  onChange={(e) => styleSettings.setColorTransition(Number(e.target.value))}
+                  onChange={(e) => throttledSetters.setColorTransition(Number(e.target.value))}
                   className="w-full"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Controls the gradient intensity from dark to light across periods
-                </p>
               </div>
             </>
           )}
@@ -2006,389 +4724,1731 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
         </CollapsibleSection>
       )}
 
-      {/* Background Section - Only for Funnel Chart */}
-      {!isSlopeChart && (
+      {/* 6. CHART TYPE - Only for Funnel Chart */}
+      {!isSlopeChart && !isBarChart && !isLineChart && (
         <CollapsibleSection
-          title="Background"
-          isExpanded={expandedSections.background}
-          onToggle={() => toggleSection('background')}
+          title="Chart Type"
+          isExpanded={expandedSections.chartType}
+          onToggle={() => toggleSection('chartType')}
         >
-          <div className="space-y-4">
+          <div className="space-y-3">
+          {/* Data Mode Toggle */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Background Opacity: {styleSettings.backgroundOpacity}%
+              Data Mode
             </label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={styleSettings.backgroundOpacity}
-              onChange={(e) => styleSettings.setBackgroundOpacity(Number(e.target.value))}
-              className="w-full"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Controls the grey background fill behind bars
+            <div className="flex gap-2">
+              <button
+                onClick={() => chartData.isComparisonMode && chartData.toggleComparisonMode()}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  !chartData.isComparisonMode
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Time Series
+              </button>
+              <button
+                onClick={() => !chartData.isComparisonMode && chartData.toggleComparisonMode()}
+                className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                  chartData.isComparisonMode
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Comparison
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {chartData.isComparisonMode
+                ? 'Multiple colors for comparing different groups/periods'
+                : 'Monochrome gradient showing progression over time'}
             </p>
           </div>
-          </div>
-        </CollapsibleSection>
-      )}
 
-      {/* Layout Section */}
-      <CollapsibleSection
-        title="Layout"
-        isExpanded={expandedSections.layout}
-        onToggle={() => toggleSection('layout')}
-      >
-        <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Aspect Ratio
+              Orientation
             </label>
             <select
-              value={styleSettings.aspectRatio}
-              onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
+              value={styleSettings.orientation}
+              onChange={(e) => {
+                styleSettings.setOrientation(e.target.value);
+                clearEmphasis();
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
-              <option value="16:9">16:9 (Widescreen)</option>
-              <option value="4:3">4:3 (Standard)</option>
-              <option value="1:1">1:1 (Square)</option>
-              <option value="3:4">3:4 (Portrait)</option>
-              <option value="9:16">9:16 (Mobile)</option>
+              <option value="vertical">Vertical</option>
+              <option value="horizontal">Horizontal</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Canvas Width: {styleSettings.canvasWidth}px
+              Emphasis Mode
             </label>
-            <input
-              type="range"
-              min="600"
-              max="2000"
-              value={styleSettings.canvasWidth}
-              onChange={(e) => styleSettings.setCanvasWidth(Number(e.target.value))}
-              className="w-full"
-            />
+            <select
+              value={styleSettings.emphasis}
+              onChange={(e) => styleSettings.setEmphasis(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              <option value="throughput">Throughput (Volume Flow)</option>
+              <option value="fallout">Fallout (Drop-offs)</option>
+            </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Canvas Height: {styleSettings.canvasHeight}px
-            </label>
-            <input
-              type="range"
-              min="400"
-              max="2000"
-              value={styleSettings.canvasHeight}
-              onChange={(e) => styleSettings.setCanvasHeight(Number(e.target.value))}
-              className="w-full"
-            />
           </div>
+        </CollapsibleSection>
+      )}
 
-          {isBarChart && (
-            <>
+      {/* Line Chart Specific Sections */}
+      {isLineChart && (
+        <>
+          {/* 1. THEME */}
+          <CollapsibleSection
+            title="Theme"
+            isExpanded={expandedSections.theme}
+            onToggle={() => toggleSection('theme')}
+          >
+            <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Chart Width: {styleSettings.chartWidth}px
-                </label>
-                <input
-                  type="range"
-                  min="200"
-                  max="1500"
-                  value={styleSettings.chartWidth}
-                  onChange={(e) => styleSettings.setChartWidth(Number(e.target.value))}
-                  onInput={(e) => styleSettings.setChartWidth(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Chart Height: {styleSettings.chartHeight}px
-                </label>
-                <input
-                  type="range"
-                  min="200"
-                  max="1000"
-                  value={styleSettings.chartHeight}
-                  onChange={(e) => styleSettings.setChartHeight(Number(e.target.value))}
-                  onInput={(e) => styleSettings.setChartHeight(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </>
-          )}
-
-          {!isSlopeChart && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {isBarChart ? 'Category Spacing' : 'Stage Gap'}: {styleSettings.stageGap}{isBarChart ? '' : 'px'}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max={isBarChart ? 100 : 50}
-                value={styleSettings.stageGap}
-                onChange={(e) => styleSettings.setStageGap(Number(e.target.value))}
-                onInput={(e) => styleSettings.setStageGap(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          )}
-
-          {!isSlopeChart && !isBarChart && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Stage Label Position
-              </label>
-              <select
-                value={styleSettings.stageLabelPosition}
-                onChange={(e) => styleSettings.setStageLabelPosition(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              >
-                <option value="top">Top</option>
-                <option value="bottom">Bottom</option>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-              </select>
-            </div>
-          )}
-        </div>
-      </CollapsibleSection>
-
-      {/* Display Options Section - Only for Funnel Chart */}
-      {!isSlopeChart && (
-        <CollapsibleSection
-          title="Display Options"
-          isExpanded={expandedSections.displayOptions}
-          onToggle={() => toggleSection('displayOptions')}
-        >
-          <div className="space-y-4">
-          {isBarChart ? (
-            <>
-              {/* Bar Chart Display Options */}
-              {/* Label Mode Toggle */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Legend Labels
+                  Chart Background
                 </label>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => styleSettings.setLabelMode('legend')}
+                    onClick={() => {
+                    styleSettings.setDarkMode(false);
+                    styleSettings.setBackgroundColor('#ffffff');
+                  }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                      styleSettings.labelMode === 'legend'
-                        ? 'bg-cyan-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      !styleSettings.darkMode
+                        ? 'bg-white text-gray-900 border-2 border-gray-400 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
                     }`}
                   >
-                    Legend
+                    Light Mode
                   </button>
                   <button
-                    onClick={() => styleSettings.setLabelMode('direct')}
+                    onClick={() => {
+                    styleSettings.setDarkMode(true);
+                    styleSettings.setBackgroundColor('#1f2937');
+                  }}
                     className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                      styleSettings.labelMode === 'direct'
-                        ? 'bg-cyan-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      styleSettings.darkMode
+                        ? 'bg-gray-800 text-white border-2 border-gray-600 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
                     }`}
                   >
-                    Direct Labels
-                  </button>
-                  <button
-                    onClick={() => styleSettings.setLabelMode('off')}
-                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                      styleSettings.labelMode === 'off'
-                        ? 'bg-cyan-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Off
+                    Dark Mode
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {styleSettings.labelMode === 'legend'
-                    ? 'Show a separate legend above or below the chart'
-                    : styleSettings.labelMode === 'direct'
-                    ? 'Display labels directly on or near the bars'
-                    : 'No labels shown (labels appear on emphasized bars only)'}
-                </p>
               </div>
 
-              {/* Legend Position (only shown when labelMode is 'legend') */}
-              {styleSettings.labelMode === 'legend' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Legend Position
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => styleSettings.setLegendPosition('above')}
-                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        styleSettings.legendPosition === 'above'
-                          ? 'bg-cyan-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Above
-                    </button>
-                    <button
-                      onClick={() => styleSettings.setLegendPosition('below')}
-                      className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        styleSettings.legendPosition === 'below'
-                          ? 'bg-cyan-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Below
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Direct Label Content (only shown when labelMode is 'direct') */}
-              {styleSettings.labelMode === 'direct' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Label Content
-                  </label>
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => styleSettings.setDirectLabelContent('metrics')}
-                      className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        styleSettings.directLabelContent === 'metrics'
-                          ? 'bg-cyan-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Metrics Only
-                    </button>
-                    <button
-                      onClick={() => styleSettings.setDirectLabelContent('metrics-category')}
-                      className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        styleSettings.directLabelContent === 'metrics-category'
-                          ? 'bg-cyan-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Metric & Period
-                    </button>
-                    <button
-                      onClick={() => styleSettings.setDirectLabelContent('category')}
-                      className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${
-                        styleSettings.directLabelContent === 'category'
-                          ? 'bg-cyan-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Category Only
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {styleSettings.directLabelContent === 'metrics' && 'Show only metric values (e.g., "1250")'}
-                    {styleSettings.directLabelContent === 'metrics-category' && 'Show metric value and period stacked (e.g., "12.5K" above "Jan")'}
-                    {styleSettings.directLabelContent === 'category' && 'Show only category names (e.g., "Shirts")'}
-                  </p>
-                </div>
-              )}
-
-              {/* Compact Numbers */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={styleSettings.compactNumbers}
-                  onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
-                  className="w-4 h-4 text-cyan-600 rounded"
-                />
-                <span className="text-sm text-gray-700">Compact Numbers (1K, 1M)</span>
-              </label>
-            </>
-          ) : (
-            <>
-              {/* Funnel Chart Display Options */}
+              {/* Background Color */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Metric Emphasis
+                  Background Color
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={styleSettings.backgroundColor}
+                    onChange={(e) => styleSettings.setBackgroundColor(e.target.value)}
+                    className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={styleSettings.backgroundColor}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                        styleSettings.setBackgroundColor(value);
+                      }
+                    }}
+                    placeholder="#ffffff"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Background Opacity */}
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Background Opacity: {styleSettings.backgroundOpacity}%
+                  <InfoTooltip text="Adjusts the transparency of the chart background" />
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={styleSettings.backgroundOpacity}
+                  onChange={(e) => throttledSetters.setBackgroundOpacity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+
+
+          {/* 2. CANVAS & LAYOUT */}
+          <CollapsibleSection
+            title="Canvas & Layout"
+            isExpanded={expandedSections.layout}
+            onToggle={() => toggleSection('layout')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Aspect Ratio
                 </label>
                 <select
-                  value={styleSettings.metricEmphasis}
-                  onChange={(e) => styleSettings.setMetricEmphasis(e.target.value)}
+                  value={styleSettings.aspectRatio}
+                  onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
-                  <option value="volume">Volume (show numbers)</option>
-                  <option value="percentage">Percentage (show %)</option>
+                  <option value="16:9">16:9 (Widescreen)</option>
+                  <option value="4:3">4:3 (Standard)</option>
+                  <option value="1:1">1:1 (Square)</option>
+                  <option value="3:4">3:4 (Portrait)</option>
+                  <option value="9:16">9:16 (Mobile)</option>
                 </select>
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canvas Width: {styleSettings.canvasWidth}px
+                </label>
                 <input
-                  type="checkbox"
-                  checked={styleSettings.normalizeToHundred}
-                  onChange={(e) => styleSettings.setNormalizeToHundred(e.target.checked)}
-                  className="w-4 h-4 text-cyan-600 rounded"
+                  type="range"
+                  min="600"
+                  max="2000"
+                  value={styleSettings.canvasWidth}
+                  onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
+                  className="w-full"
                 />
-                <span className="text-sm text-gray-700">Normalize First Stage to 100%</span>
-              </label>
+              </div>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Canvas Height: {styleSettings.canvasHeight}px
+                </label>
                 <input
-                  type="checkbox"
-                  checked={styleSettings.compactNumbers}
-                  onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
-                  className="w-4 h-4 text-cyan-600 rounded"
+                  type="range"
+                  min="400"
+                  max="2000"
+                  value={styleSettings.canvasHeight}
+                  onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
+                  className="w-full"
                 />
-                <span className="text-sm text-gray-700">Compact Numbers (1K, 1M)</span>
-              </label>
+              </div>
+            </div>
+          </CollapsibleSection>
+          {/* 3. COLORS & STYLING */}
+          <CollapsibleSection
+            title="Colors & Styling"
+            isExpanded={expandedSections.colorMode}
+            onToggle={() => toggleSection('colorMode')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Color Strategy
+                </label>
+                <select
+                  value={styleSettings.colorMode || 'category'}
+                  onChange={(e) => styleSettings.setColorMode?.(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="category">Category (Different color per line)</option>
+                  <option value="custom">Custom (Manual colors)</option>
+                </select>
+              </div>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={styleSettings.showLegend}
-                  onChange={(e) => styleSettings.setShowLegend(e.target.checked)}
-                  className="w-4 h-4 text-cyan-600 rounded"
-                />
-                <span className="text-sm text-gray-700">Show Legend</span>
-              </label>
-
-              {styleSettings.showLegend && (
+              {/* Category Palette */}
+              {styleSettings.colorMode === 'category' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Legend Position
+                    Palette
                   </label>
                   <select
-                    value={styleSettings.legendPosition}
-                    onChange={(e) => styleSettings.setLegendPosition(e.target.value)}
+                    value={styleSettings.comparisonPalette || 'observable10'}
+                    onChange={(e) => styleSettings.setComparisonPalette?.(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
-                    <option value="legend">Traditional Legend</option>
-                    <option value="direct">Direct Labels</option>
+                    {Object.entries(comparisonPalettes).map(([key, palette]) => (
+                      <option key={key} value={key}>
+                        {palette.name}
+                      </option>
+                    ))}
                   </select>
+                  {styleSettings.comparisonPalette !== 'user' && (
+                    <div className="mt-2">
+                      <div className="flex flex-wrap gap-2">
+                        {(comparisonPalettes[styleSettings.comparisonPalette || 'observable10']?.colors || []).slice(0, 8).map((color, index) => (
+                          <div
+                            key={index}
+                            className="w-10 h-10 rounded border-2 border-gray-300"
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {styleSettings.showLegend && styleSettings.legendPosition === 'direct' && (
+              {/* Custom Colors */}
+              {(styleSettings.colorMode === 'custom' || (styleSettings.colorMode === 'category' && styleSettings.comparisonPalette === 'user')) && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Direct Label Font Size: {styleSettings.inStageLabelFontSize}px
+                    Custom Colors (up to 8)
                   </label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {(styleSettings.userCustomColors || ['#1e40af', '#0d9488', '#991b1b', '#d97706', '#475569', '#7c3aed', '#059669', '#dc2626']).map((color, index) => (
+                      <div key={index} className="flex flex-col gap-1">
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={(e) => {
+                            const newColors = [...(styleSettings.userCustomColors || ['#1e40af', '#0d9488', '#991b1b', '#d97706', '#475569', '#7c3aed', '#059669', '#dc2626'])];
+                            newColors[index] = e.target.value;
+                            styleSettings.setUserCustomColors?.(newColors);
+                          }}
+                          className="w-full h-12 rounded-lg cursor-pointer border-2 border-gray-300"
+                        />
+                        <input
+                          type="text"
+                          value={color}
+                          onChange={(e) => {
+                            const newColors = [...(styleSettings.userCustomColors || ['#1e40af', '#0d9488', '#991b1b', '#d97706', '#475569', '#7c3aed', '#059669', '#dc2626'])];
+                            newColors[index] = e.target.value;
+                            styleSettings.setUserCustomColors?.(newColors);
+                          }}
+                          className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 font-mono"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
+
+          {/* 4. TYPOGRAPHY */}
+          <CollapsibleSection
+            title="Typography"
+            isExpanded={expandedSections.typography}
+            onToggle={() => toggleSection('typography')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={styleSettings.title}
+                  onChange={(e) => styleSettings.setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subtitle
+                </label>
+                <input
+                  type="text"
+                  value={styleSettings.subtitle}
+                  onChange={(e) => styleSettings.setSubtitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title Alignment
+                </label>
+                <select
+                  value={styleSettings.titleAlignment}
+                  onChange={(e) => styleSettings.setTitleAlignment(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Font Family
+                </label>
+                <select
+                  value={styleSettings.fontFamily}
+                  onChange={(e) => styleSettings.setFontFamily(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <optgroup label="Sans-Serif">
+                    <option value="Inter">Inter</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                  </optgroup>
+                  <optgroup label="Condensed">
+                    <option value="Roboto Condensed">Roboto Condensed</option>
+                    <option value="Open Sans Condensed">Open Sans Condensed</option>
+                    <option value="Economica">Economica</option>
+                  </optgroup>
+                  <optgroup label="Serif">
+                    <option value="Merriweather">Merriweather</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Lora">Lora</option>
+                    <option value="PT Serif">PT Serif</option>
+                    <option value="Newsreader">Newsreader</option>
+                    <option value="Georgia">Georgia</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Title Font Size: {styleSettings.titleFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="16"
+                  max="48"
+                  value={styleSettings.titleFontSize}
+                  onChange={(e) => styleSettings.setTitleFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Subtitle Font Size: {styleSettings.subtitleFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="12"
+                  max="32"
+                  value={styleSettings.subtitleFontSize}
+                  onChange={(e) => styleSettings.setSubtitleFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Legend Font Size: {styleSettings.legendFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="8"
+                  max="20"
+                  value={styleSettings.legendFontSize}
+                  onChange={(e) => styleSettings.setLegendFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Metric Label Font Size: {styleSettings.metricLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="24"
+                  value={styleSettings.metricLabelFontSize}
+                  onChange={(e) => styleSettings.setMetricLabelFontSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </CollapsibleSection>
+          {/* 5. LABELS */}
+          <CollapsibleSection
+            title="Labels"
+            isExpanded={expandedSections.labels}
+            onToggle={() => toggleSection('labels')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Label Type
+                </label>
+                <select
+                  value={styleSettings.legendPosition || 'direct'}
+                  onChange={(e) => {
+                    styleSettings.setLegendPosition(e.target.value);
+                    // Also update showDirectLabels and showLegend based on selection
+                    if (e.target.value === 'direct') {
+                      styleSettings.setShowDirectLabels(true);
+                      styleSettings.setShowLegend(false);
+                    } else {
+                      styleSettings.setShowDirectLabels(false);
+                      styleSettings.setShowLegend(true);
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="direct">Direct Labels (at line ends)</option>
+                  <option value="top">Legend (top)</option>
+                </select>
+              </div>
+
+              {styleSettings.legendPosition === 'direct' && (
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    Direct Label Font Size
+                    <InfoTooltip text="Font size for metric name labels at line ends" />
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="8"
+                      max="24"
+                      value={styleSettings.directLabelFontSize || 14}
+                      onChange={(e) => styleSettings.setDirectLabelFontSize?.(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-sm font-medium text-gray-700 w-12 text-right">
+                      {styleSettings.directLabelFontSize || 14}px
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {styleSettings.legendPosition === 'top' && (
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    Legend Font Size
+                    <InfoTooltip text="Font size for legend labels" />
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="8"
+                      max="24"
+                      value={styleSettings.legendFontSize || 12}
+                      onChange={(e) => styleSettings.setLegendFontSize?.(Number(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-sm font-medium text-gray-700 w-12 text-right">
+                      {styleSettings.legendFontSize || 12}px
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.compactNumbers !== undefined ? styleSettings.compactNumbers : true}
+                  onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Compact Numbers (1K, 1M, 1B)</span>
+              </label>
+            </div>
+          </CollapsibleSection>
+
+          {/* 6. LINE STYLING */}
+          <CollapsibleSection
+            title="Line Styling"
+            isExpanded={expandedSections.lineStyling}
+            onToggle={() => toggleSection('lineStyling')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Line Thickness: {styleSettings.lineThickness}px
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="7"
+                  value={styleSettings.lineThickness}
+                  onChange={(e) => throttledSetters.setLineThickness(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Line Style
+                </label>
+                <select
+                  value={styleSettings.lineStyle || 'solid'}
+                  onChange={(e) => styleSettings.setLineStyle?.(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Line Opacity: {(styleSettings.lineOpacity || 1.0).toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={styleSettings.lineOpacity || 1.0}
+                  onChange={(e) => styleSettings.setLineOpacity(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.smoothLines || false}
+                  onChange={(e) => styleSettings.setSmoothLines?.(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Smooth Lines (Curve Interpolation)</span>
+              </label>
+            </div>
+          </CollapsibleSection>
+
+          {/* 7. DATE / TIME */}
+          <CollapsibleSection
+            title="Date / Time"
+            isExpanded={expandedSections.dateTime}
+            onToggle={() => toggleSection('dateTime')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Aggregation Level
+                  <InfoTooltip text="Aggregate daily data to higher time periods" />
+                </label>
+                <select
+                  value={styleSettings.aggregationLevel || 'day'}
+                  onChange={(e) => styleSettings.setAggregationLevel?.(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="day">Day</option>
+                  <option value="week">Week</option>
+                  <option value="month">Month</option>
+                  <option value="quarter">Quarter</option>
+                  <option value="year">Year</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Aggregation Method
+                  <InfoTooltip text="How to combine values when aggregating" />
+                </label>
+                <select
+                  value={styleSettings.aggregationMethod || 'sum'}
+                  onChange={(e) => styleSettings.setAggregationMethod?.(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="sum">Sum</option>
+                  <option value="average">Average</option>
+                  <option value="min">Minimum</option>
+                  <option value="max">Maximum</option>
+                  <option value="count">Count</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Fiscal Year Start Month
+                  <InfoTooltip text="For quarter and year calculations" />
+                </label>
+                <select
+                  value={styleSettings.fiscalYearStartMonth || 1}
+                  onChange={(e) => styleSettings.setFiscalYearStartMonth?.(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  X-Axis Label Levels
+                  <InfoTooltip text="Show one or two levels of time labels on X-axis" />
+                </label>
+                <select
+                  value={styleSettings.xAxisLabelLevels || 2}
+                  onChange={(e) => styleSettings.setXAxisLabelLevels?.(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="1">Single Level (Jan, Week 1, Q1)</option>
+                  <option value="2">Two Levels (Jan + Qtr 1, Week 1 + Jan 2024)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Time Range Filter
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-12">Start</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={styleSettings.dateRangeFilter?.[0] || 0}
+                      onChange={(e) => {
+                        const newStart = Number(e.target.value);
+                        const currentEnd = styleSettings.dateRangeFilter?.[1] || 100;
+                        if (newStart <= currentEnd) {
+                          styleSettings.setDateRangeFilter?.([newStart, currentEnd]);
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="text-xs text-gray-700 w-20 text-right">
+                      {(() => {
+                        if (!chartData.data || chartData.data.length === 0) return '0%';
+                        const data = chartData.data.filter(d => d.date);
+                        if (data.length === 0) return '0%';
+                        const sortedDates = data.map(d => d.date).sort();
+                        const index = Math.floor((styleSettings.dateRangeFilter?.[0] || 0) / 100 * (sortedDates.length - 1));
+                        return sortedDates[index] || sortedDates[0];
+                      })()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 w-12">End</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={styleSettings.dateRangeFilter?.[1] || 100}
+                      onChange={(e) => {
+                        const newEnd = Number(e.target.value);
+                        const currentStart = styleSettings.dateRangeFilter?.[0] || 0;
+                        if (newEnd >= currentStart) {
+                          styleSettings.setDateRangeFilter?.([currentStart, newEnd]);
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="text-xs text-gray-700 w-20 text-right">
+                      {(() => {
+                        if (!chartData.data || chartData.data.length === 0) return '100%';
+                        const data = chartData.data.filter(d => d.date);
+                        if (data.length === 0) return '100%';
+                        const sortedDates = data.map(d => d.date).sort();
+                        const index = Math.floor((styleSettings.dateRangeFilter?.[1] || 100) / 100 * (sortedDates.length - 1));
+                        return sortedDates[index] || sortedDates[sortedDates.length - 1];
+                      })()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-gray-500">
+                    Showing {styleSettings.dateRangeFilter?.[0] || 0}% - {styleSettings.dateRangeFilter?.[1] || 100}% of data
+                  </p>
+                  {(styleSettings.dateRangeFilter?.[0] !== 0 || styleSettings.dateRangeFilter?.[1] !== 100) && (
+                    <button
+                      onClick={() => styleSettings.setDateRangeFilter?.([0, 100])}
+                      className="text-xs text-cyan-600 hover:text-cyan-700 font-medium"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 8. EMPHASIS */}
+          <CollapsibleSection
+            title="Emphasis"
+            isExpanded={expandedSections.emphasis}
+            onToggle={() => toggleSection('emphasis')}
+          >
+            <div className="space-y-2">
+              <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Emphasized Points
+                  </span>
+                  <span className="text-sm font-semibold text-cyan-600">
+                    {styleSettings.emphasizedPoints?.length || 0} / 4
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Click on point markers in the chart to emphasize them (max 4)
+                </p>
+                {styleSettings.emphasizedPoints && styleSettings.emphasizedPoints.length > 0 && (
+                  <button
+                    onClick={() => styleSettings.setEmphasizedPoints?.([])}
+                    className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Clear All
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Label Position
+                  <InfoTooltip text="Position of metric labels on emphasized points" />
+                </label>
+                <select
+                  value={styleSettings.emphasisLabelPosition || 'above'}
+                  onChange={(e) => styleSettings.setEmphasisLabelPosition?.(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="above">Above</option>
+                  <option value="below">Below</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                  Label Font Size
+                  <InfoTooltip text="Font size for emphasized point labels" />
+                </label>
+                <div className="flex items-center gap-3">
                   <input
                     type="range"
                     min="8"
                     max="20"
                     step="1"
-                    value={styleSettings.inStageLabelFontSize}
-                    onChange={(e) => styleSettings.setInStageLabelFontSize(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    value={styleSettings.emphasisLabelFontSize || 12}
+                    onChange={(e) => styleSettings.setEmphasisLabelFontSize?.(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium text-gray-700 w-12 text-right">
+                    {styleSettings.emphasisLabelFontSize || 12}px
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showEmphasisDate || false}
+                    onChange={(e) => styleSettings.setShowEmphasisDate?.(e.target.checked)}
+                    className="w-4 h-4 text-cyan-600 rounded"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    Show Date
+                    <InfoTooltip text="Display date below metric value in emphasis labels" />
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.showEmphasisVerticalLine || false}
+                    onChange={(e) => styleSettings.setShowEmphasisVerticalLine?.(e.target.checked)}
+                    className="w-4 h-4 text-cyan-600 rounded"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    Vertical Line
+                    <InfoTooltip text="Show vertical line from X-axis to emphasized point" />
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={styleSettings.emphasisCompactNumbers || false}
+                    onChange={(e) => styleSettings.setEmphasisCompactNumbers?.(e.target.checked)}
+                    className="w-4 h-4 text-cyan-600 rounded"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    Compact Numbers
+                    <InfoTooltip text="Format numbers as K, M, B (e.g., 1.2K, 3.5M)" />
+                  </span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+                    Prefix
+                    <InfoTooltip text="Text before value (e.g., $ for currency)" />
+                  </label>
+                  <input
+                    type="text"
+                    value={styleSettings.emphasisValuePrefix || ''}
+                    onChange={(e) => styleSettings.setEmphasisValuePrefix?.(e.target.value)}
+                    placeholder="$"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
                   />
                 </div>
+
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+                    Suffix
+                    <InfoTooltip text="Text after value (e.g., % or units)" />
+                  </label>
+                  <input
+                    type="text"
+                    value={styleSettings.emphasisValueSuffix || ''}
+                    onChange={(e) => styleSettings.setEmphasisValueSuffix?.(e.target.value)}
+                    placeholder="%"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-700 mb-1">
+                    Decimals
+                    <InfoTooltip text="Number of decimal places (0-5)" />
+                  </label>
+                  <input
+                    type="number"
+                    value={styleSettings.emphasisDecimalPlaces ?? 0}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                      styleSettings.setEmphasisDecimalPlaces?.(Math.max(0, Math.min(5, val)));
+                    }}
+                    min="0"
+                    max="5"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 9. POINT MARKERS */}
+          <CollapsibleSection
+            title="Point Markers"
+            isExpanded={expandedSections.pointMarkers}
+            onToggle={() => toggleSection('pointMarkers')}
+          >
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.showPoints !== undefined ? styleSettings.showPoints : true}
+                  onChange={(e) => styleSettings.setShowPoints?.(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Show Point Markers</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.excludeZeroValues !== undefined ? styleSettings.excludeZeroValues : true}
+                  onChange={(e) => styleSettings.setExcludeZeroValues?.(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Exclude Zero/Null Values</span>
+              </label>
+
+              {(styleSettings.showPoints !== false) && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Point Size: {styleSettings.pointSize || 4}px
+                    </label>
+                    <input
+                      type="range"
+                      min="2"
+                      max="12"
+                      value={styleSettings.pointSize || 4}
+                      onChange={(e) => styleSettings.setPointSize?.(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Point Style
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => styleSettings.setPointStyle?.('filled')}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          (styleSettings.pointStyle || 'filled') === 'filled'
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        Filled
+                      </button>
+                      <button
+                        onClick={() => styleSettings.setPointStyle?.('outlined')}
+                        className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                          styleSettings.pointStyle === 'outlined'
+                            ? 'bg-cyan-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        Outlined
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
-            </>
-          )}
+            </div>
+          </CollapsibleSection>
+
+          {/* 10. AREA FILL */}
+          <CollapsibleSection
+            title="Area Fill"
+            isExpanded={expandedSections.areaFill}
+            onToggle={() => toggleSection('areaFill')}
+          >
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.showAreaFill || false}
+                  onChange={(e) => styleSettings.setShowAreaFill?.(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Show Area Fill Below Lines</span>
+              </label>
+
+              {styleSettings.showAreaFill && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Area Opacity: {(styleSettings.areaOpacity || 0.2).toFixed(2)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={styleSettings.areaOpacity || 0.2}
+                      onChange={(e) => styleSettings.setAreaOpacity?.(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={styleSettings.areaGradient || false}
+                      onChange={(e) => styleSettings.setAreaGradient?.(e.target.checked)}
+                      className="w-4 h-4 text-cyan-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">Use Gradient Fill (Color → Transparent)</span>
+                  </label>
+                </>
+              )}
+            </div>
+          </CollapsibleSection>
+
+          {/* 11. AXES & GRIDLINES */}
+          <CollapsibleSection
+            title="Axes & Gridlines"
+            isExpanded={expandedSections.axesGridlines}
+            onToggle={() => toggleSection('axesGridlines')}
+          >
+            <div className="space-y-2">
+              {/* Show/Hide Axes */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.showXAxis !== undefined ? styleSettings.showXAxis : true}
+                  onChange={(e) => styleSettings.setShowXAxis?.(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Show X-Axis (Time)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={styleSettings.showYAxis !== undefined ? styleSettings.showYAxis : true}
+                  onChange={(e) => styleSettings.setShowYAxis?.(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded"
+                />
+                <span className="text-sm text-gray-700">Show Y-Axis (Values)</span>
+              </label>
+
+              {/* Bounds */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Bounds
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Minimum
+                  </label>
+                  <input
+                    type="number"
+                    value={styleSettings.axisMinimumAuto ? styleSettings.calculatedAxisMinimum : styleSettings.axisMinimum}
+                    onChange={(e) => {
+                      styleSettings.setAxisMinimum(Number(e.target.value));
+                      if (styleSettings.axisMinimumAuto) {
+                        styleSettings.setAxisMinimumAuto(false);
+                      }
+                    }}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <label className="flex items-center gap-1 text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={styleSettings.axisMinimumAuto}
+                      onChange={(e) => styleSettings.setAxisMinimumAuto(e.target.checked)}
+                      className="rounded"
+                    />
+                    Auto
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Maximum
+                  </label>
+                  <input
+                    type="number"
+                    value={styleSettings.axisMaximumAuto ? styleSettings.calculatedAxisMaximum : styleSettings.axisMaximum}
+                    onChange={(e) => {
+                      styleSettings.setAxisMaximum(Number(e.target.value));
+                      if (styleSettings.axisMaximumAuto) {
+                        styleSettings.setAxisMaximumAuto(false);
+                      }
+                    }}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <label className="flex items-center gap-1 text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={styleSettings.axisMaximumAuto}
+                      onChange={(e) => styleSettings.setAxisMaximumAuto(e.target.checked)}
+                      className="rounded"
+                    />
+                    Auto
+                  </label>
+                </div>
+              </div>
+
+              {/* Units */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Units
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Major
+                  </label>
+                  <input
+                    type="number"
+                    value={styleSettings.axisMajorUnitAuto ? styleSettings.calculatedAxisMajorUnit : styleSettings.axisMajorUnit}
+                    onChange={(e) => {
+                      styleSettings.setAxisMajorUnit(Number(e.target.value));
+                      if (styleSettings.axisMajorUnitAuto) {
+                        styleSettings.setAxisMajorUnitAuto(false);
+                      }
+                    }}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                  />
+                  <label className="flex items-center gap-1 text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={styleSettings.axisMajorUnitAuto}
+                      onChange={(e) => styleSettings.setAxisMajorUnitAuto(e.target.checked)}
+                      className="rounded"
+                    />
+                    Auto
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Minor
+                  </label>
+                  <input
+                    type="number"
+                    value={styleSettings.axisMinorUnit}
+                    onChange={(e) => styleSettings.setAxisMinorUnit(Number(e.target.value))}
+                    disabled={styleSettings.axisMinorUnitAuto}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
+                  />
+                  <label className="flex items-center gap-1 text-sm text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={styleSettings.axisMinorUnitAuto}
+                      onChange={(e) => styleSettings.setAxisMinorUnitAuto(e.target.checked)}
+                      className="rounded"
+                    />
+                    Auto
+                  </label>
+                </div>
+              </div>
+
+              {/* Tick Marks */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tick Marks
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Major Type
+                  </label>
+                  <select
+                    value={styleSettings.axisMajorTickType}
+                    onChange={(e) => styleSettings.setAxisMajorTickType(e.target.value)}
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="none">None</option>
+                    <option value="outside">Outside</option>
+                    <option value="inside">Inside</option>
+                    <option value="cross">Cross</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Minor Type
+                  </label>
+                  <select
+                    value={styleSettings.axisMinorTickType}
+                    onChange={(e) => styleSettings.setAxisMinorTickType(e.target.value)}
+                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="none">None</option>
+                    <option value="outside">Outside</option>
+                    <option value="inside">Inside</option>
+                    <option value="cross">Cross</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Gridlines */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Gridlines
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Horizontal
+                  </label>
+                  <button
+                    onClick={() => styleSettings.setShowHorizontalGridlines(!styleSettings.showHorizontalGridlines)}
+                    className={`px-4 py-1 rounded text-sm font-medium ${
+                      styleSettings.showHorizontalGridlines
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {styleSettings.showHorizontalGridlines ? 'On' : 'Off'}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="w-24 text-sm font-medium text-gray-700">
+                    Vertical
+                  </label>
+                  <button
+                    onClick={() => styleSettings.setShowVerticalGridlines(!styleSettings.showVerticalGridlines)}
+                    className={`px-4 py-1 rounded text-sm font-medium ${
+                      styleSettings.showVerticalGridlines
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {styleSettings.showVerticalGridlines ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Compact Numbers */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number Format
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 text-sm text-gray-700">
+                    Compact axis values (1.5K vs 1500)
+                  </label>
+                  <button
+                    onClick={() => styleSettings.setCompactAxisNumbers(!styleSettings.compactAxisNumbers)}
+                    className={`px-4 py-1 rounded text-sm font-medium ${
+                      styleSettings.compactAxisNumbers
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {styleSettings.compactAxisNumbers ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+
+              {/* X-Axis Label Rotation */}
+              <div className="space-y-3">
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    X-Axis Label Rotation
+                    <InfoTooltip text="Rotate time labels (0° = horizontal, 90° = vertical)" />
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 text-sm text-gray-700">
+                    Rotation Angle
+                  </label>
+                  <span className="text-sm text-gray-600 w-12 text-right">
+                    {styleSettings.xAxisLabelRotation}°
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="90"
+                  value={styleSettings.xAxisLabelRotation}
+                  onChange={(e) => styleSettings.setXAxisLabelRotation(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Axis Label */}
+              <div className="space-y-3">
+                <div>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                    Axis Label
+                    <InfoTooltip text="Optional label at the end of the value axis" />
+                  </label>
+                </div>
+
+                <input
+                  type="text"
+                  value={styleSettings.axisLabel}
+                  onChange={(e) => styleSettings.setAxisLabel(e.target.value)}
+                  placeholder="e.g., Revenue ($)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+
+              {/* Number Styling (Values) */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number Styling (Values)
+                  </label>
+                </div>
+
+                {/* Value Format */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    Value Format
+                    <InfoTooltip text="Percentage multiplies values by 100 and adds % symbol" />
+                  </label>
+                  <select
+                    value={styleSettings.valueFormat}
+                    onChange={(e) => styleSettings.setValueFormat(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  >
+                    <option value="number">Number</option>
+                    <option value="percentage">Percentage</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Prefix */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Prefix
+                    </label>
+                    <input
+                      type="text"
+                      value={styleSettings.valuePrefix}
+                      onChange={(e) => styleSettings.setValuePrefix(e.target.value)}
+                      placeholder="$"
+                      maxLength={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    />
+                  </div>
+
+                  {/* Suffix */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Suffix
+                    </label>
+                    <input
+                      type="text"
+                      value={styleSettings.valueSuffix}
+                      onChange={(e) => styleSettings.setValueSuffix(e.target.value)}
+                      placeholder="%"
+                      maxLength={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    />
+                  </div>
+
+                  {/* Decimal Places */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Decimal places
+                    </label>
+                    <input
+                      type="number"
+                      value={styleSettings.valueDecimalPlaces}
+                      onChange={(e) => styleSettings.setValueDecimalPlaces(Math.max(0, Math.min(5, parseInt(e.target.value) || 0)))}
+                      min="0"
+                      max="5"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* X-Axis Time Label Selection */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    X-Axis Time Labels
+                  </label>
+                </div>
+
+                {/* Primary Label Selection */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    Primary Label
+                    <InfoTooltip text="The detailed time unit shown for each tick mark" />
+                  </label>
+                  <select
+                    value={styleSettings.xAxisPrimaryLabel || 'auto'}
+                    onChange={(e) => {
+                      const newPrimary = e.target.value;
+                      styleSettings.setXAxisPrimaryLabel(newPrimary);
+
+                      // If Date is selected, default secondary to Month
+                      if (newPrimary === 'date') {
+                        if (styleSettings.xAxisSecondaryLabel === 'auto' || !styleSettings.xAxisSecondaryLabel) {
+                          styleSettings.setXAxisSecondaryLabel('month');
+                        }
+                      } else {
+                        // Validate secondary label - if it's now less granular than primary, reset to auto
+                        const timeHierarchy = { day: 0, week: 1, month: 2, quarter: 3, year: 4 };
+                        const currentSecondary = styleSettings.xAxisSecondaryLabel || 'auto';
+
+                        if (newPrimary !== 'auto' && currentSecondary !== 'auto' && currentSecondary !== 'none') {
+                          const primaryLevel = timeHierarchy[newPrimary];
+                          const secondaryLevel = timeHierarchy[currentSecondary];
+
+                          // If secondary is not more granular than primary, reset to auto
+                          if (secondaryLevel <= primaryLevel) {
+                            styleSettings.setXAxisSecondaryLabel('auto');
+                          }
+                        }
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  >
+                    <option value="auto">Auto (Based on Aggregation)</option>
+                    <option value="date">Date</option>
+                    <option value="day">Day</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                    <option value="quarter">Quarter</option>
+                    <option value="year">Year</option>
+                  </select>
+                </div>
+
+                {/* Date Format Selection - only show when Primary Label is "Date" */}
+                {styleSettings.xAxisPrimaryLabel === 'date' && (
+                  <>
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                        Date Format Preset
+                        <InfoTooltip text="Choose a common date format or use custom below" />
+                      </label>
+                      <select
+                        value={styleSettings.dateFormatPreset || 'MM/dd/yy'}
+                        onChange={(e) => styleSettings.setDateFormatPreset(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                      >
+                        <option value="MM/dd/yy">01/15/24 (MM/dd/yy)</option>
+                        <option value="dd/MM/yy">15/01/24 (dd/MM/yy)</option>
+                        <option value="yyyy-MM-dd">2024-01-15 (yyyy-MM-dd)</option>
+                        <option value="M/d/yy">1/15/24 (M/d/yy)</option>
+                        <option value="MMM dd, yyyy">Jan 15, 2024 (MMM dd, yyyy)</option>
+                        <option value="dd MMM yyyy">15 Jan 2024 (dd MMM yyyy)</option>
+                        <option value="MMM dd">Jan 15 (MMM dd)</option>
+                        <option value="dd MMM">15 Jan (dd MMM)</option>
+                        <option value="MMMM dd, yyyy">January 15, 2024 (MMMM dd, yyyy)</option>
+                        <option value="EEE, MM/dd">Mon, 01/15 (EEE, MM/dd)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                        Custom Format (Optional)
+                        <InfoTooltip text="Override preset with custom format. Use yyyy, MM, dd, MMM, MMMM, EEE, etc." />
+                      </label>
+                      <input
+                        type="text"
+                        value={styleSettings.dateFormatCustom || ''}
+                        onChange={(e) => styleSettings.setDateFormatCustom(e.target.value)}
+                        placeholder="e.g., EEEE, MMMM do, yyyy"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-mono"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Secondary Label Selection */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    Secondary Label
+                    <InfoTooltip text="The grouping label shown below primary labels" />
+                  </label>
+                  <select
+                    value={styleSettings.xAxisSecondaryLabel || 'auto'}
+                    onChange={(e) => {
+                      const newSecondary = e.target.value;
+                      const currentPrimary = styleSettings.xAxisPrimaryLabel || 'auto';
+
+                      // Validate - secondary must be less granular (higher level) than primary
+                      const timeHierarchy = { day: 0, week: 1, month: 2, quarter: 3, year: 4 };
+
+                      if (newSecondary !== 'auto' && newSecondary !== 'none' && currentPrimary !== 'auto') {
+                        const primaryLevel = timeHierarchy[currentPrimary];
+                        const secondaryLevel = timeHierarchy[newSecondary];
+
+                        // Only allow if secondary is less granular (higher number) than primary
+                        if (secondaryLevel > primaryLevel) {
+                          styleSettings.setXAxisSecondaryLabel(newSecondary);
+                        } else {
+                          // Invalid selection - show alert and don't change
+                          alert('Secondary label must be less granular than primary label.\nFor example: Primary = Day, Secondary = Month or Year');
+                        }
+                      } else {
+                        // Auto or none, always allowed
+                        styleSettings.setXAxisSecondaryLabel(newSecondary);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                  >
+                    <option value="auto">Auto (Based on Primary)</option>
+                    <option value="none">None</option>
+                    <option value="week">Week</option>
+                    <option value="month">Month</option>
+                    <option value="quarter">Quarter</option>
+                    <option value="year">Year</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* X-Axis Label Font Sizes */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    X-Axis Label Font Sizes
+                  </label>
+                </div>
+
+                {/* Primary Label Font Size (Day numbers, etc.) */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    Primary Label: {styleSettings.xAxisFontSize || 12}px
+                    <InfoTooltip text="Font size for day numbers, weeks, months, etc." />
+                  </label>
+                  <input
+                    type="range"
+                    min="8"
+                    max="24"
+                    value={styleSettings.xAxisFontSize || 12}
+                    onChange={(e) => styleSettings.setXAxisFontSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Secondary Label Font Size (Month/Year, etc.) */}
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    Secondary Label: {styleSettings.xAxisSecondaryFontSize || 12}px
+                    <InfoTooltip text="Font size for month/year grouping labels" />
+                  </label>
+                  <input
+                    type="range"
+                    min="8"
+                    max="24"
+                    value={styleSettings.xAxisSecondaryFontSize || 12}
+                    onChange={(e) => styleSettings.setXAxisSecondaryFontSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 13. WATERMARK */}
+          <CollapsibleSection
+            title="Watermark"
+            isExpanded={expandedSections.watermark}
+            onToggle={() => toggleSection('watermark')}
+          >
+            <div className="space-y-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  User Tier
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => styleSettings.setUserTier('free')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.userTier === 'free'
+                        ? 'bg-gray-500 text-white border-2 border-gray-600 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    Free (with watermark)
+                  </button>
+                  <button
+                    onClick={() => styleSettings.setUserTier('pro')}
+                    className={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+                      styleSettings.userTier === 'pro'
+                        ? 'bg-cyan-600 text-white border-2 border-cyan-700 shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                  >
+                    Pro (no watermark)
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Free tier displays Find&Tell watermark on charts
+                </p>
+              </div>
+            </div>
+          </CollapsibleSection>
+        </>
+      )}
+
+      {/* 9/12. DISPLAY OPTIONS - For Funnel Chart only (position 7) */}
+      {chartType === 'funnel' && (
+        <CollapsibleSection
+          title="Display Options"
+          isExpanded={expandedSections.displayOptions}
+          onToggle={() => toggleSection('displayOptions')}
+        >
+          <div className="space-y-2">
+            {/* Funnel Chart Display Options */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Metric Emphasis
+              </label>
+              <select
+                value={styleSettings.metricEmphasis}
+                onChange={(e) => styleSettings.setMetricEmphasis(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="volume">Volume (show numbers)</option>
+                <option value="percentage">Percentage (show %)</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={styleSettings.normalizeToHundred}
+                onChange={(e) => styleSettings.setNormalizeToHundred(e.target.checked)}
+                className="w-4 h-4 text-cyan-600 rounded"
+              />
+              <span className="text-sm text-gray-700">Normalize First Stage to 100%</span>
+            </label>
+
+            {/* Compact Numbers */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={styleSettings.compactNumbers}
+                onChange={(e) => styleSettings.setCompactNumbers(e.target.checked)}
+                className="w-4 h-4 text-cyan-600 rounded"
+              />
+              <span className="text-sm text-gray-700">Compact numbers (1K, 1M)</span>
+            </label>
+
+            {/* Legend Options */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={styleSettings.showLegend}
+                onChange={(e) => styleSettings.setShowLegend(e.target.checked)}
+                className="w-4 h-4 text-cyan-600 rounded"
+              />
+              <span className="text-sm text-gray-700">Show Legend</span>
+            </label>
+
+            {styleSettings.showLegend && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Legend Position
+                </label>
+                <select
+                  value={styleSettings.legendPosition}
+                  onChange={(e) => styleSettings.setLegendPosition(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="legend">Traditional Legend</option>
+                  <option value="direct">Direct Labels</option>
+                </select>
+              </div>
+            )}
+
+            {styleSettings.showLegend && styleSettings.legendPosition === 'direct' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Direct Label Font Size: {styleSettings.inStageLabelFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min="8"
+                  max="20"
+                  step="1"
+                  value={styleSettings.inStageLabelFontSize}
+                  onChange={(e) => styleSettings.setInStageLabelFontSize(Number(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            )}
           </div>
         </CollapsibleSection>
       )}
 
-      {/* Sparklines Section - Only for Funnel Chart */}
-      {!isSlopeChart && !isBarChart && (
+      {/* 8. SPARKLINES - Only for Funnel Chart */}
+      {chartType === 'funnel' && (
         <CollapsibleSection
           title="Sparklines"
           isExpanded={expandedSections.sparklines}
@@ -2424,12 +6484,13 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
         </CollapsibleSection>
       )}
 
-      {/* Watermark Section */}
-      <CollapsibleSection
-        title="Watermark"
-        isExpanded={expandedSections.watermark}
-        onToggle={() => toggleSection('watermark')}
-      >
+      {/* 9. WATERMARK - For Funnel Chart only (Bar, Slope, and Line Charts have their own) */}
+      {!isBarChart && !isSlopeChart && !isLineChart && (
+        <CollapsibleSection
+          title="Watermark"
+          isExpanded={expandedSections.watermark}
+          onToggle={() => toggleSection('watermark')}
+        >
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2449,9 +6510,38 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
           </p>
         </div>
       </CollapsibleSection>
+      )}
 
-      {/* Style Management Buttons */}
-      <div className="pt-4 border-t border-gray-200">
+      {/* Style Management */}
+      <div className="pt-4 border-t border-gray-200 space-y-3">
+        {/* Style Templates Dropdown */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Style Templates
+          </label>
+          <select
+            onChange={(e) => {
+              if (e.target.value) {
+                applyTemplate(styleSettings, e.target.value);
+                e.target.value = ''; // Reset selection after applying
+              }
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            defaultValue=""
+          >
+            <option value="">Choose a template...</option>
+            {getAllTemplates().map(template => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Apply preset styles from major publications
+          </p>
+        </div>
+
+        {/* Save/Import Buttons */}
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={onSaveStyle}
@@ -2474,16 +6564,57 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
 /**
  * Data Tab Component
  */
-function DataTabContent({ chartData, chartType }) {
+function DataTabContent({
+  chartData,
+  chartType,
+  onEditData,
+  styleSettings,
+  setCurrentSampleDatasetKey,
+  applyStylePreset,
+  showPasteCSV,
+  setShowPasteCSV,
+  pastedCSV,
+  setPastedCSV,
+  handlePasteCSV,
+  showGoogleSheets,
+  setShowGoogleSheets,
+  googleSheetsUrl,
+  setGoogleSheetsUrl,
+  googleSheetsLoading,
+  setGoogleSheetsLoading,
+  googleSheetsError,
+  setGoogleSheetsError,
+  autoRefreshEnabled,
+  setAutoRefreshEnabled,
+  autoRefreshInterval,
+  setAutoRefreshInterval
+}) {
   const isSlopeChart = chartType === 'slope';
   const isBarChart = chartType === 'bar';
+  const isLineChart = chartType === 'line';
   const fileInputRef = useRef(null);
 
+  // Track which data sections are expanded
+  const [expandedDataSections, setExpandedDataSections] = useState({
+    googleSheets: false,
+    uploadCSV: false,
+    pasteCSV: false,
+    sampleData: false,
+  });
+
+  const toggleDataSection = (section) => {
+    setExpandedDataSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   // Chart-specific labels (matching EditDataTable)
-  const stageLabel = isBarChart ? 'Category' : 'Stage';
-  const periodLabel = isBarChart ? 'Value' : 'Period';
-  const periodLabelPlural = isBarChart ? 'Values' : 'Periods';
-  const stageFieldName = isBarChart ? 'Category' : 'Stage';
+  const stageLabel = isLineChart ? 'Date' : (isBarChart ? 'Category' : 'Stage');
+  const stageLabelPlural = isLineChart ? 'Dates' : (isBarChart ? 'Categories' : 'Stages');
+  const periodLabel = isLineChart ? 'Metric' : (isBarChart ? 'Value' : 'Period');
+  const periodLabelPlural = isLineChart ? 'Metrics' : (isBarChart ? 'Values' : 'Periods');
+  const stageFieldName = isLineChart ? 'date' : (isBarChart ? 'Category' : 'Stage');
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
@@ -2492,54 +6623,279 @@ function DataTabContent({ chartData, chartType }) {
     }
   };
 
+  const handleGoogleSheetsLoad = async () => {
+    if (!googleSheetsUrl.trim()) {
+      setGoogleSheetsError('Please enter a Google Sheets URL');
+      return;
+    }
+
+    if (!isGoogleSheetsUrl(googleSheetsUrl)) {
+      setGoogleSheetsError('Please enter a valid Google Sheets URL');
+      return;
+    }
+
+    setGoogleSheetsLoading(true);
+    setGoogleSheetsError('');
+
+    try {
+      const data = await loadGoogleSheetsData(googleSheetsUrl);
+
+      // Convert array of objects to CSV text, then use existing CSV loader
+      // This ensures we follow the same data processing pipeline as file uploads
+      const headers = Object.keys(data[0]).join(',');
+      const rows = data.map(row => Object.values(row).join(',')).join('\n');
+      const csvText = headers + '\n' + rows;
+
+      // Use the existing CSV text loader
+      const success = await chartData.loadCSVText(csvText);
+
+      if (success) {
+        setGoogleSheetsError('');
+        // Don't clear URL or close panel - allow user to refresh or enable auto-refresh
+      } else {
+        setGoogleSheetsError('Failed to load data from Google Sheets');
+      }
+    } catch (error) {
+      setGoogleSheetsError(error.message);
+    } finally {
+      setGoogleSheetsLoading(false);
+    }
+  };
+
+  const handleGoogleSheetsRefresh = async () => {
+    if (googleSheetsUrl.trim()) {
+      await handleGoogleSheetsLoad();
+    }
+  };
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (!autoRefreshEnabled || !googleSheetsUrl.trim()) {
+      return;
+    }
+
+    const intervalMs = autoRefreshInterval * 60 * 1000; // Convert minutes to milliseconds
+    const intervalId = setInterval(() => {
+      handleGoogleSheetsRefresh();
+    }, intervalMs);
+
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefreshEnabled, autoRefreshInterval, googleSheetsUrl]);
+
   const handleSampleDataSelect = (event) => {
     const key = event.target.value;
     if (key) {
       chartData.loadSampleData(key);
+
+      // Store the current sample dataset key
+      setCurrentSampleDatasetKey(key);
+
+      // Get the dataset
+      const dataset = getSampleDataset(key);
+      if (dataset) {
+        // Load title and subtitle from the sample dataset
+        if (dataset.title) styleSettings.setTitle(dataset.title);
+        if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
+
+        // Load timeScale for line charts
+        if (dataset.timeScale) styleSettings.setTimeScale(dataset.timeScale);
+
+        // Apply style preset if available
+        if (dataset.stylePreset) {
+          applyStylePreset(dataset.stylePreset);
+        }
+      }
+
       event.target.value = '';
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* File Upload */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Upload CSV Data
-        </label>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={handleFileUpload}
-          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          CSV should have a "{stageFieldName}" column and one or more {periodLabel.toLowerCase()} columns
-        </p>
-      </div>
+    <div className="space-y-3">
+      {/* Connect Google Sheets - Collapsible */}
+      <CollapsibleSection
+        title="Connect Google Sheets"
+        isExpanded={expandedDataSections.googleSheets}
+        onToggle={() => toggleDataSection('googleSheets')}
+      >
+        <div className="space-y-3">
+          <div>
+            <input
+              type="text"
+              value={googleSheetsUrl}
+              onChange={(e) => setGoogleSheetsUrl(e.target.value)}
+              placeholder="Paste Google Sheets URL here..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Example: https://docs.google.com/spreadsheets/d/abc123.../edit
+            </p>
+          </div>
 
-      {/* Sample Data Selector */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Or Load Sample Data
-        </label>
-        <select
-          onChange={handleSampleDataSelect}
-          defaultValue=""
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-        >
-          <option value="">Choose a sample...</option>
+          {googleSheetsError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-700">{googleSheetsError}</p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleGoogleSheetsLoad}
+              disabled={googleSheetsLoading}
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {googleSheetsLoading ? 'Loading...' : 'Load Data'}
+            </button>
+            {googleSheetsUrl.trim() && (
+              <button
+                onClick={handleGoogleSheetsRefresh}
+                disabled={googleSheetsLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                title="Refresh data from Google Sheets"
+              >
+                🔄
+              </button>
+            )}
+          </div>
+
+          {/* Auto-refresh controls */}
+          {googleSheetsUrl.trim() && (
+            <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoRefreshEnabled}
+                  onChange={(e) => setAutoRefreshEnabled(e.target.checked)}
+                  className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Auto-refresh data
+                </span>
+              </label>
+              {autoRefreshEnabled && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600">Every</label>
+                  <select
+                    value={autoRefreshInterval}
+                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
+                    className="text-sm px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  >
+                    <option value="1">1 minute</option>
+                    <option value="5">5 minutes</option>
+                    <option value="10">10 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          <details className="text-xs text-gray-600">
+            <summary className="cursor-pointer font-medium mb-1">
+              📋 How to share your Google Sheet
+            </summary>
+            <div className="pl-4 mt-2 space-y-1 whitespace-pre-line">
+              {getPublicSharingInstructions()}
+            </div>
+          </details>
+        </div>
+      </CollapsibleSection>
+
+      {/* Upload CSV Data - Collapsible */}
+      <CollapsibleSection
+        title="Upload CSV Data"
+        isExpanded={expandedDataSections.uploadCSV}
+        onToggle={() => toggleDataSection('uploadCSV')}
+      >
+        <div className="space-y-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100 cursor-pointer"
+          />
+          <p className="text-xs text-gray-500">
+            CSV should have a "{stageFieldName}" column and one or more {periodLabel.toLowerCase()} columns
+          </p>
+        </div>
+      </CollapsibleSection>
+
+      {/* Copy/Paste CSV Data - Collapsible */}
+      <CollapsibleSection
+        title="Copy/Paste CSV Data"
+        isExpanded={expandedDataSections.pasteCSV}
+        onToggle={() => toggleDataSection('pasteCSV')}
+      >
+        <div className="space-y-3">
+          <textarea
+            value={pastedCSV}
+            onChange={(e) => setPastedCSV(e.target.value)}
+            placeholder={
+              isLineChart
+                ? `Paste your CSV data here...\n\nExample (with month names):\nMonth,Revenue,Orders,Customers\nJan,1900000,850,420\nFeb,2000000,920,465\nMar,2300000,1050,531\n\nExample (with dates):\ndate,Revenue,Orders\n2024-01-01,28500,142\n2024-02-01,29800,151`
+                : isSlopeChart
+                ? `Paste your CSV data here...\n\nExample:\nStage,2023,2024\nEast Region,85000,92000\nWest Region,78000,88000\nNorth Region,62000,71000\nSouth Region,91000,98000\nCentral Region,73000,85000`
+                : isBarChart
+                ? `Paste your CSV data here...\n\nExample:\nCategory,Sales\nProduct A,245000\nProduct B,198000\nProduct C,312000\nProduct D,156000\nProduct E,287000`
+                : `Paste your CSV data here...\n\nExample (Funnel):\nStage,Q1 2024,Q2 2024,Q3 2024,Q4 2024\nWebsite Visitors,125000,135000,142000,138000\nSign Ups,45000,48500,51200,49800\nFree Trial Users,28000,30200,31800,30900\nPaid Customers,12500,13800,14600,14200\nActive Users,9800,10900,11700,11400`
+            }
+            className="w-full h-64 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 font-mono text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handlePasteCSV}
+              className="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors font-medium"
+            >
+              Save Data
+            </button>
+            <button
+              onClick={() => setPastedCSV('')}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors font-medium"
+            >
+              Clear
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            Supports comma, tab, semicolon, and space delimiters. Auto-detected automatically.
+          </p>
+        </div>
+      </CollapsibleSection>
+
+      {/* Load Sample Data - Collapsible */}
+      <CollapsibleSection
+        title="Load Sample Data"
+        isExpanded={expandedDataSections.sampleData}
+        onToggle={() => toggleDataSection('sampleData')}
+      >
+        <div>
+          <select
+            onChange={handleSampleDataSelect}
+            defaultValue=""
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          >
+            <option value="">Choose a sample...</option>
           {isSlopeChart ? (
-            <optgroup label="Slope Charts">
-              <option value="slopeRevenue">Revenue by Product Line</option>
-              <option value="slopeCustomerSatisfaction">Customer Satisfaction Scores</option>
-              <option value="slopeEmployeeMetrics">Employee Engagement</option>
-              <option value="slopeWebsiteMetrics">Website Performance</option>
-              <option value="slopeMarketShare">Market Share Changes</option>
-              <option value="slopeEducation">Student Test Scores</option>
-              <option value="slopeHealthcare">Healthcare Quality Metrics</option>
-            </optgroup>
+            <>
+              <optgroup label="AI Created - Data Stories">
+                <option value="aiTechRevenue">AI Created - Tech Revenue Revolution</option>
+                <option value="aiMarketBattle">AI Created - Market Share Shake-Up</option>
+                <option value="aiWebsiteWin">AI Created - Digital Transformation Win</option>
+              </optgroup>
+              <optgroup label="Slope Charts">
+                <option value="tufteSlope">Tufte Slope Chart - Government Receipts</option>
+                <option value="slopeRevenue">Revenue by Product Line</option>
+                <option value="slopeCustomerSatisfaction">Customer Satisfaction Scores</option>
+                <option value="slopeEmployeeMetrics">Employee Engagement</option>
+                <option value="slopeWebsiteMetrics">Website Performance</option>
+                <option value="slopeMarketShare">Market Share Changes</option>
+                <option value="slopeEducation">Student Test Scores</option>
+                <option value="slopeHealthcare">Healthcare Quality Metrics</option>
+              </optgroup>
+            </>
           ) : isBarChart ? (
             <optgroup label="Bar Charts">
               <option value="barSimple">Simple Bar Chart</option>
@@ -2548,8 +6904,24 @@ function DataTabContent({ chartData, chartType }) {
               <option value="barProductRevenue">Product Category Revenue</option>
               <option value="barTeamPerformance">Team Performance Metrics</option>
               <option value="barCustomerAcquisition">Customer Acquisition by Source</option>
-              <option value="barElectionOpinion">Election Administration Opinion</option>
             </optgroup>
+          ) : chartType === 'line' ? (
+            <>
+              <optgroup label="Line Charts - Yearly">
+                <option value="webTrafficYearly">Web Traffic (Yearly)</option>
+              </optgroup>
+              <optgroup label="Line Charts - Monthly">
+                <option value="marketingChannelRevenue">Marketing Channel Revenue</option>
+                <option value="salesMonthly">Online Sales (Monthly)</option>
+                <option value="patientOutcomesMonthly">Patient Outcomes (Monthly)</option>
+              </optgroup>
+              <optgroup label="Line Charts - Daily">
+                <option value="clothingRetail2Years">Online Clothing Retail (2 Years Daily)</option>
+                <option value="ecommerceDailyH1">E-commerce Sales (Daily H1 2024)</option>
+                <option value="serverMetricsDaily">Server Performance (Daily)</option>
+                <option value="stockPricesDaily">Stock Prices (Daily)</option>
+              </optgroup>
+            </>
           ) : (
             <>
               <optgroup label="Time-Based">
@@ -2571,7 +6943,8 @@ function DataTabContent({ chartData, chartType }) {
             </>
           )}
         </select>
-      </div>
+        </div>
+      </CollapsibleSection>
 
       {/* Error Display */}
       {chartData.error && (
@@ -2580,36 +6953,59 @@ function DataTabContent({ chartData, chartType }) {
         </div>
       )}
 
-      {/* Data Summary */}
-      {chartData.hasData && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-          <h3 className="font-medium text-gray-900 mb-3">Data Summary</h3>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">{stageLabel}s:</span>
-            <span className="font-medium">{chartData.stageCount}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">{periodLabelPlural}:</span>
-            <span className="font-medium">{chartData.periodCount}</span>
-          </div>
-          {!isBarChart && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Mode:</span>
-              <span className={`font-medium ${chartData.isComparisonMode ? 'text-cyan-600' : 'text-blue-600'}`}>
-                {chartData.isComparisonMode ? 'Comparison' : 'Time-Based'}
-              </span>
-            </div>
+      {/* Separator */}
+      <div className="border-t-2 border-gray-300 my-4"></div>
+
+      {/* Data Summary - Always Visible */}
+      <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 space-y-2">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-medium text-gray-900">Data Summary</h3>
+          {chartData.hasData && (
+            <button
+              onClick={onEditData}
+              className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors"
+            >
+              Edit Data
+            </button>
           )}
         </div>
-      )}
+        {chartData.hasData ? (
+          <>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Data Source:</span>
+              <span className="font-medium text-gray-900">
+                {googleSheetsUrl.trim() ? 'Google Sheets' : 'CSV Data'}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">{stageLabelPlural}:</span>
+              <span className="font-medium">{chartData.stageCount}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">{periodLabelPlural}:</span>
+              <span className="font-medium">{chartData.periodCount}</span>
+            </div>
+            {!isBarChart && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Mode:</span>
+                <span className={`font-medium ${chartData.isComparisonMode ? 'text-cyan-600' : 'text-blue-600'}`}>
+                  {chartData.isComparisonMode ? 'Comparison' : 'Time-Based'}
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-gray-500 italic">No data loaded</p>
+        )}
+      </div>
 
       {/* Data Preview (Read-Only) */}
       {chartData.hasData && chartData.data && (
         <div>
-          <div className="flex justify-between items-center mb-3">
+          <div className="flex justify-between items-center mb-2">
             <h3 className="font-medium text-gray-900">Data Preview</h3>
             <p className="text-xs text-gray-500">
-              Click "Edit Data" button above the chart to modify data
+              Read-only preview
             </p>
           </div>
           <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -2667,12 +7063,13 @@ function EditDataTable({ chartData, chartType, onClose }) {
 
   // Chart-specific labels
   const isBarChart = chartType === 'bar';
+  const isLineChart = chartType === 'line';
 
   // For flattened format, rows are Periods and columns are "Group - Value" combinations
-  // For regular format, rows are Stage/Category and columns are period names
-  const stageLabel = isFlattenedGroupedStacked ? 'Period' : (isBarChart ? 'Category' : 'Stage');
-  const periodLabel = isFlattenedGroupedStacked ? 'Series' : (isBarChart ? 'Value' : 'Period');
-  const stageFieldName = isFlattenedGroupedStacked ? 'Period' : (isBarChart ? 'Category' : 'Stage');
+  // For regular format, rows are Stage/Category/Date and columns are period/metric names
+  const stageLabel = isFlattenedGroupedStacked ? 'Period' : (isLineChart ? 'Date' : (isBarChart ? 'Category' : 'Stage'));
+  const periodLabel = isFlattenedGroupedStacked ? 'Series' : (isLineChart ? 'Metric' : (isBarChart ? 'Value' : 'Period'));
+  const stageFieldName = isFlattenedGroupedStacked ? 'Period' : (isLineChart ? 'date' : (isBarChart ? 'Category' : 'Stage'));
 
   // For flattened format, "periods" are actually the Group-Value column names
   const columnNames = isFlattenedGroupedStacked
@@ -2815,7 +7212,7 @@ function EditDataTable({ chartData, chartType, onClose }) {
                             ×
                           </button>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 items-center">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -2836,6 +7233,18 @@ function EditDataTable({ chartData, chartType, onClose }) {
                           >
                             ↑
                           </button>
+                          <label className="flex items-center gap-1 ml-2" title="Hide this metric">
+                            <input
+                              type="checkbox"
+                              checked={chartData.hiddenPeriods?.has(columnName) || false}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                chartData.togglePeriodHidden(columnName, e.target.checked);
+                              }}
+                              className="w-3 h-3 text-cyan-600 focus:ring-cyan-500 rounded"
+                            />
+                            <span className="text-xs text-gray-500">Hide</span>
+                          </label>
                         </div>
                       </div>
                     )}
@@ -2928,7 +7337,7 @@ function CollapsibleSection({ title, isExpanded, onToggle, children }) {
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-medium text-gray-900"
+        className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-medium text-sm text-gray-900"
       >
         <span>{title}</span>
         <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
@@ -2936,7 +7345,7 @@ function CollapsibleSection({ title, isExpanded, onToggle, children }) {
         </span>
       </button>
       {isExpanded && (
-        <div className="px-4 py-4 bg-white">
+        <div className="px-3 py-3 bg-white">
           {children}
         </div>
       )}
