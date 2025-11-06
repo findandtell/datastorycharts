@@ -1,0 +1,72 @@
+{
+  "version": "1.0",
+  "chartType": "line",
+  "timestamp": "2025-11-06T12:00:00.000Z",
+  "name": "Website Traffic Metrics",
+  "data": {
+    "csv": "date,Visitors,Page Views,Conversions\n2024-01-01,12500,45000,350\n2024-01-02,13200,48000,385\n2024-01-03,14100,52000,420\n2024-01-04,13800,49500,395\n2024-01-05,12900,46500,365\n2024-01-06,11200,38000,295\n2024-01-07,10800,35500,275\n2024-01-08,13500,48500,395\n2024-01-09,14200,51000,425\n2024-01-10,15000,54500,465\n2024-01-11,14800,53000,445\n2024-01-12,14500,52000,430\n2024-01-13,12800,44000,345\n2024-01-14,11900,40500,315",
+    "source": "csv-paste",
+    "googleSheetsUrl": null,
+    "periodNames": [
+      "Visitors",
+      "Page Views",
+      "Conversions"
+    ],
+    "stageCount": 14,
+    "periodCount": 3,
+    "isComparisonMode": false
+  },
+  "state": {
+    "hiddenPeriods": [],
+    "emphasizedBars": [],
+    "emphasizedLines": [
+      "Conversions"
+    ],
+    "selectedMetrics": [
+      "Visitors",
+      "Page Views",
+      "Conversions"
+    ]
+  },
+  "style": {
+    "theme": "light",
+    "darkMode": false,
+    "title": "Website Traffic Metrics",
+    "subtitle": "Daily Performance - First Two Weeks of January",
+    "fontFamily": "Inter",
+    "fontSize": 13,
+    "titleSize": 26,
+    "titleWeight": "700",
+    "titleColor": "#111827",
+    "subtitleSize": 15,
+    "subtitleWeight": "400",
+    "subtitleColor": "#6b7280",
+    "canvasWidth": 1200,
+    "canvasHeight": 600,
+    "chartWidth": 1100,
+    "chartHeight": 450,
+    "chartPadding": 40,
+    "backgroundColor": "#ffffff",
+    "backgroundOpacity": 100,
+    "showWatermark": true,
+    "watermarkText": "Find&Tell",
+    "watermarkColor": "#9ca3af",
+    "watermarkSize": 12,
+    "colorPalette": ["#3b82f6", "#10b981", "#f59e0b"],
+    "lineThickness": 2.5,
+    "pointSize": 4,
+    "pointBorderWidth": 2,
+    "showPoints": true,
+    "showGrid": true,
+    "gridColor": "#e5e7eb",
+    "showXAxis": true,
+    "showYAxis": true,
+    "axisColor": "#9ca3af",
+    "legendPosition": "top",
+    "showLegend": true,
+    "legendFontSize": 13,
+    "smoothLines": true,
+    "fillArea": false,
+    "areaOpacity": 20
+  }
+}

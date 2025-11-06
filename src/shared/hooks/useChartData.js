@@ -44,6 +44,11 @@ export const useChartData = (chartType = 'funnel') => {
   const [error, setError] = useState(null);
   const [hiddenPeriods, setHiddenPeriods] = useState(new Set());
 
+  // Track raw data for Save/Load functionality
+  const [rawCSV, setRawCSV] = useState('');
+  const [source, setSource] = useState('sample'); // 'sample', 'csv-upload', 'csv-paste', 'google-sheets'
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState('');
+
   /**
    * Detect if data is in flattened grouped-stacked format
    * Format: { Period: "Nov '18", "Group - Value": 21, ... }
@@ -139,6 +144,31 @@ export const useChartData = (chartType = 'funnel') => {
     setIsComparisonMode(isComparisonDataset(datasetKey));
     setError(null);
 
+    // Convert sample data to CSV for Save/Load functionality
+    // Use the original dataset.data structure for CSV conversion
+    const csvRows = [];
+    const sampleData = dataset.data;
+    if (sampleData && sampleData.length > 0) {
+      // Get headers from first row
+      const headers = Object.keys(sampleData[0]);
+      csvRows.push(headers.join(','));
+
+      // Add data rows
+      sampleData.forEach(row => {
+        const values = headers.map(header => {
+          const value = row[header];
+          // Escape values that contain commas or quotes
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        });
+        csvRows.push(values.join(','));
+      });
+    }
+    setRawCSV(csvRows.join('\n'));
+    setSource('sample');
+
     return true;
   }, []);
 
@@ -147,6 +177,9 @@ export const useChartData = (chartType = 'funnel') => {
    */
   const loadCSVFile = useCallback(async (file) => {
     try {
+      // Read file content as text for storage
+      const fileText = await file.text();
+
       const results = await parseCSV(file);
 
       if (results.errors && results.errors.length > 0) {
@@ -173,6 +206,10 @@ export const useChartData = (chartType = 'funnel') => {
       setIsComparisonMode(false);
       setError(null);
 
+      // Track raw CSV for Save/Load
+      setRawCSV(fileText);
+      setSource('csv-upload');
+
       return true;
     } catch (err) {
       setError("Failed to load CSV: " + err.message);
@@ -183,7 +220,7 @@ export const useChartData = (chartType = 'funnel') => {
   /**
    * Load CSV from text string (for copy/paste functionality)
    */
-  const loadCSVText = useCallback(async (csvText, delimiter = ',') => {
+  const loadCSVText = useCallback(async (csvText, delimiter = ',', source = 'csv-paste') => {
     try {
       const Papa = (await import('papaparse')).default;
 
@@ -231,6 +268,10 @@ export const useChartData = (chartType = 'funnel') => {
       setEditableData(structuredClone(chartData));
       setIsComparisonMode(false);
       setError(null);
+
+      // Track raw CSV for Save/Load
+      setRawCSV(csvText);
+      setSource(source);
 
       return true;
     } catch (err) {
@@ -524,6 +565,12 @@ export const useChartData = (chartType = 'funnel') => {
     error,
     hiddenPeriods,
 
+    // Save/Load state
+    rawCSV,
+    source,
+    googleSheetsUrl,
+    setGoogleSheetsUrl,
+
     // Actions
     loadSampleData,
     loadCSVFile,
@@ -545,6 +592,7 @@ export const useChartData = (chartType = 'funnel') => {
     applyEdits,
     resetEdits,
     clearData,
+    setHiddenPeriods,
 
     // Getters
     getPeriodData,

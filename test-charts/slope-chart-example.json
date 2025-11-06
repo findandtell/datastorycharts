@@ -1,0 +1,66 @@
+{
+  "version": "1.0",
+  "chartType": "slope",
+  "timestamp": "2025-11-06T12:00:00.000Z",
+  "name": "Market Share Change",
+  "data": {
+    "csv": "Category,2023,2024\nProduct A,35,42\nProduct B,28,31\nProduct C,22,18\nProduct D,15,9",
+    "source": "csv-paste",
+    "googleSheetsUrl": null,
+    "periodNames": [
+      "2023",
+      "2024"
+    ],
+    "stageCount": 4,
+    "periodCount": 2,
+    "isComparisonMode": true
+  },
+  "state": {
+    "hiddenPeriods": [],
+    "emphasizedBars": [],
+    "emphasizedLines": [
+      "Product A"
+    ],
+    "selectedMetrics": []
+  },
+  "style": {
+    "theme": "light",
+    "darkMode": false,
+    "title": "Market Share Change",
+    "subtitle": "Year-over-Year Comparison (2023 vs 2024)",
+    "fontFamily": "Inter",
+    "fontSize": 14,
+    "titleSize": 28,
+    "titleWeight": "700",
+    "titleColor": "#111827",
+    "subtitleSize": 16,
+    "subtitleWeight": "400",
+    "subtitleColor": "#6b7280",
+    "canvasWidth": 900,
+    "canvasHeight": 600,
+    "chartWidth": 800,
+    "chartHeight": 450,
+    "chartPadding": 40,
+    "backgroundColor": "#ffffff",
+    "backgroundOpacity": 100,
+    "showWatermark": true,
+    "watermarkText": "Find&Tell",
+    "watermarkColor": "#9ca3af",
+    "watermarkSize": 12,
+    "colorMode": "change",
+    "increaseColor": "#10b981",
+    "decreaseColor": "#ef4444",
+    "noChangeColor": "#9ca3af",
+    "lineThickness": 2,
+    "endpointSize": 6,
+    "showLabels": true,
+    "labelPosition": "outside",
+    "labelColor": "#111827",
+    "showValues": true,
+    "valuePosition": "inside",
+    "valueColor": "#111827",
+    "periodLabelSize": 16,
+    "periodLabelWeight": "600",
+    "periodLabelColor": "#374151"
+  }
+}

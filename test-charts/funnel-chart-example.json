@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "chartType": "funnel",
+  "timestamp": "2025-11-06T12:00:00.000Z",
+  "name": "E-commerce Conversion Funnel",
+  "data": {
+    "csv": "Stage,Q1 2024,Q2 2024,Q3 2024\nWebsite Visitors,50000,55000,60000\nProduct Views,25000,28000,32000\nAdd to Cart,12500,14500,17000\nCheckout Started,7500,9000,11000\nPurchase Complete,5000,6500,8500",
+    "source": "csv-paste",
+    "googleSheetsUrl": null,
+    "periodNames": [
+      "Q1 2024",
+      "Q2 2024",
+      "Q3 2024"
+    ],
+    "stageCount": 5,
+    "periodCount": 3,
+    "isComparisonMode": false
+  },
+  "state": {
+    "hiddenPeriods": [],
+    "emphasizedBars": [],
+    "emphasizedLines": [],
+    "selectedMetrics": []
+  },
+  "style": {
+    "theme": "light",
+    "darkMode": false,
+    "title": "E-commerce Conversion Funnel",
+    "subtitle": "Q1-Q3 2024 Performance",
+    "fontFamily": "Inter",
+    "fontSize": 14,
+    "titleSize": 24,
+    "titleWeight": "700",
+    "titleColor": "#1f2937",
+    "subtitleSize": 16,
+    "subtitleWeight": "400",
+    "subtitleColor": "#6b7280",
+    "canvasWidth": 800,
+    "canvasHeight": 600,
+    "chartPadding": 40,
+    "backgroundColor": "#ffffff",
+    "backgroundOpacity": 100,
+    "showWatermark": true,
+    "watermarkText": "Find&Tell",
+    "watermarkColor": "#9ca3af",
+    "watermarkSize": 12,
+    "colorMode": "gradient",
+    "colorPalette": ["#3b82f6", "#60a5fa", "#93c5fd"],
+    "labelPosition": "inside",
+    "showStageLabels": true,
+    "showValueLabels": true,
+    "labelColor": "#ffffff",
+    "stageLabelColor": "#1f2937",
+    "funnelSpacing": 8,
+    "borderRadius": 4,
+    "showDropoff": true,
+    "dropoffPosition": "right",
+    "dropoffColor": "#ef4444"
+  }
+}

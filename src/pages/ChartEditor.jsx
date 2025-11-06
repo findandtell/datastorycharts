@@ -10,6 +10,7 @@ import { getSampleDataset } from '../shared/data/sampleDatasets';
 import { getAllTemplates, applyTemplate } from '../shared/design-system/styleTemplates';
 import { throttle } from '../shared/utils/performanceUtils';
 import { loadGoogleSheetsData, isGoogleSheetsUrl, getPublicSharingInstructions } from '../shared/utils/googleSheetsLoader';
+import { serializeChartState, deserializeChartState, applyChartState, generateChartFilename } from '../shared/utils/chartStateManager';
 import FunnelChart from '../charts/FunnelChart/FunnelChart';
 import SlopeChart from '../charts/SlopeChart/SlopeChart';
 import BarChart from '../charts/BarChart/BarChart';
@@ -82,6 +83,7 @@ export default function ChartEditor() {
   const svgRef = useRef(null);
   const exportMenuRef = useRef(null);
   const styleFileInputRef = useRef(null);
+  const chartImportFileInputRef = useRef(null);
   const clearEmphasisRef = useRef(null);
 
   // Collapse all sections when switching tabs
@@ -500,6 +502,92 @@ export default function ChartEditor() {
     setShowExportMenu(false);
   };
 
+  // Handle Save Chart (complete chart state)
+  const handleSaveChart = () => {
+    try {
+      // Serialize complete chart state
+      const chartState = serializeChartState({
+        chartType,
+        chartData,
+        styleSettings,
+        name: styleSettings.title || `${chartType}-chart`,
+      });
+
+      // Convert to JSON string
+      const jsonString = JSON.stringify(chartState, null, 2);
+
+      // Create blob and download
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = generateChartFilename(styleSettings.title || `${chartType}-chart`, chartType);
+      link.click();
+      URL.revokeObjectURL(url);
+
+      console.log('Chart saved successfully');
+    } catch (error) {
+      console.error('Failed to save chart:', error);
+      alert('Failed to save chart: ' + error.message);
+    }
+  };
+
+  // Handle Import Chart (load chart state from file)
+  const handleImportChart = () => {
+    chartImportFileInputRef.current?.click();
+  };
+
+  const handleChartFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // Read file content
+      const fileText = await file.text();
+      const chartState = JSON.parse(fileText);
+
+      // Deserialize and validate
+      const parsedState = deserializeChartState(chartState);
+
+      if (!parsedState.isValid) {
+        throw new Error('Invalid chart file format');
+      }
+
+      // Confirm with user before replacing current chart
+      const confirmLoad = window.confirm(
+        `This will replace your current ${chartType} chart with a ${parsedState.chartType} chart. Continue?`
+      );
+
+      if (!confirmLoad) {
+        event.target.value = ''; // Reset file input
+        return;
+      }
+
+      // Apply chart state
+      const result = await applyChartState(
+        parsedState,
+        (newChartType) => {
+          if (newChartType !== chartType) {
+            navigate(`/chart/${newChartType}`);
+          }
+        },
+        chartData,
+        styleSettings
+      );
+
+      if (result.success) {
+        console.log('Chart loaded successfully');
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Failed to import chart:', error);
+      alert('Failed to import chart: ' + error.message);
+    } finally {
+      event.target.value = ''; // Reset file input
+    }
+  };
+
   // Handle Save Style
   const handleSaveStyle = () => {
     // Generate suggested name and open modal
@@ -679,6 +767,11 @@ export default function ChartEditor() {
         data: chartData.data,
         periodNames: chartData.periodNames,
         isComparisonMode: chartData.isComparisonMode,
+        // Save/Load state
+        rawCSV: chartData.rawCSV,
+        source: chartData.source,
+        googleSheetsUrl: chartData.googleSheetsUrl,
+        hiddenPeriods: chartData.hiddenPeriods,
       },
       settings: exportedSettings,
     };
@@ -693,6 +786,44 @@ export default function ChartEditor() {
 
   const handleDeleteSnapshot = (snapshotId) => {
     setSnapshots(prev => prev.filter(s => s.id !== snapshotId));
+  };
+
+  const handleSaveChartFromSnapshot = (snapshot) => {
+    try {
+      // Build chart state from snapshot data
+      const chartState = serializeChartState({
+        chartType: snapshot.chartType,
+        chartData: {
+          rawCSV: snapshot.data?.rawCSV || '',
+          source: snapshot.data?.source || 'snapshot',
+          googleSheetsUrl: snapshot.data?.googleSheetsUrl || '',
+          periodNames: snapshot.data?.periodNames || [],
+          stageCount: snapshot.data?.data?.length || 0,
+          periodCount: snapshot.data?.periodNames?.length || 0,
+          isComparisonMode: snapshot.data?.isComparisonMode || false,
+          hiddenPeriods: snapshot.data?.hiddenPeriods || new Set(),
+        },
+        styleSettings: snapshot.settings || {},
+        name: snapshot.name || `${snapshot.chartType}-chart`,
+      });
+
+      // Convert to JSON string
+      const jsonString = JSON.stringify(chartState, null, 2);
+
+      // Create blob and download
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = generateChartFilename(snapshot.name || `${snapshot.chartType}-chart`, snapshot.chartType);
+      link.click();
+      URL.revokeObjectURL(url);
+
+      console.log('Chart saved from snapshot successfully');
+    } catch (error) {
+      console.error('Failed to save chart from snapshot:', error);
+      alert('Failed to save chart from snapshot: ' + error.message);
+    }
   };
 
   const handleLoadChart = (snapshot) => {
@@ -1419,6 +1550,27 @@ export default function ChartEditor() {
               </button>
             )}
 
+            {/* Import Chart Button */}
+            <button
+              onClick={handleImportChart}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
+              title="Import chart from file"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              Import
+            </button>
+
+            {/* Hidden file input for chart import */}
+            <input
+              ref={chartImportFileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleChartFileChange}
+              className="hidden"
+            />
+
             {/* Export Menu */}
             <div className="relative" ref={exportMenuRef}>
               <button
@@ -1607,33 +1759,55 @@ export default function ChartEditor() {
                 )}
               </div>
 
-              {/* Capture Snapshot Button */}
+              {/* Capture Snapshot and Save Chart Buttons */}
               {!showDataTable && (
-                <button
-                  onClick={handleCaptureSnapshot}
-                  className="px-6 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleCaptureSnapshot}
+                    className="px-6 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  Capture Snapshot
-                </button>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    Capture Snapshot
+                  </button>
+                  <button
+                    onClick={handleSaveChart}
+                    className="px-6 py-2 bg-green-600 text-white font-medium text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
+                    title="Save complete chart with data and styling"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                      />
+                    </svg>
+                    Save Chart
+                  </button>
+                </div>
               )}
 
               {/* Snapshot Gallery */}
@@ -1643,6 +1817,7 @@ export default function ChartEditor() {
                     snapshots={snapshots}
                     onSnapshotClick={handleSnapshotClick}
                     onDeleteSnapshot={handleDeleteSnapshot}
+                    onSaveChart={handleSaveChartFromSnapshot}
                   />
                 </div>
               )}
@@ -6646,10 +6821,13 @@ function DataTabContent({
       const rows = data.map(row => Object.values(row).join(',')).join('\n');
       const csvText = headers + '\n' + rows;
 
-      // Use the existing CSV text loader
-      const success = await chartData.loadCSVText(csvText);
+      // Use the existing CSV text loader with 'google-sheets' source
+      const success = await chartData.loadCSVText(csvText, ',', 'google-sheets');
 
       if (success) {
+        // Store Google Sheets URL
+        chartData.setGoogleSheetsUrl(googleSheetsUrl);
+
         setGoogleSheetsError('');
         // Don't clear URL or close panel - allow user to refresh or enable auto-refresh
       } else {

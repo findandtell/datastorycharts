@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "chartType": "bar",
+  "timestamp": "2025-11-06T12:00:00.000Z",
+  "name": "Live Dashboard - Google Sheets Integration",
+  "data": {
+    "csv": "Category,Week 1,Week 2,Week 3,Week 4\nEmail Marketing,4500,4800,5200,5600\nSocial Media,3200,3400,3800,4100\nPaid Search,5800,6100,6400,6800\nOrganic Search,2100,2300,2500,2700\nDirect Traffic,1800,1900,2100,2300",
+    "source": "google-sheets",
+    "googleSheetsUrl": "https://docs.google.com/spreadsheets/d/1234567890/edit#gid=0",
+    "periodNames": [
+      "Week 1",
+      "Week 2",
+      "Week 3",
+      "Week 4"
+    ],
+    "stageCount": 5,
+    "periodCount": 4,
+    "isComparisonMode": false
+  },
+  "state": {
+    "hiddenPeriods": [
+      "Week 1"
+    ],
+    "emphasizedBars": [
+      "Week 4"
+    ],
+    "emphasizedLines": [],
+    "selectedMetrics": []
+  },
+  "style": {
+    "theme": "light",
+    "darkMode": false,
+    "title": "Live Dashboard - Google Sheets Integration",
+    "subtitle": "Marketing Channel Performance (with hidden Week 1)",
+    "fontFamily": "Inter",
+    "fontSize": 14,
+    "titleSize": 26,
+    "titleWeight": "700",
+    "titleColor": "#111827",
+    "subtitleSize": 15,
+    "subtitleWeight": "400",
+    "subtitleColor": "#6b7280",
+    "canvasWidth": 1000,
+    "canvasHeight": 600,
+    "chartWidth": 900,
+    "chartHeight": 450,
+    "chartPadding": 40,
+    "backgroundColor": "#f9fafb",
+    "backgroundOpacity": 100,
+    "showWatermark": true,
+    "watermarkText": "Find&Tell - Live Data",
+    "watermarkColor": "#9ca3af",
+    "watermarkSize": 12,
+    "colorPalette": ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#ef4444"],
+    "barSpacing": 0.2,
+    "categorySpacing": 0.5,
+    "showGrid": true,
+    "gridColor": "#d1d5db",
+    "showXAxis": true,
+    "showYAxis": true,
+    "axisColor": "#9ca3af",
+    "showDataLabels": true,
+    "labelPosition": "top",
+    "labelColor": "#111827",
+    "legendPosition": "bottom",
+    "showLegend": true,
+    "legendFontSize": 12
+  }
+}

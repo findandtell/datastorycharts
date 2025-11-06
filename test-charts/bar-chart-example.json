@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "chartType": "bar",
+  "timestamp": "2025-11-06T12:00:00.000Z",
+  "name": "Regional Sales Performance",
+  "data": {
+    "csv": "Category,Jan,Feb,Mar,Apr,May,Jun\nNorth America,125000,132000,145000,138000,152000,165000\nEurope,95000,98000,105000,112000,118000,125000\nAsia Pacific,85000,92000,98000,105000,115000,128000\nLatin America,42000,45000,48000,52000,55000,58000",
+    "source": "csv-paste",
+    "googleSheetsUrl": null,
+    "periodNames": [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun"
+    ],
+    "stageCount": 4,
+    "periodCount": 6,
+    "isComparisonMode": false
+  },
+  "state": {
+    "hiddenPeriods": [],
+    "emphasizedBars": [
+      "Jun"
+    ],
+    "emphasizedLines": [],
+    "selectedMetrics": []
+  },
+  "style": {
+    "theme": "light",
+    "darkMode": false,
+    "title": "Regional Sales Performance",
+    "subtitle": "January - June 2024",
+    "fontFamily": "Inter",
+    "fontSize": 14,
+    "titleSize": 28,
+    "titleWeight": "700",
+    "titleColor": "#111827",
+    "subtitleSize": 16,
+    "subtitleWeight": "400",
+    "subtitleColor": "#6b7280",
+    "canvasWidth": 1000,
+    "canvasHeight": 600,
+    "chartWidth": 900,
+    "chartHeight": 450,
+    "chartPadding": 40,
+    "backgroundColor": "#ffffff",
+    "backgroundOpacity": 100,
+    "showWatermark": true,
+    "watermarkText": "Find&Tell",
+    "watermarkColor": "#9ca3af",
+    "watermarkSize": 12,
+    "colorPalette": ["#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b"],
+    "barSpacing": 0.2,
+    "categorySpacing": 0.5,
+    "showGrid": true,
+    "gridColor": "#e5e7eb",
+    "showXAxis": true,
+    "showYAxis": true,
+    "axisColor": "#9ca3af",
+    "showDataLabels": false,
+    "labelPosition": "top",
+    "labelColor": "#111827",
+    "legendPosition": "top",
+    "showLegend": true,
+    "legendFontSize": 12
+  }
+}

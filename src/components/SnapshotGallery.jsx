@@ -4,7 +4,7 @@ import React from 'react';
  * SnapshotGallery Component
  * Displays thumbnail grid of captured chart snapshots
  */
-export default function SnapshotGallery({ snapshots, onSnapshotClick, onDeleteSnapshot }) {
+export default function SnapshotGallery({ snapshots, onSnapshotClick, onDeleteSnapshot, onSaveChart }) {
   if (!snapshots || snapshots.length === 0) {
     return null;
   }
@@ -39,7 +39,7 @@ export default function SnapshotGallery({ snapshots, onSnapshotClick, onDeleteSn
 
             {/* Footer */}
             <div className="p-3 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-600 truncate">
                     {new Date(snapshot.timestamp).toLocaleString([], {
@@ -78,6 +78,23 @@ export default function SnapshotGallery({ snapshots, onSnapshotClick, onDeleteSn
                   </svg>
                 </button>
               </div>
+
+              {/* Save Chart Button */}
+              {onSaveChart && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSaveChart(snapshot);
+                  }}
+                  className="w-full py-1.5 px-2 bg-green-100 text-green-700 hover:bg-green-200 rounded text-xs font-medium transition-colors duration-150 flex items-center justify-center gap-1"
+                  title="Save chart state to file"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Save Chart
+                </button>
+              )}
             </div>
           </div>
         ))}
