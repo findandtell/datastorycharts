@@ -26,6 +26,17 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
   const svgRef = useRef(null);
   const [hoveredMetric, setHoveredMetric] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [debouncedStyleSettings, setDebouncedStyleSettings] = useState(styleSettings);
+
+  // Debounce style settings to reduce re-renders with large datasets
+  // This prevents the expensive D3 re-render from happening on every slider movement
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStyleSettings(styleSettings);
+    }, 100); // 100ms debounce - balances responsiveness with performance
+
+    return () => clearTimeout(timer);
+  }, [styleSettings]);
 
   // Memoize date format detection to avoid testing all parsers for every row
   const detectedDateFormat = useMemo(() => {
@@ -65,6 +76,41 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     return { format: 'native', parser: (d) => new Date(d) };
   }, [data, styleSettings?.dateField]);
 
+  // PERFORMANCE OPTIMIZATION: Memoize data aggregation for large datasets
+  // With 730+ days of data, aggregation is expensive and shouldn't run on every render
+  const processedData = useMemo(() => {
+    const aggregationLevel = debouncedStyleSettings?.aggregationLevel;
+    const shouldAggregate = aggregationLevel &&
+                           aggregationLevel !== 'day' &&
+                           data &&
+                           data.length > 0;
+
+    if (!shouldAggregate) {
+      return data;
+    }
+
+    try {
+      return aggregateData(
+        data,
+        debouncedStyleSettings?.dateField || 'date',
+        metricNames,
+        aggregationLevel,
+        debouncedStyleSettings?.aggregationMethod || 'sum',
+        debouncedStyleSettings?.fiscalYearStartMonth || 1
+      );
+    } catch (error) {
+      console.warn('Aggregation failed, using original data:', error);
+      return data;
+    }
+  }, [
+    data,
+    metricNames,
+    debouncedStyleSettings?.aggregationLevel,
+    debouncedStyleSettings?.aggregationMethod,
+    debouncedStyleSettings?.fiscalYearStartMonth,
+    debouncedStyleSettings?.dateField,
+  ]);
+
   useEffect(() => {
     if (!data || data.length === 0 || !svgRef.current) {
       return;
@@ -74,7 +120,8 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     d3.select(svgRef.current).selectAll('*').remove();
 
     // Merge provided settings with defaults
-    const settings = { ...defaultStyleSettings, ...styleSettings };
+    // Using debounced settings for better performance with large datasets
+    const settings = { ...defaultStyleSettings, ...debouncedStyleSettings };
 
     // Add extra canvas height for watermark margin area if user is on free tier
     // This extends the SVG canvas to create dedicated space for the watermark
@@ -271,28 +318,8 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     // Chart height uses original height (watermark goes in extended margin area)
     const chartHeight = height - marginTop - marginBottom - headerHeight;
 
-    // Apply time aggregation if needed
-    let processedData = data;
-    const shouldAggregate = aggregationLevel &&
-                           aggregationLevel !== 'day' &&
-                           data &&
-                           data.length > 0;
-
-    if (shouldAggregate) {
-      try {
-        processedData = aggregateData(
-          data,
-          dateField || 'date',
-          metricNames,
-          aggregationLevel,
-          aggregationMethod || 'sum',
-          fiscalYearStartMonth || 1
-        );
-      } catch (error) {
-        console.warn('Aggregation failed, using original data:', error);
-        processedData = data;
-      }
-    }
+    // Data aggregation is now memoized outside useEffect for better performance
+    // (see useMemo above for processedData)
 
     // Parse dates and prepare data
     // Use the appropriate date parser based on timeScale
@@ -1311,7 +1338,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           .on('mouseleave', null);
       }
     };
-  }, [data, metricNames, styleSettings, onLineClick, onPointClick, onMetricClick, onLabelDrag]);
+  }, [processedData, metricNames, debouncedStyleSettings, onLineClick, onPointClick, onMetricClick, onLabelDrag]);
 
   return (
     <div className="line-chart-container">
