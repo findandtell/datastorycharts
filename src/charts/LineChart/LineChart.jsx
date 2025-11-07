@@ -424,7 +424,10 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     }
 
     // Create line generator
-    const lineGenerator = smoothLines
+    // PERFORMANCE: Auto-disable smooth lines for large datasets (expensive curve calculations)
+    const shouldSmooth = smoothLines && parsedData.length <= 500;
+
+    const lineGenerator = shouldSmooth
       ? d3.line()
           .x(d => xScale(d.parsedDate))
           .y((d, metric) => yScale(d[metric]))
@@ -1018,12 +1021,42 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         });
       }
 
-      // Always draw all points so they're clickable for emphasis, even when showPoints is false
-      // When showPoints is false, non-emphasized points will be invisible (opacity: 0) but still clickable
-      const currentPointSize = isEmphasized ? emphasizedPointSize : pointSize;
+      // PERFORMANCE OPTIMIZATION: For large datasets, intelligently reduce rendered points
+      // This dramatically improves performance while maintaining visual quality
+      const isLargeDataset = metricData.length > 200;
+      let pointsToShow;
 
-      // Always include all points (for clicking), store original indices
-      const pointsToShow = metricData.map((d, idx) => ({ ...d, _originalIdx: idx }));
+      if (isLargeDataset && !isEmphasized) {
+        // Adaptive decimation: show fewer points for very large datasets
+        const decimationFactor = metricData.length > 500 ? 5 : 3;
+
+        // Always keep first and last points, plus emphasized points
+        pointsToShow = metricData
+          .map((d, idx) => ({ ...d, _originalIdx: idx }))
+          .filter((d, idx, arr) => {
+            // Keep first and last
+            if (idx === 0 || idx === arr.length - 1) return true;
+
+            // Keep emphasized points
+            const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
+              p.metric === metric && p.index === d._originalIdx
+            );
+            if (isPointEmphasized) return true;
+
+            // Keep every Nth point
+            return idx % decimationFactor === 0;
+          });
+      } else {
+        // Small dataset or emphasized line: render all points
+        pointsToShow = metricData.map((d, idx) => ({ ...d, _originalIdx: idx }));
+      }
+
+      // Create emphasis lookup Set for O(1) performance instead of O(n) .some() calls
+      const emphasizedPointsSet = new Set(
+        (emphasizedPoints || [])
+          .filter(p => p.metric === metric)
+          .map(p => p.index)
+      );
 
       const circles = chartGroup
         .selectAll(`.point-${i}`)
@@ -1036,14 +1069,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         .attr('cx', d => xScale(d.parsedDate))
         .attr('cy', d => yScale(d[metric]))
         .attr('r', (d) => {
-          // Check if this specific point is emphasized
-          const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
-            p.metric === metric && p.index === d._originalIdx
-          );
+          // Use Set for O(1) lookup instead of O(n) .some()
+          const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
+          const currentPointSize = isEmphasized ? emphasizedPointSize : pointSize;
           return isPointEmphasized ? currentPointSize + 1 : currentPointSize;
         })
         .attr('fill', (d) => {
-          // Check if this point has a custom style
+          // Check if this point has a custom style (use find only for custom style check)
           const emphPoint = emphasizedPoints && emphasizedPoints.find(p =>
             p.metric === metric && p.index === d._originalIdx
           );
@@ -1068,22 +1100,21 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
             const baseWidth = emphPoint.customPointStyle === 'outlined' ? pointBorderWidth : 2;
             return baseWidth;
           }
-          // Use global setting for emphasized points
-          const isPointEmphasized = emphPoint !== undefined;
+          // Use Set lookup for emphasized check
+          const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
           const baseWidth = pointStyle === 'outlined' ? pointBorderWidth : 0;
           return isPointEmphasized ? Math.max(baseWidth, 2) : baseWidth;
         })
         .attr('opacity', (d) => {
           // If showPoints is false, hide non-emphasized points but keep them clickable
           if (!showPoints) {
-            const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
-              p.metric === metric && p.index === d._originalIdx
-            );
+            // Use Set for O(1) lookup instead of O(n) .some()
+            const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
             return isPointEmphasized ? 1 : 0;
           }
           return 1;
         })
-        .style('cursor', 'pointer');
+        .style('cursor', isLargeDataset ? 'default' : 'pointer');
 
       // Add event listeners separately to properly capture index
       circles.each(function(d) {
