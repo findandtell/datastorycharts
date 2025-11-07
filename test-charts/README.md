@@ -38,16 +38,7 @@ This directory contains test chart files to verify the Save/Load functionality w
   - Change-based coloring (increase/decrease)
   - Inside value labels
 
-### 5. **grouped-bar-chart-example.json**
-- **Chart Type**: Grouped Bar
-- **Data**: Quarterly department performance (4 departments, 4 quarters)
-- **Features**:
-  - Multi-department comparison
-  - Data labels on top of bars
-  - Quarterly grouping
-  - Legend at top
-
-### 6. **google-sheets-example.json** ⭐
+### 5. **google-sheets-example.json** ⭐
 - **Chart Type**: Bar
 - **Data**: Marketing channel performance (5 channels, 4 weeks)
 - **Special Features**:
@@ -156,7 +147,7 @@ All test files follow this structure:
 ```json
 {
   "version": "1.0",
-  "chartType": "funnel|bar|line|slope|grouped-bar",
+  "chartType": "funnel|bar|line|slope",
   "timestamp": "ISO 8601 timestamp",
   "name": "Human-readable chart name",
 
@@ -191,7 +182,7 @@ All test files follow this structure:
 
 ### Import fails with validation error
 - Check that the JSON file has a valid `version` field
-- Verify `chartType` is one of: funnel, bar, line, slope, grouped-bar
+- Verify `chartType` is one of: funnel, bar, line, slope
 - Ensure `data.csv` is present and not empty
 
 ### Chart doesn't look right after import

@@ -14,7 +14,6 @@ import { serializeChartState, deserializeChartState, applyChartState, generateCh
 import FunnelChart from '../charts/FunnelChart/FunnelChart';
 import SlopeChart from '../charts/SlopeChart/SlopeChart';
 import BarChart from '../charts/BarChart/BarChart';
-import GroupedBarChart from '../charts/GroupedBarChart/GroupedBarChart';
 import LineChart from '../charts/LineChart/LineChart';
 import SnapshotGallery from '../components/SnapshotGallery';
 import SnapshotModal from '../components/SnapshotModal';
@@ -369,8 +368,6 @@ export default function ChartEditor() {
         sampleDataKey = 'tufteSlope';
       } else if (chartType === 'bar') {
         sampleDataKey = 'barRegionalSales';
-      } else if (chartType === 'grouped-bar') {
-        sampleDataKey = 'barElectionOpinion';
       } else if (chartType === 'line') {
         sampleDataKey = 'marketingChannelRevenue';
       } else {
@@ -1132,21 +1129,27 @@ export default function ChartEditor() {
   };
 
   // Create settings object for chart component
-  // Common settings for all chart types
-  const commonSettings = {
-    title: styleSettings.title,
-    subtitle: styleSettings.subtitle,
-    titleAlignment: styleSettings.titleAlignment,
-    fontFamily: styleSettings.fontFamily,
-    titleFontSize: styleSettings.titleFontSize,
-    subtitleFontSize: styleSettings.subtitleFontSize,
-    canvasWidth: styleSettings.canvasWidth,
-    canvasHeight: styleSettings.canvasHeight,
-    chartPadding: styleSettings.chartPadding,
-    backgroundOpacity: styleSettings.backgroundOpacity,
-    darkMode: styleSettings.darkMode,
-    userTier: styleSettings.userTier,
-  };
+  // PERFORMANCE OPTIMIZATION: Memoize chart style settings to prevent unnecessary re-renders
+  // This is critical for large datasets - without memoization, the settings object is recreated
+  // on every render, causing React.memo-wrapped chart components to re-render unnecessarily.
+  // This optimization works in conjunction with the throttled setters above (line 113) to ensure
+  // smooth interactions even with hundreds of data points.
+  const chartStyleSettings = useMemo(() => {
+    // Common settings for all chart types
+    const commonSettings = {
+      title: styleSettings.title,
+      subtitle: styleSettings.subtitle,
+      titleAlignment: styleSettings.titleAlignment,
+      fontFamily: styleSettings.fontFamily,
+      titleFontSize: styleSettings.titleFontSize,
+      subtitleFontSize: styleSettings.subtitleFontSize,
+      canvasWidth: styleSettings.canvasWidth,
+      canvasHeight: styleSettings.canvasHeight,
+      chartPadding: styleSettings.chartPadding,
+      backgroundOpacity: styleSettings.backgroundOpacity,
+      darkMode: styleSettings.darkMode,
+      userTier: styleSettings.userTier,
+    };
 
   // Funnel Chart specific settings
   const funnelSettings = chartType === 'funnel' ? {
@@ -1232,8 +1235,8 @@ export default function ChartEditor() {
     darkMode: styleSettings.darkMode,
   } : {};
 
-  // Bar Chart specific settings (applies to both 'bar' and 'grouped-bar')
-  const barSettings = (chartType === 'bar' || chartType === 'grouped-bar') ? {
+  // Bar Chart specific settings
+  const barSettings = (chartType === 'bar') ? {
     barMode: styleSettings.barMode,
     labelMode: styleSettings.labelMode,
     legendPosition: styleSettings.legendPosition,
@@ -1445,14 +1448,15 @@ export default function ChartEditor() {
     darkMode: styleSettings.darkMode,
   } : {};
 
-  // Combine all settings based on chart type
-  const chartStyleSettings = {
-    ...commonSettings,
-    ...funnelSettings,
-    ...slopeSettings,
-    ...barSettings,
-    ...lineSettings,
-  };
+    // Combine all settings based on chart type
+    return {
+      ...commonSettings,
+      ...funnelSettings,
+      ...slopeSettings,
+      ...barSettings,
+      ...lineSettings,
+    };
+  }, [styleSettings, chartType, chartData.hiddenPeriods]);
 
   // Render chart component based on type
   const renderChart = () => {
@@ -1497,19 +1501,6 @@ export default function ChartEditor() {
             styleSettings={chartStyleSettings}
             onBarClick={handleBarClick}
             onClearEmphasis={(clearFn) => { clearEmphasisRef.current = clearFn; }}
-          />
-        );
-      case 'grouped-bar':
-        // Filter out hidden periods
-        const visibleGroupedBarPeriods = (chartData.periodNames || []).filter(
-          period => !chartData.hiddenPeriods?.has(period)
-        );
-        return (
-          <GroupedBarChart
-            data={chartData.data}
-            periodNames={visibleGroupedBarPeriods}
-            styleSettings={chartStyleSettings}
-            onBarClick={handleBarClick}
           />
         );
       case 'line':

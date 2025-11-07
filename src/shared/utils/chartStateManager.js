@@ -9,7 +9,7 @@ const CHART_STATE_VERSION = '1.0';
 /**
  * Serialize chart state to JSON-compatible object
  * @param {Object} params - Chart state parameters
- * @param {string} params.chartType - Type of chart (bar, funnel, slope, line, grouped-bar)
+ * @param {string} params.chartType - Type of chart (bar, funnel, slope, line)
  * @param {Object} params.chartData - Chart data object from useChartData
  * @param {Object} params.styleSettings - Style settings from useStyleSettings
  * @param {string} params.name - Optional name for the chart
@@ -184,7 +184,7 @@ export const deserializeChartState = (stateObj) => {
   }
 
   // Chart type validation
-  const validChartTypes = ['bar', 'funnel', 'slope', 'line', 'grouped-bar'];
+  const validChartTypes = ['bar', 'funnel', 'slope', 'line'];
   if (!validChartTypes.includes(stateObj.chartType)) {
     throw new Error(`Invalid chart type: ${stateObj.chartType}`);
   }
