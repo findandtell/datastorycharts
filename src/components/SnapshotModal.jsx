@@ -1,12 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { exportAsSVG, exportAsPNG } from '../shared/utils/exportHelpers';
 
 /**
  * SnapshotModal Component
  * Full-size snapshot viewer with export and load options
  */
-export default function SnapshotModal({ snapshot, onClose, onLoadChart }) {
+export default function SnapshotModal({ snapshot, onClose, onLoadChart, onNext, onPrevious, hasNext, hasPrevious }) {
   if (!snapshot) return null;
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowRight' && hasNext) {
+        onNext();
+      } else if (e.key === 'ArrowLeft' && hasPrevious) {
+        onPrevious();
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasNext, hasPrevious, onNext, onPrevious, onClose]);
 
   const handleDownloadSVG = () => {
     // Create a temporary container to export
@@ -77,7 +93,53 @@ export default function SnapshotModal({ snapshot, onClose, onLoadChart }) {
         </div>
 
         {/* Snapshot Preview */}
-        <div className="flex-1 overflow-auto p-8 bg-gray-50">
+        <div className="flex-1 overflow-auto p-8 bg-gray-50 relative">
+          {/* Previous Button */}
+          {hasPrevious && (
+            <button
+              onClick={onPrevious}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white text-gray-700 rounded-full shadow-lg hover:bg-gray-50 hover:shadow-xl transition-all z-10 border border-gray-200"
+              title="Previous snapshot"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+          )}
+
+          {/* Next Button */}
+          {hasNext && (
+            <button
+              onClick={onNext}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white text-gray-700 rounded-full shadow-lg hover:bg-gray-50 hover:shadow-xl transition-all z-10 border border-gray-200"
+              title="Next snapshot"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          )}
+
           <div className="bg-white rounded-lg shadow-sm p-4 flex items-center justify-center">
             <div
               dangerouslySetInnerHTML={{ __html: snapshot.svgContent }}

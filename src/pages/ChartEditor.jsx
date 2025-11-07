@@ -788,6 +788,23 @@ export default function ChartEditor() {
     setSnapshots(prev => prev.filter(s => s.id !== snapshotId));
   };
 
+  // Navigation handlers for snapshot modal
+  const handleNextSnapshot = () => {
+    if (!selectedSnapshot) return;
+    const currentIndex = snapshots.findIndex(s => s.id === selectedSnapshot.id);
+    if (currentIndex < snapshots.length - 1) {
+      setSelectedSnapshot(snapshots[currentIndex + 1]);
+    }
+  };
+
+  const handlePreviousSnapshot = () => {
+    if (!selectedSnapshot) return;
+    const currentIndex = snapshots.findIndex(s => s.id === selectedSnapshot.id);
+    if (currentIndex > 0) {
+      setSelectedSnapshot(snapshots[currentIndex - 1]);
+    }
+  };
+
   const handleSaveChartFromSnapshot = (snapshot) => {
     try {
       // Build chart state from snapshot data
@@ -1966,6 +1983,10 @@ export default function ChartEditor() {
             setSelectedSnapshot(null);
           }}
           onLoadChart={handleLoadChart}
+          onNext={handleNextSnapshot}
+          onPrevious={handlePreviousSnapshot}
+          hasNext={snapshots.findIndex(s => s.id === selectedSnapshot.id) < snapshots.length - 1}
+          hasPrevious={snapshots.findIndex(s => s.id === selectedSnapshot.id) > 0}
         />
       )}
     </div>
