@@ -13,7 +13,6 @@
 import FunnelChart from './FunnelChart/FunnelChart';
 import SlopeChart from './SlopeChart/SlopeChart';
 import BarChart from './BarChart/BarChart';
-import GroupedBarChart from './GroupedBarChart/GroupedBarChart';
 import LineChart from './LineChart/LineChart';
 // import SankeyChart from './SankeyChart/SankeyChart';
 
@@ -66,20 +65,6 @@ export const chartRegistry = {
       orientation: 'vertical',
       barMode: 'grouped',
       showGrid: true,
-    },
-  },
-
-  'grouped-bar': {
-    name: 'Bar Chart (Grouped)',
-    component: GroupedBarChart,
-    icon: '📊',
-    description: 'Show grouped categories across periods (Datawrapper style)',
-    supportsComparison: false,
-    category: 'comparison',
-    defaultSettings: {
-      barMode: 'grouped',
-      showGrid: true,
-      legendPosition: 'above',
     },
   },
 

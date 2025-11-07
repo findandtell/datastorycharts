@@ -1035,51 +1035,6 @@ export const sampleDatasets = {
     ],
   },
 
-  barElectionOpinion: {
-    name: "Election Administration Opinion",
-    description: "Voter opinions on election administration (grouped-stacked style)",
-    title: "Voter Preference Poll Results",
-    subtitle: "Opinion survey results by candidate - March 2024",
-    data: [
-      {
-        "Period": "Nov '18",
-        "All Voters - Very Well": 21,
-        "All Voters - Somewhat Well": 54,
-        "Rep Candidate Voters - Very Well": 24,
-        "Rep Candidate Voters - Somewhat Well": 35,
-        "Dem Candidate Voters - Very Well": 19,
-        "Dem Candidate Voters - Somewhat Well": 54
-      },
-      {
-        "Period": "Nov '20",
-        "All Voters - Very Well": 35,
-        "All Voters - Somewhat Well": 24,
-        "Rep Candidate Voters - Very Well": 14,
-        "Rep Candidate Voters - Somewhat Well": 39,
-        "Dem Candidate Voters - Very Well": 64,
-        "Dem Candidate Voters - Somewhat Well": 30
-      },
-      {
-        "Period": "Nov '22",
-        "All Voters - Very Well": 37,
-        "All Voters - Somewhat Well": 37,
-        "Rep Candidate Voters - Very Well": 39,
-        "Rep Candidate Voters - Somewhat Well": 54,
-        "Dem Candidate Voters - Very Well": 61,
-        "Dem Candidate Voters - Somewhat Well": 35
-      },
-      {
-        "Period": "Nov '24",
-        "All Voters - Very Well": 43,
-        "All Voters - Somewhat Well": 45,
-        "Rep Candidate Voters - Very Well": 47,
-        "Rep Candidate Voters - Somewhat Well": 37,
-        "Dem Candidate Voters - Very Well": 47,
-        "Dem Candidate Voters - Somewhat Well": 37
-      },
-    ],
-  },
-
   // ==================== LINE CHART DATASETS ====================
 
   webTrafficYearly: {

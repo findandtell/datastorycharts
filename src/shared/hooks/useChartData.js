@@ -8,7 +8,6 @@ import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtil
 const getDefaultDatasetKey = (chartType) => {
   if (chartType === 'slope') return 'slopeRevenue';
   if (chartType === 'bar') return 'barSimple';
-  if (chartType === 'grouped-bar') return 'barElectionOpinion';
   if (chartType === 'line') return 'marketingChannelRevenue';
   return 'generic';
 };

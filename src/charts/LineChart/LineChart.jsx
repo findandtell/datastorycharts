@@ -26,6 +26,17 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
   const svgRef = useRef(null);
   const [hoveredMetric, setHoveredMetric] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [debouncedStyleSettings, setDebouncedStyleSettings] = useState(styleSettings);
+
+  // Debounce style settings to reduce re-renders with large datasets
+  // This prevents the expensive D3 re-render from happening on every slider movement
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStyleSettings(styleSettings);
+    }, 100); // 100ms debounce - balances responsiveness with performance
+
+    return () => clearTimeout(timer);
+  }, [styleSettings]);
 
   // Memoize date format detection to avoid testing all parsers for every row
   const detectedDateFormat = useMemo(() => {
@@ -65,6 +76,41 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     return { format: 'native', parser: (d) => new Date(d) };
   }, [data, styleSettings?.dateField]);
 
+  // PERFORMANCE OPTIMIZATION: Memoize data aggregation for large datasets
+  // With 730+ days of data, aggregation is expensive and shouldn't run on every render
+  const processedData = useMemo(() => {
+    const aggregationLevel = debouncedStyleSettings?.aggregationLevel;
+    const shouldAggregate = aggregationLevel &&
+                           aggregationLevel !== 'day' &&
+                           data &&
+                           data.length > 0;
+
+    if (!shouldAggregate) {
+      return data;
+    }
+
+    try {
+      return aggregateData(
+        data,
+        debouncedStyleSettings?.dateField || 'date',
+        metricNames,
+        aggregationLevel,
+        debouncedStyleSettings?.aggregationMethod || 'sum',
+        debouncedStyleSettings?.fiscalYearStartMonth || 1
+      );
+    } catch (error) {
+      console.warn('Aggregation failed, using original data:', error);
+      return data;
+    }
+  }, [
+    data,
+    metricNames,
+    debouncedStyleSettings?.aggregationLevel,
+    debouncedStyleSettings?.aggregationMethod,
+    debouncedStyleSettings?.fiscalYearStartMonth,
+    debouncedStyleSettings?.dateField,
+  ]);
+
   useEffect(() => {
     if (!data || data.length === 0 || !svgRef.current) {
       return;
@@ -74,7 +120,8 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     d3.select(svgRef.current).selectAll('*').remove();
 
     // Merge provided settings with defaults
-    const settings = { ...defaultStyleSettings, ...styleSettings };
+    // Using debounced settings for better performance with large datasets
+    const settings = { ...defaultStyleSettings, ...debouncedStyleSettings };
 
     // Add extra canvas height for watermark margin area if user is on free tier
     // This extends the SVG canvas to create dedicated space for the watermark
@@ -271,28 +318,8 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     // Chart height uses original height (watermark goes in extended margin area)
     const chartHeight = height - marginTop - marginBottom - headerHeight;
 
-    // Apply time aggregation if needed
-    let processedData = data;
-    const shouldAggregate = aggregationLevel &&
-                           aggregationLevel !== 'day' &&
-                           data &&
-                           data.length > 0;
-
-    if (shouldAggregate) {
-      try {
-        processedData = aggregateData(
-          data,
-          dateField || 'date',
-          metricNames,
-          aggregationLevel,
-          aggregationMethod || 'sum',
-          fiscalYearStartMonth || 1
-        );
-      } catch (error) {
-        console.warn('Aggregation failed, using original data:', error);
-        processedData = data;
-      }
-    }
+    // Data aggregation is now memoized outside useEffect for better performance
+    // (see useMemo above for processedData)
 
     // Parse dates and prepare data
     // Use the appropriate date parser based on timeScale
@@ -397,7 +424,10 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     }
 
     // Create line generator
-    const lineGenerator = smoothLines
+    // PERFORMANCE: Auto-disable smooth lines for large datasets (expensive curve calculations)
+    const shouldSmooth = smoothLines && parsedData.length <= 500;
+
+    const lineGenerator = shouldSmooth
       ? d3.line()
           .x(d => xScale(d.parsedDate))
           .y((d, metric) => yScale(d[metric]))
@@ -991,12 +1021,57 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         });
       }
 
-      // Always draw all points so they're clickable for emphasis, even when showPoints is false
-      // When showPoints is false, non-emphasized points will be invisible (opacity: 0) but still clickable
-      const currentPointSize = isEmphasized ? emphasizedPointSize : pointSize;
+      // PERFORMANCE OPTIMIZATION: For large datasets, intelligently reduce rendered points
+      // This dramatically improves performance while maintaining visual quality
+      const isLargeDataset = metricData.length > 200;
+      const isVeryLargeDataset = metricData.length > 500;
 
-      // Always include all points (for clicking), store original indices
-      const pointsToShow = metricData.map((d, idx) => ({ ...d, _originalIdx: idx }));
+      // Auto-disable points for very large datasets (500+) to maximize performance
+      const effectiveShowPoints = isVeryLargeDataset ? false : showPoints;
+
+      let pointsToShow;
+
+      if (!effectiveShowPoints && !isEmphasized) {
+        // Points disabled for performance: only render emphasized points
+        pointsToShow = metricData
+          .map((d, idx) => ({ ...d, _originalIdx: idx }))
+          .filter((d) => {
+            const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
+              p.metric === metric && p.index === d._originalIdx
+            );
+            return isPointEmphasized;
+          });
+      } else if (isLargeDataset && !isEmphasized && effectiveShowPoints) {
+        // Adaptive decimation: show fewer points for moderately large datasets
+        const decimationFactor = metricData.length > 500 ? 5 : 3;
+
+        // Always keep first and last points, plus emphasized points
+        pointsToShow = metricData
+          .map((d, idx) => ({ ...d, _originalIdx: idx }))
+          .filter((d, idx, arr) => {
+            // Keep first and last
+            if (idx === 0 || idx === arr.length - 1) return true;
+
+            // Keep emphasized points
+            const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
+              p.metric === metric && p.index === d._originalIdx
+            );
+            if (isPointEmphasized) return true;
+
+            // Keep every Nth point
+            return idx % decimationFactor === 0;
+          });
+      } else {
+        // Small dataset or emphasized line: render all points
+        pointsToShow = metricData.map((d, idx) => ({ ...d, _originalIdx: idx }));
+      }
+
+      // Create emphasis lookup Set for O(1) performance instead of O(n) .some() calls
+      const emphasizedPointsSet = new Set(
+        (emphasizedPoints || [])
+          .filter(p => p.metric === metric)
+          .map(p => p.index)
+      );
 
       const circles = chartGroup
         .selectAll(`.point-${i}`)
@@ -1009,14 +1084,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         .attr('cx', d => xScale(d.parsedDate))
         .attr('cy', d => yScale(d[metric]))
         .attr('r', (d) => {
-          // Check if this specific point is emphasized
-          const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
-            p.metric === metric && p.index === d._originalIdx
-          );
+          // Use Set for O(1) lookup instead of O(n) .some()
+          const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
+          const currentPointSize = isEmphasized ? emphasizedPointSize : pointSize;
           return isPointEmphasized ? currentPointSize + 1 : currentPointSize;
         })
         .attr('fill', (d) => {
-          // Check if this point has a custom style
+          // Check if this point has a custom style (use find only for custom style check)
           const emphPoint = emphasizedPoints && emphasizedPoints.find(p =>
             p.metric === metric && p.index === d._originalIdx
           );
@@ -1041,22 +1115,21 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
             const baseWidth = emphPoint.customPointStyle === 'outlined' ? pointBorderWidth : 2;
             return baseWidth;
           }
-          // Use global setting for emphasized points
-          const isPointEmphasized = emphPoint !== undefined;
+          // Use Set lookup for emphasized check
+          const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
           const baseWidth = pointStyle === 'outlined' ? pointBorderWidth : 0;
           return isPointEmphasized ? Math.max(baseWidth, 2) : baseWidth;
         })
         .attr('opacity', (d) => {
-          // If showPoints is false, hide non-emphasized points but keep them clickable
-          if (!showPoints) {
-            const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
-              p.metric === metric && p.index === d._originalIdx
-            );
+          // If showPoints is false (or auto-disabled for large datasets), hide non-emphasized points
+          if (!effectiveShowPoints) {
+            // Use Set for O(1) lookup instead of O(n) .some()
+            const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
             return isPointEmphasized ? 1 : 0;
           }
           return 1;
         })
-        .style('cursor', 'pointer');
+        .style('cursor', isLargeDataset ? 'default' : 'pointer');
 
       // Add event listeners separately to properly capture index
       circles.each(function(d) {
@@ -1311,7 +1384,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           .on('mouseleave', null);
       }
     };
-  }, [data, metricNames, styleSettings, onLineClick, onPointClick, onMetricClick, onLabelDrag]);
+  }, [processedData, metricNames, debouncedStyleSettings, onLineClick, onPointClick, onMetricClick, onLabelDrag]);
 
   return (
     <div className="line-chart-container">
