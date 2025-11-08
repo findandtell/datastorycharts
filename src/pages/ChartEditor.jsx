@@ -11,6 +11,7 @@ import { getAllTemplates, applyTemplate } from '../shared/design-system/styleTem
 import { throttle } from '../shared/utils/performanceUtils';
 import { loadGoogleSheetsData, isGoogleSheetsUrl, getPublicSharingInstructions } from '../shared/utils/googleSheetsLoader';
 import { serializeChartState, deserializeChartState, applyChartState, generateChartFilename } from '../shared/utils/chartStateManager';
+import { useAddonMode } from '../shared/hooks/useAddonMode';
 import FunnelChart from '../charts/FunnelChart/FunnelChart';
 import SlopeChart from '../charts/SlopeChart/SlopeChart';
 import BarChart from '../charts/BarChart/BarChart';
@@ -79,6 +80,7 @@ export default function ChartEditor() {
 
   const chartData = useChartData(chartType);
   const styleSettings = useStyleSettings();
+  const addon = useAddonMode();
   const svgRef = useRef(null);
   const exportMenuRef = useRef(null);
   const styleFileInputRef = useRef(null);
@@ -457,6 +459,14 @@ export default function ChartEditor() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Auto-load data from Google Sheets add-on
+  useEffect(() => {
+    if (addon.isAddonMode && addon.sheetData && addon.sheetData.csv) {
+      console.log('[Add-on Mode] Loading sheet data automatically');
+      chartData.loadCSVText(addon.sheetData.csv, ',', 'google-sheets-addon');
+    }
+  }, [addon.sheetData, addon.isAddonMode]);
 
   if (!chart) {
     return (
@@ -1525,97 +1535,99 @@ export default function ChartEditor() {
 
   return (
     <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
-      {/* Top Header - Fixed */}
-      <div className="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0">
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
-            >
-              ← Back to Gallery
-            </button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">{chart.name}</h1>
-              <p className="text-sm text-gray-500">{chart.description}</p>
+      {/* Top Header - Fixed - Hidden in add-on mode */}
+      {!addon.isAddonMode && (
+        <div className="bg-white border-b border-gray-200 shadow-sm z-10 flex-shrink-0">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/')}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
+              >
+                ← Back to Gallery
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">{chart.name}</h1>
+                <p className="text-sm text-gray-500">{chart.description}</p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            {/* Find&Tell Logo */}
-            <img
-              src="/findandtell_logo.png"
-              alt="Find&Tell"
-              className="h-12"
-            />
+            <div className="flex items-center gap-3">
+              {/* Find&Tell Logo */}
+              <img
+                src="/findandtell_logo.png"
+                alt="Find&Tell"
+                className="h-12"
+              />
 
-            {!showPanel && (
-              <button
-                onClick={() => setShowPanel(true)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-              >
-                Show Controls
-              </button>
-            )}
-
-            {/* Import Chart Button */}
-            <button
-              onClick={handleImportChart}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
-              title="Import chart from file"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              Import
-            </button>
-
-            {/* Hidden file input for chart import */}
-            <input
-              ref={chartImportFileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleChartFileChange}
-              className="hidden"
-            />
-
-            {/* Export Menu */}
-            <div className="relative" ref={exportMenuRef}>
-              <button
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
-              >
-                Export
-                <span className="text-sm">▼</span>
-              </button>
-
-              {showExportMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                  <button
-                    onClick={handleExportPNG}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
-                  >
-                    <span>📷</span> Export as PNG
-                  </button>
-                  <button
-                    onClick={handleExportSVG}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
-                  >
-                    <span>📐</span> Export as SVG
-                  </button>
-                  <div className="border-t border-gray-200 my-1"></div>
-                  <button
-                    disabled
-                    className="w-full px-4 py-2 text-left text-gray-400 cursor-not-allowed flex items-center gap-2"
-                  >
-                    <span>💻</span> Export D3 Code (Soon)
-                  </button>
-                </div>
+              {!showPanel && (
+                <button
+                  onClick={() => setShowPanel(true)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Show Controls
+                </button>
               )}
+
+              {/* Import Chart Button */}
+              <button
+                onClick={handleImportChart}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
+                title="Import chart from file"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Import
+              </button>
+
+              {/* Hidden file input for chart import */}
+              <input
+                ref={chartImportFileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleChartFileChange}
+                className="hidden"
+              />
+
+              {/* Export Menu */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
+                >
+                  Export
+                  <span className="text-sm">▼</span>
+                </button>
+
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                    <button
+                      onClick={handleExportPNG}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+                    >
+                      <span>📷</span> Export as PNG
+                    </button>
+                    <button
+                      onClick={handleExportSVG}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+                    >
+                      <span>📐</span> Export as SVG
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
+                    <button
+                      disabled
+                      className="w-full px-4 py-2 text-left text-gray-400 cursor-not-allowed flex items-center gap-2"
+                    >
+                      <span>💻</span> Export D3 Code (Soon)
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content Area - Two Column Layout */}
       <div className="flex-1 flex overflow-hidden">
@@ -1895,6 +1907,7 @@ export default function ChartEditor() {
                   chartType={chartType}
                   onEditData={() => setShowDataTable(true)}
                   styleSettings={styleSettings}
+                  addon={addon}
                   setCurrentSampleDatasetKey={setCurrentSampleDatasetKey}
                   applyStylePreset={applyStylePreset}
                   showPasteCSV={showPasteCSV}
@@ -6756,6 +6769,7 @@ function DataTabContent({
   chartType,
   onEditData,
   styleSettings,
+  addon,
   setCurrentSampleDatasetKey,
   applyStylePreset,
   showPasteCSV,
@@ -6903,6 +6917,46 @@ function DataTabContent({
 
   return (
     <div className="space-y-3">
+      {/* Add-on Mode: Load Sheet Data Button */}
+      {addon?.isAddonMode && (
+        <div className="bg-gradient-to-r from-cyan-50 to-blue-50 border-2 border-cyan-200 rounded-lg p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-1">
+              <svg className="w-6 h-6 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                Google Sheets Add-on
+              </h3>
+              <p className="text-xs text-gray-600 mb-3">
+                Select data in your spreadsheet, then click the button below to load it into the chart editor.
+              </p>
+              <button
+                onClick={() => {
+                  addon.requestSheetData();
+                  addon.logUsage('request_sheet_data', { chartType });
+                }}
+                className="w-full px-4 py-2.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Load Selected Data from Sheet
+              </button>
+              {addon.license && (
+                <div className="mt-2 text-xs text-gray-500">
+                  {addon.license.tier === 'free'
+                    ? `Free Plan: ${addon.license.chartsRemaining || 0} charts remaining`
+                    : `${addon.license.tier.charAt(0).toUpperCase() + addon.license.tier.slice(1)} Plan`}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Connect Google Sheets - Collapsible */}
       <CollapsibleSection
         title="Connect Google Sheets"

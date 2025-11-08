@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find&Tell Charts</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #f9fafb;
+      overflow: hidden;
+    }
+
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: white;
+    }
+
+    #loading.hidden {
+      display: none;
+    }
+
+    .spinner {
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #06b6d4;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    #error {
+      display: none;
+      padding: 20px;
+      background: white;
+      height: 100vh;
+    }
+
+    #error.visible {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .error-icon {
+      width: 48px;
+      height: 48px;
+      background: #fee2e2;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      color: #dc2626;
+      font-size: 24px;
+    }
+
+    .error-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 14px;
+      color: #6b7280;
+      text-align: center;
+      max-width: 300px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .error-button {
+      padding: 8px 16px;
+      background: #06b6d4;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .error-button:hover {
+      background: #0891b2;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100vh;
+      border: none;
+      display: none;
+    }
+
+    iframe.loaded {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading State -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading Find&Tell Charts...</div>
+  </div>
+
+  <!-- Error State -->
+  <div id="error">
+    <div class="error-icon">⚠</div>
+    <div class="error-title">Unable to Load</div>
+    <div class="error-message" id="error-message">
+      An error occurred while loading the chart editor.
+    </div>
+    <button class="error-button" onclick="retryLoad()">Try Again</button>
+  </div>
+
+  <!-- Main Chart App (iframe) -->
+  <iframe
+    id="chartApp"
+    src="https://funnel-viz-refactored-aggq70kuw-matthews-projects-3e12dabf.vercel.app?mode=addon"
+    allow="clipboard-write"
+  ></iframe>
+
+  <script>
+    // Configuration
+    const IFRAME_LOAD_TIMEOUT = 15000; // 15 seconds
+    let iframeLoadTimer = null;
+
+    // Elements
+    const loadingEl = document.getElementById('loading');
+    const errorEl = document.getElementById('error');
+    const errorMessageEl = document.getElementById('error-message');
+    const iframeEl = document.getElementById('chartApp');
+
+    /**
+     * Initialize the add-on
+     */
+    function init() {
+      console.log('Initializing Find&Tell Charts add-on...');
+
+      // Set iframe load timeout
+      iframeLoadTimer = setTimeout(function() {
+        showError('The chart editor is taking longer than expected to load. Please check your internet connection and try again.');
+      }, IFRAME_LOAD_TIMEOUT);
+
+      // Listen for iframe load
+      iframeEl.addEventListener('load', handleIframeLoad);
+
+      // Listen for messages from iframe
+      window.addEventListener('message', handleMessage);
+
+      // Get user info and license
+      getUserInfoAndLicense();
+    }
+
+    /**
+     * Handle iframe load event
+     */
+    function handleIframeLoad() {
+      console.log('iframe loaded successfully');
+      clearTimeout(iframeLoadTimer);
+
+      loadingEl.classList.add('hidden');
+      iframeEl.classList.add('loaded');
+
+      // Send initial configuration to the React app
+      sendMessageToApp({
+        type: 'ADDON_READY',
+        platform: 'google-sheets'
+      });
+    }
+
+    /**
+     * Get user info and license from Apps Script
+     */
+    function getUserInfoAndLicense() {
+      google.script.run
+        .withSuccessHandler(function(userInfo) {
+          console.log('User info retrieved:', userInfo);
+
+          // Get license info
+          google.script.run
+            .withSuccessHandler(function(license) {
+              console.log('License info retrieved:', license);
+
+              // Send to React app
+              sendMessageToApp({
+                type: 'USER_INFO',
+                data: {
+                  user: userInfo.user,
+                  license: license.license
+                }
+              });
+            })
+            .withFailureHandler(handleError)
+            .checkLicense();
+        })
+        .withFailureHandler(handleError)
+        .getUserInfo();
+    }
+
+    /**
+     * Handle messages from the React app
+     */
+    function handleMessage(event) {
+      // Security: Verify origin in production
+      // if (event.origin !== 'https://funnel-viz-refactored-fp1mibj2f-matthews-projects-3e12dabf.vercel.app') {
+      //   return;
+      // }
+
+      const message = event.data;
+      console.log('Message received from app:', message);
+
+      switch (message.type) {
+        case 'REQUEST_DATA':
+          getSheetData();
+          break;
+
+        case 'INSERT_CHART':
+          insertChart(message.data);
+          break;
+
+        case 'LOG_USAGE':
+          logUsage(message.action, message.metadata);
+          break;
+
+        case 'READY':
+          console.log('React app is ready');
+          break;
+
+        default:
+          console.log('Unknown message type:', message.type);
+      }
+    }
+
+    /**
+     * Get selected data from the sheet
+     */
+    function getSheetData() {
+      console.log('Getting sheet data...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            console.log('Sheet data retrieved:', result.data);
+
+            sendMessageToApp({
+              type: 'SHEET_DATA',
+              data: result.data
+            });
+          } else {
+            showError(result.error);
+          }
+        })
+        .withFailureHandler(handleError)
+        .getSelectedData();
+    }
+
+    /**
+     * Insert chart into the sheet
+     */
+    function insertChart(chartData) {
+      console.log('Inserting chart to sheet...');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            console.log('Chart inserted successfully');
+
+            sendMessageToApp({
+              type: 'INSERT_SUCCESS',
+              message: result.message
+            });
+          } else {
+            showError(result.error);
+          }
+        })
+        .withFailureHandler(handleError)
+        .insertChartToSheet(chartData.imageBase64, chartData.format);
+    }
+
+    /**
+     * Log usage analytics
+     */
+    function logUsage(action, metadata) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('Usage logged:', action);
+        })
+        .withFailureHandler(function(error) {
+          console.error('Failed to log usage:', error);
+        })
+        .logUsage(action, metadata);
+    }
+
+    /**
+     * Send message to React app
+     */
+    function sendMessageToApp(message) {
+      if (iframeEl && iframeEl.contentWindow) {
+        iframeEl.contentWindow.postMessage(message, '*');
+      }
+    }
+
+    /**
+     * Handle errors
+     */
+    function handleError(error) {
+      console.error('Error:', error);
+      showError(error.message || 'An unexpected error occurred. Please try again.');
+    }
+
+    /**
+     * Show error state
+     */
+    function showError(message) {
+      loadingEl.classList.add('hidden');
+      iframeEl.classList.remove('loaded');
+      errorEl.classList.add('visible');
+      errorMessageEl.textContent = message;
+    }
+
+    /**
+     * Retry loading
+     */
+    function retryLoad() {
+      errorEl.classList.remove('visible');
+      loadingEl.classList.remove('hidden');
+      location.reload();
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
