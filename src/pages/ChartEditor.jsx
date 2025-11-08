@@ -576,7 +576,9 @@ export default function ChartEditor() {
         parsedState,
         (newChartType) => {
           if (newChartType !== chartType) {
-            navigate(`/chart/${newChartType}`);
+            // Preserve query parameters (like ?mode=addon) when navigating
+            const searchParams = window.location.search;
+            navigate(`/chart/${newChartType}${searchParams}`);
           }
         },
         chartData,

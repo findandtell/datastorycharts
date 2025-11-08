@@ -36,7 +36,9 @@ export default function Home() {
   ];
 
   const handleChartSelect = (chartKey) => {
-    navigate(`/chart/${chartKey}`);
+    // Preserve query parameters (like ?mode=addon) when navigating
+    const searchParams = window.location.search;
+    navigate(`/chart/${chartKey}${searchParams}`);
   };
 
   return (
