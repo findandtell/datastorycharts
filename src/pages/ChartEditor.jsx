@@ -45,8 +45,15 @@ export default function ChartEditor() {
   const chart = getChart(chartType);
 
   const [activeTab, setActiveTab] = useState('style');
-  // Hide control panel by default in add-on mode to show chart first
   const [showPanel, setShowPanel] = useState(true);
+
+  // Hide control panel by default in add-on mode to maximize chart space
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'addon') {
+      setShowPanel(false);
+    }
+  }, []);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showPasteCSV, setShowPasteCSV] = useState(false);
@@ -1646,6 +1653,22 @@ export default function ChartEditor() {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
         >
+          {/* Toggle Controls Button - Top Right */}
+          {!showPanel && (
+            <button
+              onClick={() => setShowPanel(true)}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="absolute top-4 right-4 px-4 py-2 bg-cyan-600 text-white rounded-lg shadow-lg hover:bg-cyan-700 font-medium flex items-center gap-2 z-50 transition-all"
+              style={{ pointerEvents: 'auto' }}
+              title="Show Controls"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              Controls
+            </button>
+          )}
+
           {/* Zoom Controls - Fixed Position */}
           {chartData.hasData && !showDataTable && (
             <div className="absolute bottom-8 left-8 flex flex-col gap-2 z-50" style={{ pointerEvents: 'auto' }}>
@@ -1862,7 +1885,7 @@ export default function ChartEditor() {
         {showPanel && (
           <div className="w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg overflow-hidden">
             {/* Tab Navigation - Fixed at top */}
-            <div className="flex border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center border-b border-gray-200 flex-shrink-0">
               <button
                 onClick={() => setActiveTab('style')}
                 className={`flex-1 px-4 py-2 font-medium text-sm transition-colors ${
@@ -1882,6 +1905,15 @@ export default function ChartEditor() {
                 }`}
               >
                 Data
+              </button>
+              <button
+                onClick={() => setShowPanel(false)}
+                className="px-3 py-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                title="Hide Controls"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
