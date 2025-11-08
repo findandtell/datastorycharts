@@ -26,15 +26,15 @@ function onInstall(e) {
 }
 
 /**
- * Opens the main chart creation dialog as a modal overlay.
- * Modal takes up most of the screen for optimal chart editing.
+ * Opens the main chart creation dialog as a modeless dialog.
+ * Modeless allows larger size and doesn't block interaction with the sheet.
  */
 function showSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setWidth(1600)
     .setHeight(900);
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Find&Tell Charts');
+  SpreadsheetApp.getUi().showModelessDialog(html, 'Find&Tell Charts');
 }
 
 /**
