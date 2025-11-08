@@ -45,6 +45,7 @@ export default function ChartEditor() {
   const chart = getChart(chartType);
 
   const [activeTab, setActiveTab] = useState('style');
+  // Hide control panel by default in add-on mode to show chart first
   const [showPanel, setShowPanel] = useState(true);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDataTable, setShowDataTable] = useState(false);
