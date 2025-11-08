@@ -27,11 +27,12 @@ function onInstall(e) {
 
 /**
  * Opens the main chart creation dialog as a modal overlay.
+ * Modal takes up most of the screen for optimal chart editing.
  */
 function showSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setWidth(1200)
-    .setHeight(800);
+    .setWidth(1600)
+    .setHeight(900);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Find&Tell Charts');
 }

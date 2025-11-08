@@ -460,6 +460,16 @@ export default function ChartEditor() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Set larger canvas size for add-on mode to fill the modal
+  useEffect(() => {
+    if (addon.isAddonMode) {
+      // For 1600px modal with 256px panel, we have ~1344px for chart area
+      // Set canvas to 1250px width to leave room for zoom controls and padding
+      styleSettings.setCanvasWidth(1250);
+      styleSettings.setCanvasHeight(800);
+    }
+  }, [addon.isAddonMode]);
+
   // Auto-load data from Google Sheets add-on
   useEffect(() => {
     if (addon.isAddonMode && addon.sheetData && addon.sheetData.csv) {
