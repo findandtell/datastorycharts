@@ -1860,7 +1860,7 @@ export default function ChartEditor() {
 
         {/* Right Control Panel - Only this scrolls */}
         {showPanel && (
-          <div className="w-96 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg overflow-hidden">
+          <div className="w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg overflow-hidden">
             {/* Tab Navigation - Fixed at top */}
             <div className="flex border-b border-gray-200 flex-shrink-0">
               <button
