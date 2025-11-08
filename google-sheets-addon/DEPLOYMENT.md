@@ -81,12 +81,12 @@ This guide will walk you through deploying the Find&Tell Charts Google Sheets Ad
 
 The React app is deployed at:
 ```
-https://funnel-viz-refactored-aggq70kuw-matthews-projects-3e12dabf.vercel.app
+https://charts.findandtell.co
 ```
 
 The iframe loads:
 ```
-https://funnel-viz-refactored-aggq70kuw-matthews-projects-3e12dabf.vercel.app?mode=addon
+https://charts.findandtell.co?mode=addon
 ```
 
 ### Local Development
