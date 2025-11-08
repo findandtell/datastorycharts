@@ -46,14 +46,6 @@ export default function ChartEditor() {
 
   const [activeTab, setActiveTab] = useState('style');
   const [showPanel, setShowPanel] = useState(true);
-
-  // Hide control panel by default in add-on mode to maximize chart space
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('mode') === 'addon') {
-      setShowPanel(false);
-    }
-  }, []);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showDataTable, setShowDataTable] = useState(false);
   const [showPasteCSV, setShowPasteCSV] = useState(false);
@@ -1883,7 +1875,7 @@ export default function ChartEditor() {
 
         {/* Right Control Panel - Only this scrolls */}
         {showPanel && (
-          <div className="w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg overflow-hidden">
+          <div className="w-64 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 shadow-lg overflow-hidden">
             {/* Tab Navigation - Fixed at top */}
             <div className="flex items-center border-b border-gray-200 flex-shrink-0">
               <button
