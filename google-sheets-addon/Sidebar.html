@@ -331,18 +331,19 @@
       google.script.run
         .withSuccessHandler(function(result) {
           if (result.success) {
-            console.log('Chart inserted successfully');
+            console.log('Chart inserted successfully with ID:', result.chartId);
 
             sendMessageToApp({
               type: 'INSERT_SUCCESS',
-              message: result.message
+              message: result.message,
+              chartId: result.chartId
             });
           } else {
             showError(result.error);
           }
         })
         .withFailureHandler(handleError)
-        .insertChartToSheet(chartData.imageBase64, chartData.format);
+        .insertChartToSheet(chartData.imageBase64, chartData.format, chartData.chartState);
     }
 
     /**

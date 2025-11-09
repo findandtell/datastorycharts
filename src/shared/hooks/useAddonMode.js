@@ -55,8 +55,11 @@ export function useAddonMode() {
           break;
 
         case 'INSERT_SUCCESS':
-          console.log('[Add-on Mode] Chart inserted successfully');
-          // Could show a success toast here
+          console.log('[Add-on Mode] Chart inserted successfully with ID:', message.chartId);
+          // Show alert with chart ID so user can edit it later
+          if (message.chartId) {
+            alert(`Chart inserted successfully!\n\nChart ID: ${message.chartId}\n\nSave this ID to edit the chart later using "Find&Tell Charts" → "Edit Chart by ID"`);
+          }
           break;
 
         default:
@@ -90,12 +93,13 @@ export function useAddonMode() {
   }, [sendMessageToAddon]);
 
   // Insert chart to sheet
-  const insertChartToSheet = useCallback((imageBase64, format = 'png') => {
+  const insertChartToSheet = useCallback((imageBase64, format = 'png', chartState = null) => {
     sendMessageToAddon({
       type: 'INSERT_CHART',
       data: {
         imageBase64,
-        format
+        format,
+        chartState
       }
     });
   }, [sendMessageToAddon]);

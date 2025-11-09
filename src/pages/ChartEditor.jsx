@@ -482,6 +482,28 @@ export default function ChartEditor() {
     }
   }, []);
 
+  // Load chart state from URL (from "Edit Chart by ID" feature)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const encodedChartState = urlParams.get('chartState');
+
+    if (encodedChartState) {
+      console.log('[Chart State] Loading chart state from URL parameter');
+      try {
+        const chartStateJson = decodeURIComponent(encodedChartState);
+        const chartState = JSON.parse(chartStateJson);
+
+        // Apply the chart state to restore the chart
+        applyChartState(chartState, { navigate, chartData, styleSettings });
+
+        console.log('[Chart State] Chart state loaded successfully');
+      } catch (error) {
+        console.error('[Chart State] Failed to load chart state:', error);
+        alert('Failed to load chart state. The chart ID may be invalid.');
+      }
+    }
+  }, []);
+
   // Auto-load data from Google Sheets add-on
   useEffect(() => {
     if (addon.isAddonMode && addon.sheetData && addon.sheetData.csv) {
@@ -547,10 +569,21 @@ export default function ChartEditor() {
       const svgString = new XMLSerializer().serializeToString(svgElement);
       const svgBase64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
 
-      // Send SVG to Google Sheets
-      addon.insertChartToSheet(svgBase64, 'svg');
+      // Serialize complete chart state for later editing
+      const chartState = serializeChartState({
+        chartType,
+        chartData,
+        styleSettings,
+        name: styleSettings.title || `${chartType}-chart`,
+      });
 
-      alert('Chart inserted to Google Sheets as SVG!');
+      // Convert chart state to JSON string
+      const chartStateJson = JSON.stringify(chartState);
+
+      // Send SVG and chart state to Google Sheets
+      addon.insertChartToSheet(svgBase64, 'svg', chartStateJson);
+
+      // Success alert is now handled in useAddonMode hook with Chart ID
     } catch (error) {
       console.error('Error inserting chart:', error);
       alert('Error inserting chart. Please try again.');

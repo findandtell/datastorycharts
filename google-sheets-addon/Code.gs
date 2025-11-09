@@ -12,6 +12,7 @@ function onOpen(e) {
     .createMenu('Find&Tell Charts')
     .addItem('Create Chart', 'showSidebar')
     .addItem('Open in Browser (Full Screen)', 'openInBrowser')
+    .addItem('Edit Chart by ID', 'editChartById')
     .addSeparator()
     .addItem('Help & Documentation', 'showHelp')
     .addItem('About', 'showAbout')
@@ -251,11 +252,13 @@ function checkLicense() {
 
 /**
  * Inserts a chart image into the spreadsheet at the current cursor position.
+ * Also stores the chart state for later editing.
  * @param {string} imageBase64 Base64 encoded image data
  * @param {string} imageFormat Format of the image (png, svg)
+ * @param {string} chartState JSON string containing complete chart state
  * @return {object} Result of the insertion
  */
-function insertChartToSheet(imageBase64, imageFormat) {
+function insertChartToSheet(imageBase64, imageFormat, chartState) {
   try {
     const sheet = SpreadsheetApp.getActiveSheet();
     const cell = sheet.getActiveCell();
@@ -273,12 +276,20 @@ function insertChartToSheet(imageBase64, imageFormat) {
       'chart.' + imageFormat
     );
 
+    // Generate unique chart ID
+    var chartId = 'chart_' + new Date().getTime();
+
+    // Store chart state in document properties
+    var documentProperties = PropertiesService.getDocumentProperties();
+    documentProperties.setProperty(chartId, chartState);
+
     // Insert image at current cell
     sheet.insertImage(blob, cell.getColumn(), cell.getRow());
 
     return {
       success: true,
-      message: 'Chart inserted successfully'
+      message: 'Chart inserted successfully',
+      chartId: chartId
     };
   } catch (error) {
     return {
@@ -286,6 +297,85 @@ function insertChartToSheet(imageBase64, imageFormat) {
       error: 'Error inserting chart: ' + error.message
     };
   }
+}
+
+/**
+ * Retrieves a saved chart state by ID.
+ * @param {string} chartId The ID of the chart to retrieve
+ * @return {object} Result containing the chart state
+ */
+function getChartState(chartId) {
+  try {
+    var documentProperties = PropertiesService.getDocumentProperties();
+    var chartState = documentProperties.getProperty(chartId);
+
+    if (!chartState) {
+      return {
+        success: false,
+        error: 'Chart ID not found. Please check the ID and try again.'
+      };
+    }
+
+    return {
+      success: true,
+      chartState: chartState
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: 'Error retrieving chart: ' + error.message
+    };
+  }
+}
+
+/**
+ * Opens the chart editor with a saved chart state.
+ */
+function editChartById() {
+  const ui = SpreadsheetApp.getUi();
+
+  // Prompt user for chart ID
+  const response = ui.prompt(
+    'Edit Chart',
+    'Enter the Chart ID (from when you inserted the chart):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  const chartId = response.getResponseText().trim();
+
+  if (!chartId) {
+    ui.alert('Please enter a valid Chart ID.');
+    return;
+  }
+
+  // Get chart state
+  const result = getChartState(chartId);
+
+  if (!result.success) {
+    ui.alert('Error: ' + result.error);
+    return;
+  }
+
+  // Open chart editor with the state
+  const encodedState = encodeURIComponent(result.chartState);
+
+  const html = HtmlService.createHtmlOutput(
+    '<html><body>' +
+    '<p>Opening chart editor...</p>' +
+    '<script>' +
+    'window.open("https://charts.findandtell.co?mode=addon&chartState=' + encodedState + '", "_blank");' +
+    'google.script.host.close();' +
+    '</script>' +
+    '</body></html>'
+  )
+    .setWidth(300)
+    .setHeight(100);
+
+  ui.showModalDialog(html, 'Opening Chart Editor...');
 }
 
 /**
