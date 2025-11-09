@@ -140,6 +140,16 @@
     <button class="error-button" onclick="retryLoad()">Try Again</button>
   </div>
 
+  <!-- Open in New Tab Button - Floating -->
+  <div id="openInTabButton" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;">
+    <button onclick="openInNewTab()" style="padding: 12px 24px; background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4); transition: all 0.2s; display: flex; align-items: center; gap: 8px;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(6, 182, 212, 0.5)'" onmouseout="this.style.transform=''; this.style.boxShadow='0 4px 12px rgba(6, 182, 212, 0.4)'">
+      <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+      </svg>
+      Open in Full Screen
+    </button>
+  </div>
+
   <!-- Main Chart App (iframe) -->
   <iframe
     id="chartApp"
@@ -189,11 +199,41 @@
       loadingEl.classList.add('hidden');
       iframeEl.classList.add('loaded');
 
+      // Show "Open in New Tab" button
+      document.getElementById('openInTabButton').style.display = 'block';
+
       // Send initial configuration to the React app
       sendMessageToApp({
         type: 'ADDON_READY',
         platform: 'google-sheets'
       });
+    }
+
+    /**
+     * Open chart editor in a new browser tab with selected data
+     */
+    function openInNewTab() {
+      console.log('Opening chart editor in new tab');
+
+      // Get selected data from the sheet
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success && result.data && result.data.csv) {
+            // Encode CSV data for URL
+            const encodedCSV = encodeURIComponent(result.data.csv);
+
+            // Open new tab with CSV data as URL parameter
+            const url = `https://charts.findandtell.co?csv=${encodedCSV}`;
+            window.open(url, '_blank');
+          } else {
+            alert('Please select data in your spreadsheet first.');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('Error getting sheet data:', error);
+          alert('Error getting sheet data: ' + error.message);
+        })
+        .getSelectedData();
     }
 
     /**

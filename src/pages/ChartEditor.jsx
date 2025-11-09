@@ -470,6 +470,18 @@ export default function ChartEditor() {
     }
   }, [addon.isAddonMode]);
 
+  // Load CSV data from URL (from "Open in New Tab" feature)
+  useEffect(() => {
+    const pendingCSV = sessionStorage.getItem('pendingCSVData');
+    if (pendingCSV) {
+      console.log('[URL CSV] Loading CSV data from URL parameter');
+      const decodedCSV = decodeURIComponent(pendingCSV);
+      chartData.loadCSVText(decodedCSV, ',', 'url-parameter');
+      // Clear the pending data
+      sessionStorage.removeItem('pendingCSVData');
+    }
+  }, []);
+
   // Auto-load data from Google Sheets add-on
   useEffect(() => {
     if (addon.isAddonMode && addon.sheetData && addon.sheetData.csv) {

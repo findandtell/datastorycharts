@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /**
@@ -7,6 +7,19 @@ import { useNavigate } from 'react-router-dom';
  */
 export default function Home() {
   const navigate = useNavigate();
+
+  // Check if CSV data was passed via URL (from "Open in New Tab" feature)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const csvData = urlParams.get('csv');
+
+    if (csvData) {
+      // CSV data detected - redirect to bar chart with the data
+      // Store CSV in sessionStorage so ChartEditor can load it
+      sessionStorage.setItem('pendingCSVData', csvData);
+      navigate(`/chart/bar${window.location.search}`);
+    }
+  }, [navigate]);
 
   const charts = [
     {
