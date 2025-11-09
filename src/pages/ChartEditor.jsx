@@ -531,6 +531,47 @@ export default function ChartEditor() {
     setShowExportMenu(false);
   };
 
+  // Handle Insert to Google Sheets
+  const handleInsertToSheet = async () => {
+    if (!addon.isAddonMode) return;
+
+    try {
+      // Get the chart SVG element
+      const svgElement = svgRef.current?.querySelector('svg');
+      if (!svgElement) {
+        alert('Chart not found. Please try again.');
+        return;
+      }
+
+      // Convert SVG to PNG as base64
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const svgString = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = () => {
+        canvas.width = svgElement.width.baseVal.value;
+        canvas.height = svgElement.height.baseVal.value;
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+
+        // Get base64 data
+        const imageBase64 = canvas.toDataURL('image/png');
+
+        // Send to Google Sheets
+        addon.insertChartToSheet(imageBase64, 'png');
+
+        alert('Chart inserted to Google Sheets!');
+      };
+      img.src = url;
+    } catch (error) {
+      console.error('Error inserting chart:', error);
+      alert('Error inserting chart. Please try again.');
+    }
+  };
+
   // Handle Save Chart (complete chart state)
   const handleSaveChart = () => {
     try {
@@ -1822,6 +1863,29 @@ export default function ChartEditor() {
               {/* Capture Snapshot and Save Chart Buttons */}
               {!showDataTable && (
                 <div className="flex items-center gap-3">
+                  {/* Insert to Sheet button - only in add-on mode */}
+                  {addon.isAddonMode && (
+                    <button
+                      onClick={handleInsertToSheet}
+                      className="px-6 py-2 bg-purple-600 text-white font-medium text-sm rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
+                      title="Insert chart into Google Sheets"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      Insert to Sheet
+                    </button>
+                  )}
                   <button
                     onClick={handleCaptureSnapshot}
                     className="px-6 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
