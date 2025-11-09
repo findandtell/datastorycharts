@@ -543,29 +543,14 @@ export default function ChartEditor() {
         return;
       }
 
-      // Convert SVG to PNG as base64
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      // Get SVG as string and convert to base64
       const svgString = new XMLSerializer().serializeToString(svgElement);
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      const svgBase64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
 
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = svgElement.width.baseVal.value;
-        canvas.height = svgElement.height.baseVal.value;
-        ctx.drawImage(img, 0, 0);
-        URL.revokeObjectURL(url);
+      // Send SVG to Google Sheets
+      addon.insertChartToSheet(svgBase64, 'svg');
 
-        // Get base64 data
-        const imageBase64 = canvas.toDataURL('image/png');
-
-        // Send to Google Sheets
-        addon.insertChartToSheet(imageBase64, 'png');
-
-        alert('Chart inserted to Google Sheets!');
-      };
-      img.src = url;
+      alert('Chart inserted to Google Sheets as SVG!');
     } catch (error) {
       console.error('Error inserting chart:', error);
       alert('Error inserting chart. Please try again.');
