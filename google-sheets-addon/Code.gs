@@ -11,8 +11,9 @@ function onOpen(e) {
   SpreadsheetApp.getUi()
     .createMenu('Find&Tell Charts')
     .addItem('Create Chart', 'showSidebar')
-    .addItem('Help & Documentation', 'showHelp')
+    .addItem('Open in Browser (Full Screen)', 'openInBrowser')
     .addSeparator()
+    .addItem('Help & Documentation', 'showHelp')
     .addItem('About', 'showAbout')
     .addToUi();
 }
@@ -35,6 +36,36 @@ function showSidebar() {
     .setHeight(900);
 
   SpreadsheetApp.getUi().showModelessDialog(html, 'Find&Tell Charts');
+}
+
+/**
+ * Opens chart editor in a new browser tab with selected data.
+ */
+function openInBrowser() {
+  const result = getSelectedData();
+
+  if (!result.success) {
+    SpreadsheetApp.getUi().alert('Please select data in your spreadsheet first.');
+    return;
+  }
+
+  // Encode CSV data for URL
+  const encodedCSV = encodeURIComponent(result.data.csv);
+
+  // Create HTML with redirect
+  const html = HtmlService.createHtmlOutput(
+    '<html><body>' +
+    '<p>Opening chart editor in a new window...</p>' +
+    '<script>' +
+    'window.open("https://charts.findandtell.co?csv=' + encodedCSV + '", "_blank");' +
+    'google.script.host.close();' +
+    '</script>' +
+    '</body></html>'
+  )
+    .setWidth(300)
+    .setHeight(100);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Opening...');
 }
 
 /**
