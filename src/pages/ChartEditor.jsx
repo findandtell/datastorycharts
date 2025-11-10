@@ -494,15 +494,18 @@ export default function ChartEditor() {
         const chartState = JSON.parse(chartStateJson);
 
         // Apply the chart state to restore the chart
-        applyChartState(chartState, { navigate, chartData, styleSettings });
-
-        console.log('[Chart State] Chart state loaded successfully');
+        if (applyChartState && navigate && chartData && styleSettings) {
+          applyChartState(chartState, { navigate, chartData, styleSettings });
+          console.log('[Chart State] Chart state loaded successfully');
+        } else {
+          console.error('[Chart State] Missing dependencies for applyChartState');
+        }
       } catch (error) {
         console.error('[Chart State] Failed to load chart state:', error);
-        alert('Failed to load chart state. The chart ID may be invalid.');
+        // Don't show alert for normal page loads, only log error
       }
     }
-  }, []);
+  }, [navigate, chartData, styleSettings]);
 
   // Auto-load data from Google Sheets add-on
   useEffect(() => {

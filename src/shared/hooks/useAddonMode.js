@@ -10,6 +10,7 @@ export function useAddonMode() {
   const [userInfo, setUserInfo] = useState(null);
   const [license, setLicense] = useState(null);
   const [sheetData, setSheetData] = useState(null);
+  const [useDirectAPI, setUseDirectAPI] = useState(false);
 
   // Check if we're in add-on mode
   useEffect(() => {
@@ -19,6 +20,29 @@ export function useAddonMode() {
 
     if (mode === 'addon') {
       console.log('[Add-on Mode] Initialized');
+
+      // Check for injected API
+      const checkAPI = () => {
+        if (window.googleSheetsAPI) {
+          console.log('[Add-on Mode] Direct API detected!');
+          setUseDirectAPI(true);
+          setAddonReady(true);
+
+          // Get user info via direct API
+          window.googleSheetsAPI.getUserInfo((error, data) => {
+            if (!error && data) {
+              setUserInfo(data.user);
+              setLicense(data.license);
+            }
+          });
+        } else {
+          console.log('[Add-on Mode] Direct API not available, will check again...');
+          setTimeout(checkAPI, 500);
+        }
+      };
+
+      // Start checking for API
+      setTimeout(checkAPI, 100);
     }
   }, []);
 
@@ -82,36 +106,87 @@ export function useAddonMode() {
     }
 
     console.log('[Add-on Mode] Sending message:', message);
-    window.parent.postMessage(message, '*');
+    console.log('[Add-on Mode] window.parent:', window.parent);
+    console.log('[Add-on Mode] Are we in iframe?:', window !== window.parent);
+
+    // Try multiple ways to send the message
+    try {
+      window.parent.postMessage(message, '*');
+      console.log('[Add-on Mode] postMessage sent successfully');
+    } catch (error) {
+      console.error('[Add-on Mode] postMessage failed:', error);
+    }
   }, [isAddonMode]);
 
   // Request sheet data
   const requestSheetData = useCallback(() => {
-    sendMessageToAddon({
-      type: 'REQUEST_DATA'
-    });
-  }, [sendMessageToAddon]);
+    console.log('[Add-on Mode] Requesting sheet data...');
+    console.log('[Add-on Mode] Using direct API:', useDirectAPI);
+
+    if (useDirectAPI && window.googleSheetsAPI) {
+      // Use direct API
+      window.googleSheetsAPI.getSelectedData((error, result) => {
+        if (error) {
+          console.error('[Add-on Mode] Error getting data:', error);
+          alert('Error getting data: ' + error.message);
+        } else if (result && result.success) {
+          console.log('[Add-on Mode] Data received via direct API');
+          setSheetData(result.data);
+        } else {
+          console.error('[Add-on Mode] Invalid data response');
+        }
+      });
+    } else {
+      // Fallback to postMessage
+      sendMessageToAddon({
+        type: 'REQUEST_DATA'
+      });
+    }
+  }, [useDirectAPI, sendMessageToAddon]);
 
   // Insert chart to sheet
   const insertChartToSheet = useCallback((imageBase64, format = 'png', chartState = null) => {
-    sendMessageToAddon({
-      type: 'INSERT_CHART',
-      data: {
-        imageBase64,
-        format,
-        chartState
-      }
-    });
-  }, [sendMessageToAddon]);
+    console.log('[Add-on Mode] Inserting chart...');
+    console.log('[Add-on Mode] Using direct API:', useDirectAPI);
+
+    if (useDirectAPI && window.googleSheetsAPI) {
+      // Use direct API
+      window.googleSheetsAPI.insertChart(imageBase64, format, chartState, (error, result) => {
+        if (error) {
+          console.error('[Add-on Mode] Error inserting chart:', error);
+          alert('Error inserting chart: ' + error.message);
+        } else if (result && result.success) {
+          console.log('[Add-on Mode] Chart inserted successfully');
+          if (result.chartId) {
+            alert(`Chart inserted successfully!\n\nChart ID: ${result.chartId}\n\nSave this ID to edit the chart later using "Find&Tell Charts" → "Edit Chart by ID"`);
+          }
+        }
+      });
+    } else {
+      // Fallback to postMessage
+      sendMessageToAddon({
+        type: 'INSERT_CHART',
+        data: {
+          imageBase64,
+          format,
+          chartState
+        }
+      });
+    }
+  }, [useDirectAPI, sendMessageToAddon]);
 
   // Log usage
   const logUsage = useCallback((action, metadata = {}) => {
-    sendMessageToAddon({
-      type: 'LOG_USAGE',
-      action,
-      metadata
-    });
-  }, [sendMessageToAddon]);
+    if (useDirectAPI && window.googleSheetsAPI) {
+      window.googleSheetsAPI.logUsage(action, metadata);
+    } else {
+      sendMessageToAddon({
+        type: 'LOG_USAGE',
+        action,
+        metadata
+      });
+    }
+  }, [useDirectAPI, sendMessageToAddon]);
 
   return {
     isAddonMode,
@@ -122,6 +197,7 @@ export function useAddonMode() {
     requestSheetData,
     insertChartToSheet,
     logUsage,
-    sendMessageToAddon
+    sendMessageToAddon,
+    useDirectAPI
   };
 }

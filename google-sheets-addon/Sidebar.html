@@ -187,17 +187,93 @@
         console.log('iframe load event fired');
         iframeLoaded = true;
 
-        // Send initial configuration to the React app
+        // Inject API directly into iframe to bypass postMessage restrictions
         setTimeout(function() {
-          sendMessageToApp({
-            type: 'ADDON_READY',
-            platform: 'google-sheets'
-          });
-        }, 100);
+          try {
+            // Create API object in iframe's window
+            iframeEl.contentWindow.googleSheetsAPI = {
+              // Get selected data from Google Sheets
+              getSelectedData: function(callback) {
+                console.log('[Sidebar] getSelectedData called from iframe');
+                google.script.run
+                  .withSuccessHandler(function(result) {
+                    console.log('[Sidebar] Data retrieved:', result);
+                    callback(null, result);
+                  })
+                  .withFailureHandler(function(error) {
+                    console.error('[Sidebar] Error getting data:', error);
+                    callback(error, null);
+                  })
+                  .getSelectedData();
+              },
+
+              // Insert chart to sheet
+              insertChart: function(imageBase64, format, chartState, callback) {
+                console.log('[Sidebar] insertChart called from iframe');
+                google.script.run
+                  .withSuccessHandler(function(result) {
+                    console.log('[Sidebar] Chart inserted:', result);
+                    callback(null, result);
+                  })
+                  .withFailureHandler(function(error) {
+                    console.error('[Sidebar] Error inserting chart:', error);
+                    callback(error, null);
+                  })
+                  .insertChartToSheet(imageBase64, format, chartState);
+              },
+
+              // Log usage
+              logUsage: function(action, metadata) {
+                console.log('[Sidebar] logUsage called:', action);
+                google.script.run
+                  .withSuccessHandler(function() {
+                    console.log('[Sidebar] Usage logged');
+                  })
+                  .withFailureHandler(function(error) {
+                    console.error('[Sidebar] Error logging usage:', error);
+                  })
+                  .logUsage(action, metadata);
+              },
+
+              // Get user info
+              getUserInfo: function(callback) {
+                console.log('[Sidebar] getUserInfo called from iframe');
+                google.script.run
+                  .withSuccessHandler(function(userInfo) {
+                    google.script.run
+                      .withSuccessHandler(function(license) {
+                        callback(null, { user: userInfo.user, license: license.license });
+                      })
+                      .withFailureHandler(function(error) {
+                        callback(error, null);
+                      })
+                      .checkLicense();
+                  })
+                  .withFailureHandler(function(error) {
+                    callback(error, null);
+                  })
+                  .getUserInfo();
+              }
+            };
+
+            console.log('[Sidebar] API injected successfully into iframe');
+            alert('API injected! The iframe can now call google.script.run functions directly.');
+          } catch (error) {
+            console.error('[Sidebar] Failed to inject API:', error);
+            alert('Failed to inject API: ' + error.message);
+          }
+        }, 500);
       });
 
       // Listen for messages from iframe
+      console.log('Setting up message listener...');
       window.addEventListener('message', handleMessage);
+      console.log('Message listener set up successfully');
+
+      // Debug: Test message listener with alert
+      window.addEventListener('message', function(event) {
+        alert('ANY message received! Origin: ' + event.origin + ', Type: ' + (event.data ? event.data.type : 'unknown'));
+      });
 
       // Get user info and license
       getUserInfoAndLicense();
@@ -288,6 +364,9 @@
      * Handle messages from the React app
      */
     function handleMessage(event) {
+      // Debug alert
+      alert('handleMessage called! Type: ' + (event.data ? event.data.type : 'unknown'));
+
       // Security: Verify origin in production
       // if (event.origin !== 'https://charts.findandtell.co') {
       //   return;
@@ -298,6 +377,7 @@
 
       switch (message.type) {
         case 'REQUEST_DATA':
+          alert('REQUEST_DATA received! Calling getSheetData()');
           getSheetData();
           break;
 
