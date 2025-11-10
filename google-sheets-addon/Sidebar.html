@@ -20,16 +20,22 @@
     }
 
     #loading {
-      display: flex;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
       background: white;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1000;
     }
 
-    #loading.hidden {
-      display: none;
+    #loading.visible {
+      display: flex;
     }
 
     .spinner {
@@ -115,11 +121,8 @@
       width: 100%;
       height: 100vh;
       border: none;
-      display: none;
-    }
-
-    iframe.loaded {
       display: block;
+      background: white;
     }
   </style>
 </head>
@@ -159,8 +162,9 @@
 
   <script>
     // Configuration
-    const IFRAME_LOAD_TIMEOUT = 15000; // 15 seconds
+    const IFRAME_LOAD_TIMEOUT = 10000; // 10 seconds
     let iframeLoadTimer = null;
+    let iframeLoaded = false;
 
     // Elements
     const loadingEl = document.getElementById('loading');
@@ -173,14 +177,24 @@
      */
     function init() {
       console.log('Initializing Find&Tell Charts add-on...');
+      console.log('iframe src:', iframeEl.src);
 
-      // Set iframe load timeout
-      iframeLoadTimer = setTimeout(function() {
-        showError('The chart editor is taking longer than expected to load. Please check your internet connection and try again.');
-      }, IFRAME_LOAD_TIMEOUT);
+      // Show "Open in New Tab" button immediately
+      document.getElementById('openInTabButton').style.display = 'block';
 
       // Listen for iframe load
-      iframeEl.addEventListener('load', handleIframeLoad);
+      iframeEl.addEventListener('load', function() {
+        console.log('iframe load event fired');
+        iframeLoaded = true;
+
+        // Send initial configuration to the React app
+        setTimeout(function() {
+          sendMessageToApp({
+            type: 'ADDON_READY',
+            platform: 'google-sheets'
+          });
+        }, 100);
+      });
 
       // Listen for messages from iframe
       window.addEventListener('message', handleMessage);
@@ -194,8 +208,10 @@
      */
     function handleIframeLoad() {
       console.log('iframe loaded successfully');
+      iframeLoaded = true;
       clearTimeout(iframeLoadTimer);
 
+      // Hide loading immediately
       loadingEl.classList.add('hidden');
       iframeEl.classList.add('loaded');
 
@@ -203,10 +219,13 @@
       document.getElementById('openInTabButton').style.display = 'block';
 
       // Send initial configuration to the React app
-      sendMessageToApp({
-        type: 'ADDON_READY',
-        platform: 'google-sheets'
-      });
+      // Use a small delay to ensure iframe is fully ready
+      setTimeout(function() {
+        sendMessageToApp({
+          type: 'ADDON_READY',
+          platform: 'google-sheets'
+        });
+      }, 100);
     }
 
     /**
