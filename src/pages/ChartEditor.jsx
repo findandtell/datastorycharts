@@ -1508,6 +1508,8 @@ export default function ChartEditor() {
   // Slope Chart specific settings
   const slopeSettings = chartType === 'slope' ? {
     colorMode: styleSettings.colorMode,
+    comparisonPalette: styleSettings.comparisonPalette,
+    userCustomColors: styleSettings.userCustomColors,
     lineThickness: styleSettings.lineThickness,
     lineOpacity: styleSettings.lineOpacity,
     lineSaturation: styleSettings.lineSaturation,
