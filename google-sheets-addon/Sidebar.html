@@ -184,24 +184,48 @@
 
       // Listen for iframe load
       iframeEl.addEventListener('load', function() {
-        console.log('iframe load event fired');
+        console.log('[DEBUG] iframe load event fired');
         iframeLoaded = true;
 
         // Inject API directly into iframe to bypass postMessage restrictions
         setTimeout(function() {
           try {
+            console.log('[DEBUG] Starting API injection...');
+            console.log('[DEBUG] iframeEl exists:', !!iframeEl);
+            console.log('[DEBUG] iframeEl.contentWindow exists:', !!iframeEl.contentWindow);
+
+            // Test if we can access the iframe's window
+            var testAccess = false;
+            try {
+              testAccess = typeof iframeEl.contentWindow === 'object';
+              console.log('[DEBUG] Can access contentWindow:', testAccess);
+            } catch (e) {
+              console.error('[DEBUG] Cannot access contentWindow:', e);
+              alert('SECURITY ERROR: Cannot access iframe window. Cross-origin restriction detected.');
+              return;
+            }
+
             // Create API object in iframe's window
             iframeEl.contentWindow.googleSheetsAPI = {
+              // Test function
+              test: function() {
+                alert('[API TEST] API is accessible from iframe!');
+                return 'API is working!';
+              },
+
               // Get selected data from Google Sheets
               getSelectedData: function(callback) {
+                alert('[DEBUG] getSelectedData called from iframe');
                 console.log('[Sidebar] getSelectedData called from iframe');
                 google.script.run
                   .withSuccessHandler(function(result) {
                     console.log('[Sidebar] Data retrieved:', result);
+                    alert('[DEBUG] Data retrieved successfully: ' + JSON.stringify(result).substring(0, 100));
                     callback(null, result);
                   })
                   .withFailureHandler(function(error) {
                     console.error('[Sidebar] Error getting data:', error);
+                    alert('[DEBUG] Error getting data: ' + error.message);
                     callback(error, null);
                   })
                   .getSelectedData();
@@ -209,14 +233,17 @@
 
               // Insert chart to sheet
               insertChart: function(imageBase64, format, chartState, callback) {
+                alert('[DEBUG] insertChart called from iframe');
                 console.log('[Sidebar] insertChart called from iframe');
                 google.script.run
                   .withSuccessHandler(function(result) {
                     console.log('[Sidebar] Chart inserted:', result);
+                    alert('[DEBUG] Chart inserted successfully');
                     callback(null, result);
                   })
                   .withFailureHandler(function(error) {
                     console.error('[Sidebar] Error inserting chart:', error);
+                    alert('[DEBUG] Error inserting chart: ' + error.message);
                     callback(error, null);
                   })
                   .insertChartToSheet(imageBase64, format, chartState);
@@ -256,11 +283,20 @@
               }
             };
 
-            console.log('[Sidebar] API injected successfully into iframe');
-            alert('API injected! The iframe can now call google.script.run functions directly.');
+            console.log('[DEBUG] API object created');
+
+            // Verify the API was injected
+            if (iframeEl.contentWindow.googleSheetsAPI) {
+              console.log('[DEBUG] API verified in iframe window');
+              console.log('[DEBUG] API keys:', Object.keys(iframeEl.contentWindow.googleSheetsAPI));
+              alert('[SUCCESS] API injected successfully! Keys: ' + Object.keys(iframeEl.contentWindow.googleSheetsAPI).join(', '));
+            } else {
+              console.error('[DEBUG] API not found after injection!');
+              alert('[ERROR] API injection failed - API not found in iframe');
+            }
           } catch (error) {
-            console.error('[Sidebar] Failed to inject API:', error);
-            alert('Failed to inject API: ' + error.message);
+            console.error('[DEBUG] Failed to inject API:', error);
+            alert('[ERROR] Failed to inject API: ' + error.message);
           }
         }, 500);
       });

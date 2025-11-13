@@ -1,7 +1,7 @@
 /**
  * Chart Registry
  * Central registry for all available chart types
- * 
+ *
  * To add a new chart:
  * 1. Create chart component in charts/YourChart/
  * 2. Import it here
@@ -16,6 +16,15 @@ import BarChart from './BarChart/BarChart';
 import LineChart from './LineChart/LineChart';
 // import SankeyChart from './SankeyChart/SankeyChart';
 
+// Import Heroicons
+import {
+  ChartBarIcon,
+  ChartBarSquareIcon,
+  ArrowTrendingUpIcon,
+  PresentationChartLineIcon,
+  FunnelIcon,
+} from '@heroicons/react/24/outline';
+
 /**
  * Chart registry object
  * Each chart type should have:
@@ -27,38 +36,26 @@ import LineChart from './LineChart/LineChart';
  * - category: Chart category (flow, comparison, distribution, etc.)
  */
 export const chartRegistry = {
-  funnel: {
-    name: 'Funnel Chart',
-    component: FunnelChart,
-    icon: '📊',
-    description: 'Visualize conversion funnels and drop-offs',
+  'bar-horizontal': {
+    name: 'Bar Chart Horizontal',
+    component: BarChart,
+    icon: ChartBarIcon,
+    description: 'Horizontal bar chart for comparing categories',
     supportsComparison: true,
-    category: 'flow',
-    defaultSettings: {
-      orientation: 'vertical',
-      emphasis: 'throughput',
-    },
-  },
-
-  slope: {
-    name: 'Slope Chart',
-    component: SlopeChart,
-    icon: '📈',
-    description: 'Show change between two time periods',
-    supportsComparison: false,
     category: 'comparison',
     defaultSettings: {
-      colorMode: 'category',
-      labelPosition: 'left',
-      lineThickness: 3,
+      orientation: 'horizontal',
+      barMode: 'grouped',
+      showGrid: true,
     },
+    defaultDataset: 'barHorizontalSingle',
   },
 
-  bar: {
-    name: 'Bar Chart',
+  'bar-vertical': {
+    name: 'Bar Chart Vertical',
     component: BarChart,
-    icon: '📊',
-    description: 'Compare values across categories',
+    icon: ChartBarIcon,
+    description: 'Vertical bar chart for comparing categories',
     supportsComparison: true,
     category: 'comparison',
     defaultSettings: {
@@ -66,12 +63,43 @@ export const chartRegistry = {
       barMode: 'grouped',
       showGrid: true,
     },
+    defaultDataset: 'barVerticalSingle',
+  },
+
+  'bar-grouped-horizontal': {
+    name: 'Grouped Bar Horizontal',
+    component: BarChart,
+    icon: ChartBarSquareIcon,
+    description: 'Compare multiple series across categories horizontally',
+    supportsComparison: true,
+    category: 'comparison',
+    defaultSettings: {
+      orientation: 'horizontal',
+      barMode: 'grouped',
+      showGrid: true,
+    },
+    defaultDataset: 'barGroupedHorizontal',
+  },
+
+  'bar-grouped-vertical': {
+    name: 'Grouped Bar Vertical',
+    component: BarChart,
+    icon: ChartBarSquareIcon,
+    description: 'Compare multiple series across categories vertically',
+    supportsComparison: true,
+    category: 'comparison',
+    defaultSettings: {
+      orientation: 'vertical',
+      barMode: 'grouped',
+      showGrid: true,
+    },
+    defaultDataset: 'barGroupedVertical',
   },
 
   line: {
     name: 'Line Chart',
     component: LineChart,
-    icon: '📈',
+    icon: PresentationChartLineIcon,
     description: 'Visualize time-series data and trends',
     supportsComparison: true,
     category: 'trend',
@@ -80,7 +108,94 @@ export const chartRegistry = {
       smoothLines: false,
       showGridLines: true,
       timeScale: 'month',
+      chartMode: 'line',
+      showAreaFill: false,
+      stackAreas: false,
+      xAxisTimeGrouping: 'single',
+      xAxisPrimaryLabel: 'date',
+      xAxisSecondaryLabel: 'none',
+      dateFormatPreset: 'M/d/yy',
     },
+    defaultDataset: 'marketingChannelRevenue',
+  },
+
+  area: {
+    name: 'Area Chart',
+    component: LineChart,
+    icon: PresentationChartLineIcon,
+    description: 'Show trends with filled areas under lines',
+    supportsComparison: true,
+    category: 'trend',
+    defaultSettings: {
+      showPoints: false,
+      smoothLines: false,
+      showGridLines: true,
+      timeScale: 'month',
+      chartMode: 'area',
+      areaOpacity: 0.4,
+      lineOpacity: 0.10,
+      showAreaFill: true,
+      stackAreas: false,
+      xAxisTimeGrouping: 'single',
+      xAxisPrimaryLabel: 'date',
+      xAxisSecondaryLabel: 'none',
+      dateFormatPreset: 'M/d/yy',
+    },
+    defaultDataset: 'marketingChannelRevenue',
+  },
+
+  'area-stacked': {
+    name: 'Stacked Area',
+    component: LineChart,
+    icon: PresentationChartLineIcon,
+    description: 'Show cumulative trends with stacked areas',
+    supportsComparison: true,
+    category: 'trend',
+    defaultSettings: {
+      showPoints: false,
+      smoothLines: false,
+      showGridLines: true,
+      timeScale: 'month',
+      chartMode: 'area-stacked',
+      areaOpacity: 0.8,
+      lineOpacity: 0.10,
+      showAreaFill: true,
+      stackAreas: true,
+      xAxisTimeGrouping: 'single',
+      xAxisPrimaryLabel: 'date',
+      xAxisSecondaryLabel: 'none',
+      dateFormatPreset: 'M/d/yy',
+    },
+    defaultDataset: 'areaStackedDefault',
+  },
+
+  slope: {
+    name: 'Slope Chart',
+    component: SlopeChart,
+    icon: ArrowTrendingUpIcon,
+    description: 'Show change between two time periods',
+    supportsComparison: false,
+    category: 'comparison',
+    defaultSettings: {
+      colorMode: 'category',
+      labelPosition: 'left',
+      lineThickness: 3,
+    },
+    defaultDataset: 'tufteSlope',
+  },
+
+  funnel: {
+    name: 'Funnel Chart',
+    component: FunnelChart,
+    icon: FunnelIcon,
+    description: 'Visualize conversion funnels and drop-offs',
+    supportsComparison: true,
+    category: 'flow',
+    defaultSettings: {
+      orientation: 'vertical',
+      emphasis: 'throughput',
+    },
+    defaultDataset: 'abTest',
   },
 
   // Future chart types:

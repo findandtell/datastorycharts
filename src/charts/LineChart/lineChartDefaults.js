@@ -86,6 +86,18 @@ export const defaultStyleSettings = {
   labelFontSize: 12,
   compactNumbers: true,
 
+  // Number formatting (Labels)
+  valuePrefix: '',
+  valueSuffix: '',
+  valueDecimalPlaces: 0,
+  valueFormat: 'number',
+
+  // Number formatting (Axis)
+  axisValuePrefix: '',
+  axisValueSuffix: '',
+  axisValueDecimalPlaces: 0,
+  axisValueFormat: 'number',
+
   // Axes
   showXAxis: true,
   showYAxis: true,

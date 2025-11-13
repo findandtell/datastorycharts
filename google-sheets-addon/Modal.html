@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find&Tell Charts</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: white;
+      overflow: hidden;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100vh;
+      border: none;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <iframe
+    id="chartApp"
+    src="https://charts.findandtell.co?mode=addon"
+    allow="clipboard-write"
+    sandbox="allow-scripts allow-same-origin allow-forms"
+  ></iframe>
+
+  <script>
+    const iframeEl = document.getElementById('chartApp');
+
+    // Try to inject API after iframe loads
+    iframeEl.addEventListener('load', function() {
+      console.log('[Modal] iframe loaded');
+
+      setTimeout(function() {
+        try {
+          console.log('[Modal] Attempting API injection...');
+
+          // Check if we can access contentWindow
+          if (!iframeEl.contentWindow) {
+            console.error('[Modal] Cannot access contentWindow');
+            alert('[Modal ERROR] Cannot access iframe window');
+            return;
+          }
+
+          // Try to inject the API
+          iframeEl.contentWindow.googleSheetsAPI = {
+            test: function() {
+              alert('[Modal API TEST] API is accessible!');
+              return 'Working!';
+            },
+
+            getSelectedData: function(callback) {
+              console.log('[Modal] getSelectedData called');
+              google.script.run
+                .withSuccessHandler(function(result) {
+                  callback(null, result);
+                })
+                .withFailureHandler(function(error) {
+                  callback(error, null);
+                })
+                .getSelectedData();
+            },
+
+            insertChart: function(imageBase64, format, chartState, callback) {
+              console.log('[Modal] insertChart called');
+              google.script.run
+                .withSuccessHandler(function(result) {
+                  callback(null, result);
+                })
+                .withFailureHandler(function(error) {
+                  callback(error, null);
+                })
+                .insertChartToSheet(imageBase64, format, chartState);
+            },
+
+            logUsage: function(action, metadata) {
+              console.log('[Modal] logUsage called');
+              google.script.run
+                .withSuccessHandler(function() {
+                  console.log('[Modal] Usage logged');
+                })
+                .withFailureHandler(function(error) {
+                  console.error('[Modal] Error logging usage:', error);
+                })
+                .logUsage(action, metadata);
+            },
+
+            getUserInfo: function(callback) {
+              console.log('[Modal] getUserInfo called');
+              google.script.run
+                .withSuccessHandler(function(userInfo) {
+                  google.script.run
+                    .withSuccessHandler(function(license) {
+                      callback(null, { user: userInfo.user, license: license.license });
+                    })
+                    .withFailureHandler(function(error) {
+                      callback(error, null);
+                    })
+                    .checkLicense();
+                })
+                .withFailureHandler(function(error) {
+                  callback(error, null);
+                })
+                .getUserInfo();
+            }
+          };
+
+          console.log('[Modal] API injection attempted');
+          alert('[Modal] API injected! Type: ' + typeof iframeEl.contentWindow.googleSheetsAPI);
+        } catch (error) {
+          console.error('[Modal] API injection failed:', error);
+          alert('[Modal ERROR] ' + error.message);
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import ChartEditor from './pages/ChartEditor';
+import GoogleSheetsBanner from './shared/components/GoogleSheetsBanner';
 
 /**
  * Main App Component with Routing
@@ -12,6 +13,7 @@ import ChartEditor from './pages/ChartEditor';
 export default function App() {
   return (
     <Router>
+      <GoogleSheetsBanner />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/chart/:chartType" element={<ChartEditor />} />

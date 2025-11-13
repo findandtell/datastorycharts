@@ -1,0 +1,26 @@
+{
+  "name": "findtell-charts-figma-plugin",
+  "version": "1.0.0",
+  "description": "Find&Tell Charts plugin for Figma - Create beautiful charts from Google Sheets",
+  "main": "code.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "keywords": [
+    "figma",
+    "plugin",
+    "charts",
+    "visualization",
+    "google-sheets",
+    "funnel",
+    "bar",
+    "line"
+  ],
+  "author": "Find&Tell",
+  "license": "MIT",
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.99.0",
+    "typescript": "^5.3.3"
+  }
+}

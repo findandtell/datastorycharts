@@ -111,6 +111,32 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     debouncedStyleSettings?.dateField,
   ]);
 
+  // Convert axis color brightness (0-100) to hex color at component level
+  // 0 = black, 50 = grey, 100 = white
+  const computedAxisColor = useMemo(() => {
+    const brightness = Math.round((axisColorBrightness / 100) * 255);
+    const hex = brightness.toString(16).padStart(2, '0');
+    return `#${hex}${hex}${hex}`;
+  }, [axisColorBrightness]);
+
+  // Define theme colors at component level (NOT inside useEffect)
+  const themeColors = useMemo(() => {
+    const darkMode = debouncedStyleSettings?.darkMode || false;
+    const gridLineColor = debouncedStyleSettings?.gridLineColor || '#e5e7eb';
+
+    return {
+      titleColor: darkMode ? '#f9fafb' : '#111827',
+      subtitleColor: darkMode ? '#d1d5db' : '#6b7280',
+      // Axis value labels (Y-axis numbers) - affected by axis color slider
+      axisValueLabelColor: computedAxisColor,
+      // Category labels (X-axis dates/times) - NOT affected by axis color slider
+      categoryLabelColor: darkMode ? '#e5e7eb' : '#374151',
+      // Axis lines, ticks, and gridlines - affected by axis color slider
+      axisLineColor: computedAxisColor,
+      gridColor: darkMode ? '#4b5563' : gridLineColor,
+    };
+  }, [debouncedStyleSettings?.darkMode, debouncedStyleSettings?.gridLineColor, computedAxisColor]);
+
   useEffect(() => {
     if (!data || data.length === 0 || !svgRef.current) {
       return;
@@ -152,10 +178,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       pointStyle,
       pointBorderWidth,
       excludeZeroValues,
+      showMostRecentPoint,
       // Area fill
       showAreaFill,
       areaOpacity,
       areaGradient,
+      stackAreas,
+      chartMode,
       // Emphasis
       emphasizedLines,
       emphasizedLineThickness,
@@ -168,6 +197,11 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       // Axes
       showXAxis,
       showYAxis,
+      xAxisLineThickness = 1,
+      yAxisLineThickness = 1,
+      axisColorBrightness = 0, // 0=black, 50=grey, 100=white
+      showXAxisLabels = true,
+      showYAxisLabels = true,
       xAxisLabelRotation,
       yAxisFormat,
       xAxisFontSize,
@@ -199,11 +233,16 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       showHorizontalGridlines,
       showVerticalGridlines,
       compactAxisNumbers,
-      // Number formatting
+      // Number formatting (Labels)
       valuePrefix,
       valueSuffix,
       valueDecimalPlaces,
       valueFormat,
+      // Number formatting (Axis)
+      axisValuePrefix,
+      axisValueSuffix,
+      axisValueDecimalPlaces,
+      axisValueFormat,
       // Legend
       showLegend,
       legendPosition,
@@ -252,13 +291,8 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       calculatedMarginRight = Math.max(marginRight, requiredMargin);
     }
 
-    // Define theme colors
-    const themeColors = {
-      titleColor: darkMode ? '#f9fafb' : '#111827',
-      subtitleColor: darkMode ? '#d1d5db' : '#6b7280',
-      axisColor: darkMode ? '#e5e7eb' : '#374151',
-      gridColor: darkMode ? '#4b5563' : gridLineColor,
-    };
+    // Use themeColors that were memoized at component level
+    // (computedAxisColor and themeColors are now defined outside useEffect)
 
     // Create SVG with extended height for watermark margin area
     const actualHeight = height + watermarkMarginHeight;
@@ -379,9 +413,15 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     }
 
     // Get all values for Y scale
-    const allValues = metricNames.flatMap(metric =>
-      filteredData.map(d => d[metric]).filter(v => v != null)
-    );
+    // For stacked areas, we need to use cumulative sums instead of individual values
+    const allValues = (stackAreas && showAreaFill)
+      ? filteredData.map(d => {
+          // Sum all metric values at this data point
+          return metricNames.reduce((sum, metric) => sum + (d[metric] || 0), 0);
+        })
+      : metricNames.flatMap(metric =>
+          filteredData.map(d => d[metric]).filter(v => v != null)
+        );
 
     // Create scales
     const xScale = d3
@@ -606,12 +646,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           xAxisGroup
             .append('text')
             .attr('x', groupCenterX)
-            .attr('y', 61) // Spacing from primary labels
+            .attr('y', 66) // Increased from 61 for +5px spacing
             .attr('text-anchor', 'middle')
             .attr('font-family', fontFamily)
             .attr('font-size', `${xAxisSecondaryFontSize || 12}px`) // Use secondary font size
             .attr('font-weight', '400')
-            .attr('fill', themeColors.axisColor)
+            .attr('fill', themeColors.categoryLabelColor)
+            .attr('opacity', showXAxisLabels ? 1 : 0) // Hide if toggle is off
             .text(group.label);
 
           // Draw major tick mark at group boundary
@@ -623,7 +664,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
               .attr('x2', group.startX)
               .attr('y1', chartHeight)
               .attr('y2', chartHeight + 12)
-              .attr('stroke', themeColors.axisColor)
+              .attr('stroke', themeColors.axisLineColor)
               .attr('stroke-width', 2);
           }
         });
@@ -644,12 +685,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           xAxisGroup
             .append('text')
             .attr('x', -10) // Position to the left of Y-axis
-            .attr('y', 61) // Same Y position as secondary labels
+            .attr('y', 66) // Increased from 61 for +5px spacing
             .attr('text-anchor', 'end')
             .attr('font-family', fontFamily)
             .attr('font-size', `${xAxisSecondaryFontSize || 12}px`) // Use secondary font size
             .attr('font-weight', '400')
-            .attr('fill', themeColors.axisColor)
+            .attr('fill', themeColors.categoryLabelColor)
+            .attr('opacity', showXAxisLabels ? 1 : 0) // Hide if toggle is off
             .text(secondaryPrefixLabel);
         }
       }
@@ -708,7 +750,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           .attr('x2', xPos)
           .attr('y1', chartHeight)
           .attr('y2', chartHeight + 6)
-          .attr('stroke', themeColors.axisColor)
+          .attr('stroke', themeColors.axisLineColor)
           .attr('stroke-width', 1)
           .style('opacity', 0.6);
 
@@ -716,12 +758,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         xAxisGroup
           .append('text')
           .attr('x', xPos)
-          .attr('y', 29) // Increased from 24 for more spacing (+5px)
+          .attr('y', 34) // Increased from 29 for more spacing (+5px)
           .attr('text-anchor', 'middle')
           .attr('font-family', fontFamily)
           .attr('font-size', `${xAxisFontSize || 12}px`)
           .attr('font-weight', '400')
-          .attr('fill', themeColors.axisColor)
+          .attr('fill', themeColors.categoryLabelColor)
+          .attr('opacity', showXAxisLabels ? 1 : 0) // Hide if toggle is off
           .text(primaryLabel);
       });
 
@@ -746,18 +789,26 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         xAxisGroup
           .append('text')
           .attr('x', -10) // Position to the left of Y-axis (at x=0)
-          .attr('y', 29)
+          .attr('y', 34) // Increased from 29 for +5px spacing
           .attr('text-anchor', 'end')
           .attr('font-family', fontFamily)
           .attr('font-size', `${xAxisFontSize || 12}px`)
           .attr('font-weight', '400') // Same weight as other labels
-          .attr('fill', themeColors.axisColor)
+          .attr('fill', themeColors.categoryLabelColor)
+          .attr('opacity', showXAxisLabels ? 1 : 0) // Hide if toggle is off
           .text(prefixLabel);
       }
 
+      // Style axis lines - hide domain line if thickness is 0
       xAxisGroup
-        .selectAll('line, path')
-        .attr('stroke', themeColors.axisColor);
+        .selectAll('.tick line')
+        .attr('stroke', themeColors.axisLineColor);
+
+      xAxisGroup
+        .select('.domain')
+        .attr('stroke', themeColors.axisLineColor)
+        .attr('stroke-width', xAxisLineThickness)
+        .attr('opacity', xAxisLineThickness > 0 ? 1 : 0);
     }
 
     // Draw Y axis
@@ -776,37 +827,49 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         numMajorTicks = Math.max(1, Math.floor((yMax - yMin) / axisMajorUnit));
       }
 
-      // Format number with all user settings
+      // Format number with all user settings (using Axis Number Styling)
       const formatYAxisNumber = (value) => {
-        let formatted = value;
+        if (value == null) return '';
 
-        // Apply decimal places
-        if (valueDecimalPlaces !== undefined) {
-          formatted = Number(formatted).toFixed(valueDecimalPlaces);
+        // Handle percentage format
+        if (axisValueFormat === 'percentage') {
+          const percentValue = value * 100;
+          let formattedValue;
+
+          if (compactAxisNumbers) {
+            const absValue = Math.abs(percentValue);
+            if (absValue >= 1000000) {
+              formattedValue = (percentValue / 1000000).toFixed(axisValueDecimalPlaces) + 'M';
+            } else if (absValue >= 1000) {
+              formattedValue = (percentValue / 1000).toFixed(axisValueDecimalPlaces) + 'K';
+            } else {
+              formattedValue = percentValue.toFixed(axisValueDecimalPlaces);
+            }
+          } else {
+            formattedValue = percentValue.toFixed(axisValueDecimalPlaces);
+          }
+
+          return `${axisValuePrefix || ''}${formattedValue}%${axisValueSuffix || ''}`;
         }
 
-        // Apply percentage format
-        if (valueFormat === 'percentage') {
-          formatted = `${formatted}%`;
-        } else if (compactAxisNumbers) {
-          // Apply compact notation
+        // Handle number format
+        let formattedValue;
+
+        if (compactAxisNumbers) {
           const absValue = Math.abs(value);
-          const sign = value < 0 ? '-' : '';
-          if (absValue >= 1000000000) {
-            formatted = `${sign}${(absValue / 1000000000).toFixed(absValue % 1000000000 === 0 ? 0 : 1)}B`;
-          } else if (absValue >= 1000000) {
-            formatted = `${sign}${(absValue / 1000000).toFixed(absValue % 1000000 === 0 ? 0 : 1)}M`;
+          if (absValue >= 1000000) {
+            formattedValue = (value / 1000000).toFixed(axisValueDecimalPlaces) + 'M';
           } else if (absValue >= 1000) {
-            formatted = `${sign}${(absValue / 1000).toFixed(absValue % 1000 === 0 ? 0 : 1)}K`;
+            formattedValue = (value / 1000).toFixed(axisValueDecimalPlaces) + 'K';
           } else {
-            formatted = value.toLocaleString();
+            formattedValue = value.toFixed(axisValueDecimalPlaces);
           }
         } else {
-          formatted = value.toLocaleString();
+          formattedValue = value.toFixed(axisValueDecimalPlaces);
         }
 
-        // Add prefix and suffix
-        return `${valuePrefix || ''}${formatted}${valueSuffix || ''}`;
+        // Apply prefix and suffix
+        return `${axisValuePrefix || ''}${formattedValue}${axisValueSuffix || ''}`;
       };
 
       // Create Y axis with major ticks
@@ -833,15 +896,22 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       // Style axis text with additional spacing
       yAxisGroup
         .selectAll('text')
-        .attr('fill', themeColors.axisColor)
+        .attr('fill', themeColors.axisValueLabelColor) // Y-axis shows values
         .attr('font-family', fontFamily)
         .attr('font-size', `${yAxisFontSize || 12}px`)
-        .attr('dx', '-0.5em'); // Add spacing between label and axis line
+        .attr('dx', '-5px') // Add 5px spacing between label and axis line
+        .attr('opacity', showYAxisLabels ? 1 : 0); // Hide if toggle is off
 
-      // Style axis lines
+      // Style axis lines - hide domain line if thickness is 0
       yAxisGroup
-        .selectAll('line, path')
-        .attr('stroke', themeColors.axisColor);
+        .selectAll('.tick line')
+        .attr('stroke', themeColors.axisLineColor);
+
+      yAxisGroup
+        .select('.domain')
+        .attr('stroke', themeColors.axisLineColor)
+        .attr('stroke-width', yAxisLineThickness)
+        .attr('opacity', yAxisLineThickness > 0 ? 1 : 0);
 
       // Draw minor ticks if enabled
       if (axisMinorTickType !== 'none' && !axisMinorUnitAuto) {
@@ -869,7 +939,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           .attr('x2', minorTickSize)
           .attr('y1', d => yScale(d))
           .attr('y2', d => yScale(d))
-          .attr('stroke', themeColors.axisColor)
+          .attr('stroke', themeColors.axisLineColor)
           .attr('stroke-width', 0.5)
           .style('opacity', 0.5);
       }
@@ -885,9 +955,28 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           .attr('font-family', fontFamily)
           .attr('font-size', `${axisLabelFontSize || 14}px`)
           .attr('font-weight', 400)
-          .attr('fill', themeColors.axisColor)
+          .attr('fill', themeColors.axisValueLabelColor)
           .text(axisLabel);
       }
+    }
+
+    // Calculate stacked values if stacking is enabled
+    // For stacked areas, we need to calculate cumulative values for each point
+    console.log('[LineChart] Stacking config:', { stackAreas, showAreaFill, metricNamesLength: metricNames?.length });
+    const stackedData = stackAreas && showAreaFill ? filteredData.map(d => {
+      const stackedPoint = { ...d };
+      let cumulative = 0;
+      metricNames.forEach(metric => {
+        const value = d[metric] || 0;
+        stackedPoint[`${metric}_y0`] = cumulative;
+        cumulative += value;
+        stackedPoint[`${metric}_y1`] = cumulative;
+      });
+      return stackedPoint;
+    }) : null;
+
+    if (stackedData) {
+      console.log('[LineChart] Stacked data sample (first point):', stackedData[0]);
     }
 
     // Draw lines and points for each metric
@@ -920,10 +1009,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
 
       // Create area fill if enabled
       if (showAreaFill) {
+        // Use stacked values if stacking is enabled, otherwise use baseline
+        const dataForArea = stackAreas ? stackedData : metricData;
+
         const areaGenerator = d3.area()
           .x(d => xScale(d.parsedDate))
-          .y0(chartHeight)
-          .y1(d => yScale(d[metric]));
+          .y0(d => stackAreas ? yScale(d[`${metric}_y0`]) : chartHeight)
+          .y1(d => stackAreas ? yScale(d[`${metric}_y1`]) : yScale(d[metric]));
 
         if (smoothLines) {
           areaGenerator.curve(d3.curveCatmullRom.alpha(0.5));
@@ -953,14 +1045,14 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
 
           chartGroup
             .append('path')
-            .datum(metricData)
+            .datum(dataForArea)
             .attr('class', `area-${i}`)
             .attr('d', areaGenerator)
             .attr('fill', `url(#${gradientId})`);
         } else {
           chartGroup
             .append('path')
-            .datum(metricData)
+            .datum(dataForArea)
             .attr('class', `area-${i}`)
             .attr('d', areaGenerator)
             .attr('fill', lineColor)
@@ -969,7 +1061,10 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       }
 
       // Draw line
-      const lineGen = lineGenerator.y(d => yScale(d[metric]));
+      // For stacked areas, lines follow the top of each stacked area
+      const lineGen = stackAreas && showAreaFill
+        ? lineGenerator.y(d => yScale(d[`${metric}_y1`]))
+        : lineGenerator.y(d => yScale(d[metric]));
       const strokeDashArray = lineStyle === 'dashed' ? '8,4' : lineStyle === 'dotted' ? '2,4' : 'none';
 
       // Calculate line width: bold if metric is emphasized, normal otherwise
@@ -977,9 +1072,12 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         ? emphasizedLineThickness
         : (isEmphasized ? emphasizedLineThickness : lineThickness);
 
+      // Use stacked data for line if stacking is enabled, otherwise use metric data
+      const dataForLine = (stackAreas && showAreaFill) ? stackedData : metricData;
+
       chartGroup
         .append('path')
-        .datum(metricData)
+        .datum(dataForLine)
         .attr('class', `line-${i}`)
         .attr('fill', 'none')
         .attr('stroke', lineColor)
@@ -1029,24 +1127,29 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       // Auto-disable points for very large datasets (500+) to maximize performance
       const effectiveShowPoints = isVeryLargeDataset ? false : showPoints;
 
+      // Use stacked data for points if stacking is enabled, otherwise use metric data
+      const dataForPoints = (stackAreas && showAreaFill) ? stackedData : metricData;
+
       let pointsToShow;
 
       if (!effectiveShowPoints && !isEmphasized) {
-        // Points disabled for performance: only render emphasized points
-        pointsToShow = metricData
+        // Points disabled: only render emphasized points and optionally most recent point
+        pointsToShow = dataForPoints
           .map((d, idx) => ({ ...d, _originalIdx: idx }))
-          .filter((d) => {
+          .filter((d, idx, arr) => {
             const isPointEmphasized = emphasizedPoints && emphasizedPoints.some(p =>
               p.metric === metric && p.index === d._originalIdx
             );
-            return isPointEmphasized;
+            // Include if emphasized OR if it's the last point and showMostRecentPoint is enabled
+            const isLastPoint = idx === arr.length - 1;
+            return isPointEmphasized || (showMostRecentPoint && isLastPoint);
           });
       } else if (isLargeDataset && !isEmphasized && effectiveShowPoints) {
         // Adaptive decimation: show fewer points for moderately large datasets
-        const decimationFactor = metricData.length > 500 ? 5 : 3;
+        const decimationFactor = dataForPoints.length > 500 ? 5 : 3;
 
         // Always keep first and last points, plus emphasized points
-        pointsToShow = metricData
+        pointsToShow = dataForPoints
           .map((d, idx) => ({ ...d, _originalIdx: idx }))
           .filter((d, idx, arr) => {
             // Keep first and last
@@ -1058,12 +1161,22 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
             );
             if (isPointEmphasized) return true;
 
+            // Keep last point if showMostRecentPoint is enabled
+            if (showMostRecentPoint && idx === arr.length - 1) return true;
+
             // Keep every Nth point
             return idx % decimationFactor === 0;
           });
       } else {
-        // Small dataset or emphasized line: render all points
-        pointsToShow = metricData.map((d, idx) => ({ ...d, _originalIdx: idx }));
+        // Small dataset or emphasized line: render all points (or just last if showMostRecentPoint and points disabled)
+        if (!effectiveShowPoints && showMostRecentPoint) {
+          // Only show last point when points are disabled but showMostRecentPoint is enabled
+          pointsToShow = dataForPoints
+            .map((d, idx) => ({ ...d, _originalIdx: idx }))
+            .filter((d, idx, arr) => idx === arr.length - 1);
+        } else {
+          pointsToShow = dataForPoints.map((d, idx) => ({ ...d, _originalIdx: idx }));
+        }
       }
 
       // Create emphasis lookup Set for O(1) performance instead of O(n) .some() calls
@@ -1082,7 +1195,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         .attr('data-metric', metric)
         .attr('data-index', d => d._originalIdx)
         .attr('cx', d => xScale(d.parsedDate))
-        .attr('cy', d => yScale(d[metric]))
+        .attr('cy', d => stackAreas && showAreaFill ? yScale(d[`${metric}_y1`]) : yScale(d[metric]))
         .attr('r', (d) => {
           // Use Set for O(1) lookup instead of O(n) .some()
           const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
@@ -1120,12 +1233,14 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           const baseWidth = pointStyle === 'outlined' ? pointBorderWidth : 0;
           return isPointEmphasized ? Math.max(baseWidth, 2) : baseWidth;
         })
-        .attr('opacity', (d) => {
+        .attr('opacity', (d, idx) => {
           // If showPoints is false (or auto-disabled for large datasets), hide non-emphasized points
           if (!effectiveShowPoints) {
             // Use Set for O(1) lookup instead of O(n) .some()
             const isPointEmphasized = emphasizedPointsSet.has(d._originalIdx);
-            return isPointEmphasized ? 1 : 0;
+            // Show point if it's emphasized OR if it's the last point and showMostRecentPoint is enabled
+            const isLastPoint = d._originalIdx === dataForPoints.length - 1;
+            return (isPointEmphasized || (showMostRecentPoint && isLastPoint)) ? 1 : 0;
           }
           return 1;
         })
@@ -1148,12 +1263,16 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           // Only process points for the current metric
           if (emphPoint.metric !== metric) return;
 
-          // Find the data point by index
-          const matchingData = metricData[emphPoint.index];
+          // Find the data point by index - use stacked data for stacked areas
+          const dataForLabels = (stackAreas && showAreaFill) ? stackedData : metricData;
+          const matchingData = dataForLabels[emphPoint.index];
 
           if (matchingData) {
             const x = xScale(matchingData.parsedDate);
-            const y = yScale(matchingData[metric]);
+            // For stacked areas, position label at the top (y1) of the stacked segment
+            const y = (stackAreas && showAreaFill)
+              ? yScale(matchingData[`${metric}_y1`])
+              : yScale(matchingData[metric]);
 
             // Calculate offset to position label above the point without blocking it
             // If date is shown, need more space (metric + date + padding)
@@ -1268,9 +1387,14 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
 
       // Draw direct labels at end of line
       if (showDirectLabels && metricData.length > 0) {
-        const lastPoint = metricData[metricData.length - 1];
+        // For stacked areas, use the stacked data for label positioning
+        const dataForLabels = (stackAreas && showAreaFill) ? stackedData : metricData;
+        const lastPoint = dataForLabels[dataForLabels.length - 1];
         const x = xScale(lastPoint.parsedDate);
-        const y = yScale(lastPoint[metric]);
+        // For stacked areas, position label at the top (y1) of the stacked segment
+        const y = (stackAreas && showAreaFill)
+          ? yScale(lastPoint[`${metric}_y1`])
+          : yScale(lastPoint[metric]);
 
         chartGroup
           .append('text')

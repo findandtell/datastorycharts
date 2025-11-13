@@ -117,6 +117,13 @@ export const serializeChartState = ({
       leftLabelFontSize: styleSettings.leftLabelFontSize,
       rightLabelFontSize: styleSettings.rightLabelFontSize,
       headerLabelFontSize: styleSettings.headerLabelFontSize,
+      lineThickness: styleSettings.lineThickness,
+      lineOpacity: styleSettings.lineOpacity,
+      lineSaturation: styleSettings.lineSaturation,
+      endpointSize: styleSettings.endpointSize,
+      endpointStyle: styleSettings.endpointStyle,
+      labelPosition: styleSettings.labelPosition,
+      showCategoryLabels: styleSettings.showCategoryLabels,
 
       // Line Chart Specific
       timeScale: styleSettings.timeScale,
@@ -124,14 +131,33 @@ export const serializeChartState = ({
       aggregationMethod: styleSettings.aggregationMethod,
       fiscalYearStartMonth: styleSettings.fiscalYearStartMonth,
       lineStyle: styleSettings.lineStyle,
+      smoothLines: styleSettings.smoothLines,
+      showPoints: styleSettings.showPoints,
+      pointSize: styleSettings.pointSize,
+      pointStyle: styleSettings.pointStyle,
+      pointBorderWidth: styleSettings.pointBorderWidth,
+      excludeZeroValues: styleSettings.excludeZeroValues,
+      showMostRecentPoint: styleSettings.showMostRecentPoint,
+      showAreaFill: styleSettings.showAreaFill,
+      areaOpacity: styleSettings.areaOpacity,
+      areaGradient: styleSettings.areaGradient,
+      stackAreas: styleSettings.stackAreas,
       showMarkers: styleSettings.showMarkers,
       markerSize: styleSettings.markerSize,
       showArea: styleSettings.showArea,
-      areaOpacity: styleSettings.areaOpacity,
       showMovingAverage: styleSettings.showMovingAverage,
       movingAveragePeriod: styleSettings.movingAveragePeriod,
       movingAverageColor: styleSettings.movingAverageColor,
       baselines: styleSettings.baselines,
+      emphasizedPoints: styleSettings.emphasizedPoints,
+      emphasizedMetric: styleSettings.emphasizedMetric,
+      emphasisLabelPosition: styleSettings.emphasisLabelPosition,
+      emphasisLabelFontSize: styleSettings.emphasisLabelFontSize,
+      dateFormatPreset: styleSettings.dateFormatPreset,
+      dateFormatCustom: styleSettings.dateFormatCustom,
+      showXAxis: styleSettings.showXAxis,
+      showYAxis: styleSettings.showYAxis,
+      yAxisFormat: styleSettings.yAxisFormat,
 
       // Axes & Gridlines
       showHorizontalGridlines: styleSettings.showHorizontalGridlines,
@@ -153,11 +179,17 @@ export const serializeChartState = ({
       xAxisLabelRotation: styleSettings.xAxisLabelRotation,
       compactAxisNumbers: styleSettings.compactAxisNumbers,
 
-      // Number Formatting
+      // Number Formatting (Labels)
       valuePrefix: styleSettings.valuePrefix,
       valueSuffix: styleSettings.valueSuffix,
       valueDecimalPlaces: styleSettings.valueDecimalPlaces,
       valueFormat: styleSettings.valueFormat,
+
+      // Number Formatting (Axis)
+      axisValuePrefix: styleSettings.axisValuePrefix,
+      axisValueSuffix: styleSettings.axisValueSuffix,
+      axisValueDecimalPlaces: styleSettings.axisValueDecimalPlaces,
+      axisValueFormat: styleSettings.axisValueFormat,
 
       // Branding
       userTier: styleSettings.userTier,
@@ -183,8 +215,18 @@ export const deserializeChartState = (stateObj) => {
     // For now, we'll try to proceed - future versions should handle migration
   }
 
-  // Chart type validation
-  const validChartTypes = ['bar', 'funnel', 'slope', 'line'];
+  // Chart type validation - must match chartRegistry keys
+  const validChartTypes = [
+    'bar-horizontal',
+    'bar-vertical',
+    'bar-grouped-horizontal',
+    'bar-grouped-vertical',
+    'line',
+    'area',
+    'area-stacked',
+    'slope',
+    'funnel'
+  ];
   if (!validChartTypes.includes(stateObj.chartType)) {
     throw new Error(`Invalid chart type: ${stateObj.chartType}`);
   }

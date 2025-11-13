@@ -24,7 +24,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     fontFamily = 'Inter',
     orientation = 'vertical',
     barMode = 'grouped',
-    colorPalette = 'vibrant',
+    colorPalette = 'observable10',
     customColors = [],
     categoryFont = 'Inter',
     categoryFontSize = 16,
@@ -70,6 +70,11 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     gridOpacity = 0.1,
     showXAxis = true,
     showYAxis = true,
+    xAxisLineThickness = 1,
+    yAxisLineThickness = 1,
+    axisColorBrightness = 0, // 0=black, 50=grey, 100=white
+    showXAxisLabels = true,
+    showYAxisLabels = true,
     axisColor = '#000000',
     axisOpacity = 1,
     barWidthPercent = 100,
@@ -87,11 +92,14 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     percentChangeLabelFormat = 'percent',
     percentChangeBracketDistance = 100,
     barColor = '#1e40af',
-    colorTransition = 60,
     valuePrefix = '',
     valueSuffix = '',
     valueDecimalPlaces = 0,
     valueFormat = 'number',
+    axisValuePrefix = '',
+    axisValueSuffix = '',
+    axisValueDecimalPlaces = 0,
+    axisValueFormat = 'number',
     periodLabelFontSize = 14,
     darkMode = false,
     backgroundColor = '#ffffff',
@@ -99,19 +107,31 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     boldTotal = false,
   } = styleSettings;
 
+  // Convert axis color brightness (0-100) to hex color
+  // 0 = black, 50 = grey, 100 = white
+  const computedAxisColor = useMemo(() => {
+    const brightness = Math.round((axisColorBrightness / 100) * 255);
+    const hex = brightness.toString(16).padStart(2, '0');
+    return `#${hex}${hex}${hex}`;
+  }, [axisColorBrightness]);
+
   // Define theme-aware colors based on dark mode
   const themeColors = useMemo(() => ({
     // Title and subtitle
     titleColor: darkMode ? '#f9fafb' : '#111827',
     subtitleColor: darkMode ? '#d1d5db' : '#6b7280',
-    // Axis labels and text
-    axisLabelColor: darkMode ? '#e5e7eb' : '#374151',
-    // Axis lines and gridlines
-    axisLineColor: darkMode ? '#4b5563' : '#d1d5db',
+    // Axis value labels (numbers like 0, 1M, 2M) - use computed axis color
+    axisValueLabelColor: computedAxisColor,
+    // Category labels (bar names) - NOT affected by axis color slider
+    categoryLabelColor: darkMode ? '#e5e7eb' : '#374151',
+    // Axis lines and gridlines - use computed axis color for lines
+    axisLineColor: computedAxisColor,
     gridlineColor: darkMode ? '#374151' : '#e5e7eb',
     // Legend text
     legendTextColor: darkMode ? '#e5e7eb' : '#374151',
-  }), [darkMode]);
+    // Emphasis color for brackets and highlights - theme-aware
+    emphasisColor: darkMode ? '#ffffff' : '#000000', // white in dark mode, black in light mode
+  }), [darkMode, computedAxisColor]);
 
   // Determine if we're in comparison mode (multiple periods) or single-color mode
   const isComparisonMode = periodNames && periodNames.length > 1;
@@ -123,13 +143,12 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       if (colorPalette === 'user' && customColors.length > 0) {
         return customColors;
       }
-      return comparisonPalettes[colorPalette]?.colors || comparisonPalettes.vibrant.colors;
+      return comparisonPalettes[colorPalette]?.colors || comparisonPalettes.observable10.colors;
     } else {
-      // Single-color mode: use barColor with color transition for different categories
-      // Generate shades based on colorTransition setting
-      return [barColor]; // Single color for all bars in single-period mode
+      // Single-color mode: use barColor for all bars
+      return [barColor];
     }
-  }, [isComparisonMode, customColors, colorPalette, barColor, colorTransition, periodNames]);
+  }, [isComparisonMode, customColors, colorPalette, barColor, periodNames]);
 
   // Handle container resize
   useEffect(() => {
@@ -392,30 +411,30 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
 
     /**
      * Format axis tick values in compact format if compactAxisNumbers is enabled
-     * Applies prefix, suffix, and decimal places from Number Styling settings
+     * Applies prefix, suffix, and decimal places from Axis Number Styling settings
      */
     const formatAxisValue = (value) => {
       if (value == null) return '';
 
       // Handle percentage format
-      if (valueFormat === 'percentage') {
+      if (axisValueFormat === 'percentage') {
         const percentValue = value * 100;
         let formattedValue;
 
         if (compactAxisNumbers) {
           const absValue = Math.abs(percentValue);
           if (absValue >= 1000000) {
-            formattedValue = (percentValue / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            formattedValue = (percentValue / 1000000).toFixed(axisValueDecimalPlaces) + 'M';
           } else if (absValue >= 1000) {
-            formattedValue = (percentValue / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+            formattedValue = (percentValue / 1000).toFixed(axisValueDecimalPlaces) + 'K';
           } else {
-            formattedValue = valueDecimalPlaces === 0 ? percentValue.toString() : percentValue.toFixed(valueDecimalPlaces);
+            formattedValue = percentValue.toFixed(axisValueDecimalPlaces);
           }
         } else {
-          formattedValue = valueDecimalPlaces === 0 ? percentValue.toString() : percentValue.toFixed(valueDecimalPlaces);
+          formattedValue = percentValue.toFixed(axisValueDecimalPlaces);
         }
 
-        return `${valuePrefix}${formattedValue}%${valueSuffix}`;
+        return `${axisValuePrefix}${formattedValue}%${axisValueSuffix}`;
       }
 
       // Handle number format
@@ -424,18 +443,18 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       if (compactAxisNumbers) {
         const absValue = Math.abs(value);
         if (absValue >= 1000000) {
-          formattedValue = (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+          formattedValue = (value / 1000000).toFixed(axisValueDecimalPlaces) + 'M';
         } else if (absValue >= 1000) {
-          formattedValue = (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+          formattedValue = (value / 1000).toFixed(axisValueDecimalPlaces) + 'K';
         } else {
-          formattedValue = valueDecimalPlaces === 0 ? value.toString() : value.toFixed(valueDecimalPlaces);
+          formattedValue = value.toFixed(axisValueDecimalPlaces);
         }
       } else {
-        formattedValue = valueDecimalPlaces === 0 ? value.toString() : value.toFixed(valueDecimalPlaces);
+        formattedValue = value.toFixed(axisValueDecimalPlaces);
       }
 
       // Apply prefix and suffix
-      return `${valuePrefix}${formattedValue}${valueSuffix}`;
+      return `${axisValuePrefix}${formattedValue}${axisValueSuffix}`;
     };
 
     /**
@@ -824,7 +843,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
               if (showMetricLabels || isEmphasized) {
                 const textColor = metricLabelPosition === 'inside'
                   ? getContrastTextColor(effectiveColor)
-                  : themeColors.axisLabelColor;
+                  : themeColors.categoryLabelColor;
 
                 let metricY;
                 if (value < 0) {
@@ -881,7 +900,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
                 .attr('font-family', valueFont)
                 .attr('font-size', valueFontSize)
                 .attr('font-weight', labelWeight)
-                .attr('fill', axisColor)
+                .attr('fill', themeColors.categoryLabelColor)
                 .text(formatValue(value));
             }
           } else {
@@ -950,7 +969,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
               if (showMetricLabels || isEmphasized) {
                 const textColor = metricLabelPosition === 'inside'
                   ? getContrastTextColor(effectiveColor)
-                  : themeColors.axisLabelColor;
+                  : themeColors.categoryLabelColor;
 
                 let metricX, textAnchor;
                 if (value < 0) {
@@ -1017,7 +1036,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
                 .attr('font-family', valueFont)
                 .attr('font-size', valueFontSize)
                 .attr('font-weight', labelWeight)
-                .attr('fill', axisColor)
+                .attr('fill', themeColors.categoryLabelColor)
                 .text(formatValue(value));
             }
           }
@@ -1193,7 +1212,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
               .attr('y1', y)
               .attr('x2', x + barWidth)
               .attr('y2', y)
-              .attr('stroke', themeColors.axisLabelColor)
+              .attr('stroke', themeColors.categoryLabelColor)
               .attr('stroke-width', 2);
 
             // Create a unique barId for the total
@@ -1207,7 +1226,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
               .attr('font-family', valueFont)
               .attr('font-size', valueFontSize)
               .attr('font-weight', totalWeight)
-              .attr('fill', themeColors.axisLabelColor)
+              .attr('fill', themeColors.categoryLabelColor)
               .style('cursor', percentChangeEnabled ? 'pointer' : 'default')
               .text(formatValue(totalValue))
               .on('click', () => {
@@ -1359,8 +1378,10 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         .attr('font-family', axisFont)
         .attr('font-size', xAxisFontSize)
         .attr('font-weight', axisWeight)
-        .attr('fill', themeColors.axisLabelColor)
-        .attr('opacity', axisOpacity);
+        // Vertical orientation: X-axis shows categories (not affected by axis color)
+        // Horizontal orientation: X-axis shows values (affected by axis color)
+        .attr('fill', orientation === 'vertical' ? themeColors.categoryLabelColor : themeColors.axisValueLabelColor)
+        .attr('opacity', showXAxisLabels ? axisOpacity : 0); // Hide labels if toggle is off
 
       // Make category labels bold if they have emphasized bars (works for both grouped and stacked modes)
       if (emphasizedBars && emphasizedBars.length > 0 && orientation === 'vertical') {
@@ -1377,9 +1398,15 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         });
       }
 
-      xAxisGroup.selectAll('line, path')
+      // Style axis lines - hide domain line if thickness is 0
+      xAxisGroup.selectAll('.tick line')
         .attr('stroke', themeColors.axisLineColor)
         .attr('opacity', axisOpacity);
+
+      xAxisGroup.select('.domain')
+        .attr('stroke', themeColors.axisLineColor)
+        .attr('stroke-width', xAxisLineThickness)
+        .attr('opacity', xAxisLineThickness > 0 ? axisOpacity : 0);
 
       // Apply X-axis label rotation
       if (orientation === 'vertical') {
@@ -1394,7 +1421,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
           xAxisGroup.selectAll('text')
             .style('text-anchor', 'middle')
             .attr('dx', null)
-            .attr('dy', '.71em')
+            .attr('dy', `${0.71 * xAxisFontSize + 5}px`) // .71em + 5px spacing
             .attr('transform', null);
         }
 
@@ -1427,6 +1454,11 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             }
           });
         }
+      } else {
+        // Horizontal orientation - value labels below X-axis
+        xAxisGroup.selectAll('text')
+          .style('text-anchor', 'middle')
+          .attr('dy', `${0.71 * xAxisFontSize + 5}px`); // .71em + 5px spacing
       }
 
       // Handle cross tick type for major ticks
@@ -1456,8 +1488,11 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         .attr('font-family', axisFont)
         .attr('font-size', yAxisFontSize)
         .attr('font-weight', axisWeight)
-        .attr('fill', themeColors.axisLabelColor)
-        .attr('opacity', axisOpacity);
+        // Vertical orientation: Y-axis shows values (affected by axis color)
+        // Horizontal orientation: Y-axis shows categories (not affected by axis color)
+        .attr('fill', orientation === 'vertical' ? themeColors.axisValueLabelColor : themeColors.categoryLabelColor)
+        .attr('opacity', showYAxisLabels ? axisOpacity : 0) // Hide labels if toggle is off
+        .attr('dx', '-5px'); // Add 5px spacing from axis line (labels appear to the left)
 
       // Make category labels bold if they have emphasized bars (works for both grouped and stacked modes)
       if (emphasizedBars && emphasizedBars.length > 0 && orientation === 'horizontal') {
@@ -1474,9 +1509,15 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         });
       }
 
-      yAxisGroup.selectAll('line, path')
+      // Style axis lines - hide domain line if thickness is 0
+      yAxisGroup.selectAll('.tick line')
         .attr('stroke', themeColors.axisLineColor)
         .attr('opacity', axisOpacity);
+
+      yAxisGroup.select('.domain')
+        .attr('stroke', themeColors.axisLineColor)
+        .attr('stroke-width', yAxisLineThickness)
+        .attr('opacity', yAxisLineThickness > 0 ? axisOpacity : 0);
 
       // Handle cross tick type for major ticks
       if (axisMajorTickType === 'cross') {
@@ -1563,7 +1604,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
           .attr('font-family', axisFont)
           .attr('font-size', axisLabelFontSize)
           .attr('font-weight', 400)
-          .attr('fill', themeColors.axisLabelColor)
+          .attr('fill', themeColors.axisValueLabelColor)
           .text(axisLabel);
       } else {
         // Horizontal orientation: label appears horizontally below the last value, centered with it
@@ -1577,7 +1618,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
           .attr('font-family', axisFont)
           .attr('font-size', axisLabelFontSize)
           .attr('font-weight', 400)
-          .attr('fill', themeColors.axisLabelColor)
+          .attr('fill', themeColors.axisValueLabelColor)
           .text(axisLabel);
       }
     }
@@ -1621,8 +1662,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
           // Rough estimate: each character is about 0.6 * fontSize pixels wide
           const estimatedWidth1 = labelText1.length * valueFontSize * 0.6;
           const estimatedWidth2 = labelText2.length * valueFontSize * 0.6;
-          const x1 = first.labelX + estimatedWidth1; // Right edge of first label
-          const x2 = second.labelX + estimatedWidth2; // Right edge of second label
+          const labelSpacing = 10; // Spacing between label and bracket
+          const x1 = first.labelX + estimatedWidth1 + labelSpacing; // Right edge of first label + spacing
+          const x2 = second.labelX + estimatedWidth2 + labelSpacing; // Right edge of second label + spacing
 
           // Calculate bracket extension based on slider (0-100%)
           // 100% = full extension to chart edge, 0% = minimal extension
@@ -1639,7 +1681,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('y1', y1)
             .attr('x2', bracketX)
             .attr('y2', y1)
-            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke', themeColors.emphasisColor)
             .attr('stroke-width', 2);
 
           // Vertical line connecting the two horizontal lines
@@ -1648,7 +1690,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('y1', y1)
             .attr('x2', bracketX)
             .attr('y2', y2)
-            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke', themeColors.emphasisColor)
             .attr('stroke-width', 2);
 
           // Horizontal line from right edge back to RIGHT EDGE of second label
@@ -1657,10 +1699,10 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('y1', y2)
             .attr('x2', x2)
             .attr('y2', y2)
-            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke', themeColors.emphasisColor)
             .attr('stroke-width', 2);
 
-          // Arrow pointing to second bar label
+          // Arrow pointing to second bar label (with spacing)
           const arrowSize = 6;
           bracketGroup.append('polygon')
             .attr('points', `
@@ -1668,7 +1710,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
               ${x2 + arrowSize},${y2 - arrowSize}
               ${x2 + arrowSize},${y2 + arrowSize}
             `)
-            .attr('fill', themeColors.axisLabelColor);
+            .attr('fill', themeColors.emphasisColor);
 
           // Label on the vertical connecting line
           const labelY = (y1 + y2) / 2;
@@ -1685,7 +1727,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('font-family', fontFamily)
             .attr('font-size', valueFontSize)
             .attr('font-weight', 700)
-            .attr('fill', themeColors.axisLabelColor)
+            .attr('fill', themeColors.emphasisColor)
             .text(label);
 
         } else {
@@ -1695,8 +1737,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
 
           // For vertical bars, labels are above the bar with y position at baseline
           // The TOP of the label is approximately fontSize pixels above the baseline
-          const y1 = first.labelY - valueFontSize; // Top edge of first label
-          const y2 = second.labelY - valueFontSize; // Top edge of second label
+          const labelSpacing = 10; // Spacing between label and bracket
+          const y1 = first.labelY - valueFontSize - labelSpacing; // Top edge of first label - spacing
+          const y2 = second.labelY - valueFontSize - labelSpacing; // Top edge of second label - spacing
 
           // Calculate bracket extension based on slider (0-100%)
           // 100% = full extension to chart edge, 0% = minimal extension
@@ -1714,7 +1757,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('y1', y1)
             .attr('x2', x1)
             .attr('y2', bracketY)
-            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke', themeColors.emphasisColor)
             .attr('stroke-width', 2);
 
           // Horizontal line connecting the two vertical lines
@@ -1723,7 +1766,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('y1', bracketY)
             .attr('x2', x2)
             .attr('y2', bracketY)
-            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke', themeColors.emphasisColor)
             .attr('stroke-width', 2);
 
           // Vertical line from top edge back down to TOP EDGE of second label
@@ -1732,7 +1775,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('y1', bracketY)
             .attr('x2', x2)
             .attr('y2', y2)
-            .attr('stroke', themeColors.axisLabelColor)
+            .attr('stroke', themeColors.emphasisColor)
             .attr('stroke-width', 2);
 
           // Arrow pointing to second bar label
@@ -1743,7 +1786,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
               ${x2 - arrowSize},${y2 - arrowSize}
               ${x2 + arrowSize},${y2 - arrowSize}
             `)
-            .attr('fill', themeColors.axisLabelColor);
+            .attr('fill', themeColors.emphasisColor);
 
           // Label on the horizontal connecting line
           const labelX = (x1 + x2) / 2;
@@ -1758,7 +1801,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             .attr('font-family', fontFamily)
             .attr('font-size', valueFontSize)
             .attr('font-weight', 700)
-            .attr('fill', themeColors.axisLabelColor)
+            .attr('fill', themeColors.emphasisColor)
             .text(label);
         }
       });

@@ -4,7 +4,7 @@ A scalable, maintainable React-based data visualization platform for creating pr
 
 ## 🚀 Live Demo
 
-**Production URL**: [https://datastorycharts.vercel.app](https://datastorycharts.vercel.app)
+**Production URL**: [https://charts.findandtell.co](https://charts.findandtell.co)
 
 ## ✨ Latest Features (v3.0)
 

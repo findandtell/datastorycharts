@@ -17,33 +17,70 @@ export default function Home() {
       // CSV data detected - redirect to bar chart with the data
       // Store CSV in sessionStorage so ChartEditor can load it
       sessionStorage.setItem('pendingCSVData', csvData);
-      navigate(`/chart/bar${window.location.search}`);
+      navigate(`/chart/bar-vertical${window.location.search}`);
     }
   }, [navigate]);
 
-  const charts = [
+  // Chart gallery organized by type
+  const barCharts = [
+    {
+      key: 'bar-horizontal',
+      name: 'Bar Chart Horizontal',
+      description: 'Horizontal bar chart for comparing categories side-by-side.',
+      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+    },
+    {
+      key: 'bar-vertical',
+      name: 'Bar Chart Vertical',
+      description: 'Vertical bar chart for comparing categories.',
+      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+    },
+    {
+      key: 'bar-grouped-horizontal',
+      name: 'Grouped Bar Horizontal',
+      description: 'Compare multiple series across categories horizontally.',
+      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+    },
+    {
+      key: 'bar-grouped-vertical',
+      name: 'Grouped Bar Vertical',
+      description: 'Compare multiple series across categories vertically.',
+      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+    },
+  ];
+
+  const lineAreaCharts = [
     {
       key: 'line',
       name: 'Line Chart',
-      description: 'Visualize trends and patterns over time with continuous data points connected by lines, perfect for showing growth, decline, or cyclical patterns.',
+      description: 'Visualize trends and patterns over time with continuous data points connected by lines.',
       image: '/Examples/line_chart_marketing_channels.svg',
     },
     {
-      key: 'bar',
-      name: 'Bar Chart',
-      description: 'Compare values across different categories or time periods with horizontal or vertical bars, ideal for showing relative sizes and rankings.',
-      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+      key: 'area',
+      name: 'Area Chart',
+      description: 'Show trends with filled areas under lines for visual emphasis.',
+      image: '/Examples/line_chart_marketing_channels.svg',
+    },
+    {
+      key: 'area-stacked',
+      name: 'Stacked Area',
+      description: 'Show cumulative trends with stacked areas, perfect for part-to-whole relationships.',
+      image: '/Examples/line_chart_marketing_channels.svg',
     },
     {
       key: 'slope',
       name: 'Slope Chart',
-      description: 'Show change between two points in time with connecting lines that emphasize increases, decreases, or stability across multiple categories.',
+      description: 'Show change between two points in time with connecting lines.',
       image: '/Examples/slope_chart_tufte.svg',
     },
+  ];
+
+  const otherCharts = [
     {
       key: 'funnel',
       name: 'Funnel Chart',
-      description: 'Track progression through sequential stages in a process, displaying conversion rates and drop-off points in sales pipelines or user journeys.',
+      description: 'Track progression through sequential stages in a process, displaying conversion rates and drop-off points.',
       image: '/Examples/funnel_chart_ab.svg',
     },
   ];
@@ -53,6 +90,39 @@ export default function Home() {
     const searchParams = window.location.search;
     navigate(`/chart/${chartKey}${searchParams}`);
   };
+
+  const renderChartCard = (chart) => (
+    <div
+      key={chart.key}
+      onClick={() => handleChartSelect(chart.key)}
+      className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-cyan-400"
+    >
+      {/* Chart Preview Image */}
+      <div className="bg-white border-b border-gray-200 relative h-48 overflow-hidden">
+        <object
+          data={chart.image}
+          type="image/svg+xml"
+          className="pointer-events-none w-full h-full"
+          aria-label={`${chart.name} Example`}
+        />
+      </div>
+
+      {/* Chart Info */}
+      <div className="p-5">
+        <h3 className="text-lg font-bold text-gray-900 mb-2">
+          {chart.name}
+        </h3>
+        <p className="text-gray-600 text-xs mb-4 leading-relaxed">
+          {chart.description}
+        </p>
+
+        {/* CTA Button */}
+        <button className="w-full px-4 py-2 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 transition-colors text-sm">
+          Create Chart
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
@@ -86,39 +156,32 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-4 gap-8">
-          {charts.map((chart) => (
-            <div
-              key={chart.key}
-              onClick={() => handleChartSelect(chart.key)}
-              className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-cyan-400"
-            >
-              {/* Chart Preview Image */}
-              <div className="bg-white border-b border-gray-200 relative h-56 overflow-hidden">
-                <object
-                  data={chart.image}
-                  type="image/svg+xml"
-                  className="pointer-events-none w-full h-full"
-                  aria-label={`${chart.name} Example`}
-                />
-              </div>
+        {/* Bar Charts Row */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Bar Charts</h3>
+          <div className="grid grid-cols-4 gap-6">
+            {barCharts.map(renderChartCard)}
+          </div>
+        </div>
 
-              {/* Chart Info */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-3">
-                  {chart.name}
-                </h3>
-                <p className="text-gray-600 text-sm mb-6 leading-relaxed">
-                  {chart.description}
-                </p>
+        {/* Line/Area/Slope Charts Row */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Line & Area Charts</h3>
+          <div className="grid grid-cols-4 gap-6">
+            {lineAreaCharts.map(renderChartCard)}
+          </div>
+        </div>
 
-                {/* CTA Button */}
-                <button className="w-full px-4 py-2 bg-cyan-600 text-white font-semibold rounded-lg hover:bg-cyan-700 transition-colors">
-                  Create Chart
-                </button>
-              </div>
-            </div>
-          ))}
+        {/* Other Charts Row */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4">Other Charts</h3>
+          <div className="grid grid-cols-4 gap-6">
+            {otherCharts.map(renderChartCard)}
+            {/* Empty placeholders to maintain grid */}
+            <div className="invisible"></div>
+            <div className="invisible"></div>
+            <div className="invisible"></div>
+          </div>
         </div>
       </div>
 

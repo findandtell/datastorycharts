@@ -32,7 +32,7 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [canvasHeight, setCanvasHeight] = useState(600);
   const [chartWidth, setChartWidth] = useState(600);
   const [chartHeight, setChartHeight] = useState(400);
-  const [chartPadding, setChartPadding] = useState(25);
+  const [chartPadding, setChartPadding] = useState(15);
   const [stageGap, setStageGap] = useState(10);
   const [barWidth, setBarWidth] = useState(100);
   const [stageLabelPosition, setStageLabelPosition] = useState("bottom");
@@ -59,7 +59,7 @@ export const useStyleSettings = (initialTheme = theme) => {
 
   // Slope Chart specific settings
   const [colorMode, setColorMode] = useState("category"); // 'category', 'trend', 'custom', 'gradient'
-  const [lineThickness, setLineThickness] = useState(3);
+  const [lineThickness, setLineThickness] = useState(2);
   const [lineOpacity, setLineOpacity] = useState(1.0);
   const [lineSaturation, setLineSaturation] = useState(100); // 0-100%, where 100% = full color, 0% = grey
   const [endpointSize, setEndpointSize] = useState(6);
@@ -125,6 +125,17 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [showHorizontalGridlines, setShowHorizontalGridlines] = useState(false);
   const [showVerticalGridlines, setShowVerticalGridlines] = useState(false);
   const [compactAxisNumbers, setCompactAxisNumbers] = useState(true);
+  const [xAxisLineThickness, setXAxisLineThickness] = useState(1); // X-axis line thickness (0-3px, 0 = off)
+  const [yAxisLineThickness, setYAxisLineThickness] = useState(1); // Y-axis line thickness (0-3px, 0 = off)
+  const [axisColorBrightness, setAxisColorBrightness] = useState(0); // Axis color brightness (0=black, 50=grey, 100=white)
+  const [showXAxisLabels, setShowXAxisLabels] = useState(true); // Show/hide X-axis labels
+  const [showYAxisLabels, setShowYAxisLabels] = useState(true); // Show/hide Y-axis labels
+
+  // Axis-specific number formatting (separate from data label formatting)
+  const [axisValuePrefix, setAxisValuePrefix] = useState(""); // Prefix for axis values (e.g., "$")
+  const [axisValueSuffix, setAxisValueSuffix] = useState(""); // Suffix for axis values (e.g., "%")
+  const [axisValueDecimalPlaces, setAxisValueDecimalPlaces] = useState(0); // Decimal places for axis values
+  const [axisValueFormat, setAxisValueFormat] = useState("number"); // 'number' or 'percentage'
 
   // Calculated bounds (for display when Auto is enabled)
   const [calculatedAxisMinimum, setCalculatedAxisMinimum] = useState(0);
@@ -142,6 +153,8 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [showAreaFill, setShowAreaFill] = useState(true);
   const [areaOpacity, setAreaOpacity] = useState(0.2);
   const [areaGradient, setAreaGradient] = useState(true);
+  const [stackAreas, setStackAreas] = useState(false);
+  const [chartMode, setChartMode] = useState('line');
   const [showXAxis, setShowXAxis] = useState(true);
   const [showYAxis, setShowYAxis] = useState(true);
   const [showGridLines, setShowGridLines] = useState(true);
@@ -153,6 +166,7 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [directLabelFontSize, setDirectLabelFontSize] = useState(14); // Direct label font size (Line Chart)
   const [yAxisFormat, setYAxisFormat] = useState('auto');
   const [excludeZeroValues, setExcludeZeroValues] = useState(true); // Exclude zero/null values from plotting
+  const [showMostRecentPoint, setShowMostRecentPoint] = useState(false); // Show point marker on most recent value
 
   // Time aggregation settings (Line Chart)
   const [aggregationLevel, setAggregationLevel] = useState('day'); // 'day', 'week', 'month', 'quarter', 'year'
@@ -187,6 +201,20 @@ export const useStyleSettings = (initialTheme = theme) => {
     setCanvasWidth(dimensions.width);
     setCanvasHeight(dimensions.height);
   }, [initialTheme]);
+
+  /**
+   * Wrapper for setDarkMode that also syncs axis color
+   * Light mode: 0 (black), Dark mode: 100 (white)
+   */
+  const handleSetDarkMode = useCallback((value) => {
+    setDarkMode(value);
+    // Auto-sync axis color with theme
+    if (value) {
+      setAxisColorBrightness(100); // White for dark mode
+    } else {
+      setAxisColorBrightness(0); // Black for light mode
+    }
+  }, []);
 
   /**
    * Reset all settings to defaults
@@ -373,6 +401,15 @@ export const useStyleSettings = (initialTheme = theme) => {
           valueSuffix,
           valueDecimalPlaces,
           valueFormat,
+          axisValuePrefix,
+          axisValueSuffix,
+          axisValueDecimalPlaces,
+          axisValueFormat,
+          xAxisLineThickness,
+          yAxisLineThickness,
+          axisColorBrightness,
+          showXAxisLabels,
+          showYAxisLabels,
         },
         funnel: {
           // Funnel-specific settings will be here
@@ -399,14 +436,19 @@ export const useStyleSettings = (initialTheme = theme) => {
           pointStyle,
           pointBorderWidth,
           excludeZeroValues,
+          showMostRecentPoint,
           // Area fill
           showAreaFill,
           areaOpacity,
           areaGradient,
+          stackAreas,
+          chartMode,
           // Axis display
           showXAxis,
           showYAxis,
           yAxisFormat,
+          xAxisLineThickness,
+          yAxisLineThickness,
           // Grid
           showGridLines,
           gridDirection,
@@ -451,10 +493,13 @@ export const useStyleSettings = (initialTheme = theme) => {
     axisMajorUnit, axisMajorUnitAuto, axisMinorUnit, axisMinorUnitAuto,
     axisMajorTickType, axisMinorTickType, showHorizontalGridlines, showVerticalGridlines,
     compactAxisNumbers, valuePrefix, valueSuffix, valueDecimalPlaces, valueFormat,
+    axisValuePrefix, axisValueSuffix, axisValueDecimalPlaces, axisValueFormat,
+    xAxisLineThickness, yAxisLineThickness, axisColorBrightness,
+    showXAxisLabels, showYAxisLabels,
     timeScale, aggregationLevel, aggregationMethod, fiscalYearStartMonth,
     xAxisTimeGrouping, xAxisLabelLevels, dateRangeFilter, xAxisPrimaryLabel, xAxisSecondaryLabel,
     dateFormatPreset, dateFormatCustom, lineStyle, smoothLines,
-    showPoints, pointSize, pointStyle, pointBorderWidth, excludeZeroValues,
+    showPoints, pointSize, pointStyle, pointBorderWidth, excludeZeroValues, showMostRecentPoint,
     showAreaFill, areaOpacity, areaGradient, showXAxis, showYAxis, yAxisFormat,
     showGridLines, gridDirection, gridLineColor, gridLineStyle, gridLineOpacity,
     showDirectLabels, directLabelFontSize,
@@ -580,6 +625,11 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.showHorizontalGridlines !== undefined) setShowHorizontalGridlines(barSettings.showHorizontalGridlines);
         if (barSettings.showVerticalGridlines !== undefined) setShowVerticalGridlines(barSettings.showVerticalGridlines);
         if (barSettings.compactAxisNumbers !== undefined) setCompactAxisNumbers(barSettings.compactAxisNumbers);
+        if (barSettings.xAxisLineThickness !== undefined) setXAxisLineThickness(barSettings.xAxisLineThickness);
+        if (barSettings.yAxisLineThickness !== undefined) setYAxisLineThickness(barSettings.yAxisLineThickness);
+        if (barSettings.axisColorBrightness !== undefined) setAxisColorBrightness(barSettings.axisColorBrightness);
+        if (barSettings.showXAxisLabels !== undefined) setShowXAxisLabels(barSettings.showXAxisLabels);
+        if (barSettings.showYAxisLabels !== undefined) setShowYAxisLabels(barSettings.showYAxisLabels);
         if (barSettings.showMetricLabels !== undefined) setShowMetricLabels(barSettings.showMetricLabels);
         if (barSettings.showPeriodLabels !== undefined) setShowPeriodLabels(barSettings.showPeriodLabels);
         if (barSettings.metricLabelPosition !== undefined) setMetricLabelPosition(barSettings.metricLabelPosition);
@@ -592,6 +642,15 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.valueSuffix !== undefined) setValueSuffix(barSettings.valueSuffix);
         if (barSettings.valueDecimalPlaces !== undefined) setValueDecimalPlaces(barSettings.valueDecimalPlaces);
         if (barSettings.valueFormat !== undefined) setValueFormat(barSettings.valueFormat);
+        // Axis-specific formatting (with backward compatibility fallback to label formatting)
+        if (barSettings.axisValuePrefix !== undefined) setAxisValuePrefix(barSettings.axisValuePrefix);
+        else if (barSettings.valuePrefix !== undefined) setAxisValuePrefix(barSettings.valuePrefix);
+        if (barSettings.axisValueSuffix !== undefined) setAxisValueSuffix(barSettings.axisValueSuffix);
+        else if (barSettings.valueSuffix !== undefined) setAxisValueSuffix(barSettings.valueSuffix);
+        if (barSettings.axisValueDecimalPlaces !== undefined) setAxisValueDecimalPlaces(barSettings.axisValueDecimalPlaces);
+        else if (barSettings.valueDecimalPlaces !== undefined) setAxisValueDecimalPlaces(barSettings.valueDecimalPlaces);
+        if (barSettings.axisValueFormat !== undefined) setAxisValueFormat(barSettings.axisValueFormat);
+        else if (barSettings.valueFormat !== undefined) setAxisValueFormat(barSettings.valueFormat);
       } else if (currentChartType === 'line' && settings.chartSpecific.line) {
         const lineSettings = settings.chartSpecific.line;
         // Time settings
@@ -615,14 +674,19 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (lineSettings.pointStyle !== undefined) setPointStyle(lineSettings.pointStyle);
         if (lineSettings.pointBorderWidth !== undefined) setPointBorderWidth(lineSettings.pointBorderWidth);
         if (lineSettings.excludeZeroValues !== undefined) setExcludeZeroValues(lineSettings.excludeZeroValues);
+        if (lineSettings.showMostRecentPoint !== undefined) setShowMostRecentPoint(lineSettings.showMostRecentPoint);
         // Area fill
         if (lineSettings.showAreaFill !== undefined) setShowAreaFill(lineSettings.showAreaFill);
         if (lineSettings.areaOpacity !== undefined) setAreaOpacity(lineSettings.areaOpacity);
         if (lineSettings.areaGradient !== undefined) setAreaGradient(lineSettings.areaGradient);
+        if (lineSettings.stackAreas !== undefined) setStackAreas(lineSettings.stackAreas);
+        if (lineSettings.chartMode !== undefined) setChartMode(lineSettings.chartMode);
         // Axis display
         if (lineSettings.showXAxis !== undefined) setShowXAxis(lineSettings.showXAxis);
         if (lineSettings.showYAxis !== undefined) setShowYAxis(lineSettings.showYAxis);
         if (lineSettings.yAxisFormat !== undefined) setYAxisFormat(lineSettings.yAxisFormat);
+        if (lineSettings.xAxisLineThickness !== undefined) setXAxisLineThickness(lineSettings.xAxisLineThickness);
+        if (lineSettings.yAxisLineThickness !== undefined) setYAxisLineThickness(lineSettings.yAxisLineThickness);
         // Grid
         if (lineSettings.showGridLines !== undefined) setShowGridLines(lineSettings.showGridLines);
         if (lineSettings.gridDirection !== undefined) setGridDirection(lineSettings.gridDirection);
@@ -743,7 +807,7 @@ export const useStyleSettings = (initialTheme = theme) => {
 
     // Theme
     darkMode,
-    setDarkMode,
+    setDarkMode: handleSetDarkMode,
     backgroundColor,
     setBackgroundColor,
 
@@ -862,6 +926,24 @@ export const useStyleSettings = (initialTheme = theme) => {
     setShowVerticalGridlines,
     compactAxisNumbers,
     setCompactAxisNumbers,
+    xAxisLineThickness,
+    setXAxisLineThickness,
+    yAxisLineThickness,
+    setYAxisLineThickness,
+    axisColorBrightness,
+    setAxisColorBrightness,
+    showXAxisLabels,
+    setShowXAxisLabels,
+    showYAxisLabels,
+    setShowYAxisLabels,
+    axisValuePrefix,
+    setAxisValuePrefix,
+    axisValueSuffix,
+    setAxisValueSuffix,
+    axisValueDecimalPlaces,
+    setAxisValueDecimalPlaces,
+    axisValueFormat,
+    setAxisValueFormat,
     calculatedAxisMinimum,
     setCalculatedAxisMinimum,
     calculatedAxisMaximum,
@@ -890,6 +972,10 @@ export const useStyleSettings = (initialTheme = theme) => {
     setAreaOpacity,
     areaGradient,
     setAreaGradient,
+    stackAreas,
+    setStackAreas,
+    chartMode,
+    setChartMode,
     showXAxis,
     setShowXAxis,
     showYAxis,
@@ -912,6 +998,8 @@ export const useStyleSettings = (initialTheme = theme) => {
     setYAxisFormat,
     excludeZeroValues,
     setExcludeZeroValues,
+    showMostRecentPoint,
+    setShowMostRecentPoint,
 
     // Time aggregation (Line Chart)
     aggregationLevel,

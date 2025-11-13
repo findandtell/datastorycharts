@@ -1,0 +1,40 @@
+{
+  "chartType": "bar-horizontal",
+  "metadata": {
+    "title": "Chart Title Here",
+    "description": "A brief description of what this chart shows and its use case (1-2 sentences)",
+    "tags": ["sales", "business", "modern"],
+    "createdDate": "2025-01-13",
+    "updatedDate": "2025-01-13",
+    "author": "FindandTell",
+    "difficulty": "beginner",
+    "featured": false
+  },
+  "data": {
+    "categories": ["Category A", "Category B", "Category C"],
+    "periods": ["2024"],
+    "values": [
+      [100, 200, 150]
+    ]
+  },
+  "styleSettings": {
+    "title": "Chart Title",
+    "subtitle": "Chart subtitle with context",
+    "darkMode": false,
+    "fontFamily": "Inter",
+    "titleFontSize": 28,
+    "subtitleFontSize": 16,
+    "backgroundColor": "#ffffff",
+    "chartWidth": 1200,
+    "chartHeight": 600,
+    "orientation": "horizontal",
+    "colorPalette": "observable10",
+    "showValueLabels": true,
+    "labelMode": "direct",
+    "xAxisLineThickness": 1,
+    "yAxisLineThickness": 1,
+    "axisColorBrightness": 0,
+    "showXAxisLabels": true,
+    "showYAxisLabels": true
+  }
+}

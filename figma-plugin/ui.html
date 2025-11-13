@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find&Tell Charts</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      background: #f5f5f5;
+    }
+
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-center;
+      height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    #loading h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
+
+    #loading p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      margin: 20px 0;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    iframe {
+      width: 100%;
+      height: 100vh;
+      border: none;
+      display: none;
+    }
+
+    iframe.loaded {
+      display: block;
+    }
+
+    #error {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-center;
+      height: 100vh;
+      padding: 40px;
+      text-align: center;
+      background: #fee;
+      color: #c00;
+    }
+
+    #error h2 {
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading State -->
+  <div id="loading">
+    <h1>📊 Find&Tell Charts</h1>
+    <div class="spinner"></div>
+    <p>Loading chart editor...</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="error">
+    <h2>⚠️ Failed to Load</h2>
+    <p id="error-message"></p>
+  </div>
+
+  <!-- Chart Editor Iframe -->
+  <iframe
+    id="chart-app"
+    src="https://charts.findandtell.co?mode=figma"
+    allow="clipboard-write"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+  ></iframe>
+
+  <script>
+    console.log('[Figma Plugin UI] Initializing...');
+
+    const iframe = document.getElementById('chart-app');
+    const loading = document.getElementById('loading');
+    const errorDiv = document.getElementById('error');
+    const errorMessage = document.getElementById('error-message');
+
+    // Timeout for loading
+    const loadTimeout = setTimeout(() => {
+      loading.style.display = 'none';
+      errorDiv.style.display = 'flex';
+      errorMessage.textContent = 'Failed to load chart editor. Please check your internet connection.';
+    }, 15000); // 15 seconds
+
+    // Hide loading when iframe loads
+    iframe.addEventListener('load', () => {
+      console.log('[Figma Plugin UI] Iframe loaded');
+      clearTimeout(loadTimeout);
+      loading.style.display = 'none';
+      iframe.classList.add('loaded');
+    });
+
+    // Handle messages from the chart editor iframe
+    window.addEventListener('message', (event) => {
+      // Security: Only accept messages from our chart app
+      if (event.origin !== 'https://charts.findandtell.co' &&
+          event.origin !== 'http://localhost:5175' &&
+          event.origin !== 'http://localhost:5174' &&
+          event.origin !== 'http://localhost:5173') {
+        console.warn('[Figma Plugin UI] Ignored message from unknown origin:', event.origin);
+        return;
+      }
+
+      const message = event.data;
+      console.log('[Figma Plugin UI] Received message from chart app:', message);
+
+      // Forward message to Figma plugin code
+      if (message.pluginMessage) {
+        parent.postMessage({
+          pluginMessage: message.pluginMessage
+        }, '*');
+      }
+    });
+
+    // Handle messages from Figma plugin code
+    window.onmessage = (event) => {
+      const message = event.data.pluginMessage;
+      if (!message) return;
+
+      console.log('[Figma Plugin UI] Received message from plugin code:', message);
+
+      // Forward message to chart app iframe
+      if (iframe.contentWindow) {
+        iframe.contentWindow.postMessage(message, '*');
+      }
+    };
+
+    console.log('[Figma Plugin UI] Ready');
+  </script>
+</body>
+</html>

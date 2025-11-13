@@ -1035,6 +1035,142 @@ export const sampleDatasets = {
     ],
   },
 
+  // ==================== BAR CHART VARIANT DATASETS ====================
+
+  barHorizontalSingle: {
+    name: "Revenue by Quarter (Horizontal)",
+    description: "Single-series horizontal bar chart - Quarterly revenue",
+    chartType: "bar",
+    title: "Quarterly Revenue Performance",
+    subtitle: "Q1-Q4 2024 revenue in millions",
+    data: [
+      { Category: "Q1 2024", Revenue: 2450000 },
+      { Category: "Q2 2024", Revenue: 2890000 },
+      { Category: "Q3 2024", Revenue: 3120000 },
+      { Category: "Q4 2024", Revenue: 3450000 },
+    ],
+    defaultSettings: {
+      orientation: "horizontal",
+      barMode: "grouped",
+    },
+  },
+
+  barVerticalSingle: {
+    name: "Top Products by Sales (Vertical)",
+    description: "Single-series vertical bar chart - Product sales ranking",
+    chartType: "bar",
+    title: "Best Selling Products - 2024",
+    subtitle: "Units sold by product category",
+    data: [
+      { Category: "Smartphones", Units: 45800 },
+      { Category: "Laptops", Units: 32400 },
+      { Category: "Tablets", Units: 28900 },
+      { Category: "Smartwatches", Units: 19500 },
+      { Category: "Headphones", Units: 15200 },
+    ],
+    defaultSettings: {
+      orientation: "vertical",
+      barMode: "grouped",
+    },
+  },
+
+  barGroupedHorizontal: {
+    name: "Sales by Region (Grouped Horizontal)",
+    description: "Multi-series horizontal grouped bar chart",
+    chartType: "bar",
+    title: "Regional Sales Comparison",
+    subtitle: "2023 vs 2024 sales performance by region",
+    data: [
+      { Category: "North America", "2023": 2450000, "2024": 2980000 },
+      { Category: "Europe", "2023": 1890000, "2024": 2280000 },
+      { Category: "Asia Pacific", "2023": 1560000, "2024": 2450000 },
+      { Category: "Latin America", "2023": 980000, "2024": 1250000 },
+      { Category: "Middle East", "2023": 720000, "2024": 950000 },
+    ],
+    defaultSettings: {
+      orientation: "horizontal",
+      barMode: "grouped",
+    },
+  },
+
+  barGroupedVertical: {
+    name: "Monthly Performance (Grouped Vertical)",
+    description: "Multi-series vertical grouped bar chart",
+    chartType: "bar",
+    title: "Sales Team Performance Comparison",
+    subtitle: "Q1 2024 monthly performance by team",
+    data: [
+      { Category: "January", "Team A": 145000, "Team B": 132000, "Team C": 118000 },
+      { Category: "February", "Team A": 162000, "Team B": 149000, "Team C": 135000 },
+      { Category: "March", "Team A": 178000, "Team B": 165000, "Team C": 152000 },
+    ],
+    defaultSettings: {
+      orientation: "vertical",
+      barMode: "grouped",
+    },
+  },
+
+  // ==================== AREA CHART DATASETS ====================
+
+  areaChartDefault: {
+    name: "Marketing Channels (Area)",
+    description: "Multi-series area chart with overlapping areas",
+    chartType: "area",
+    title: "Marketing Channel Traffic",
+    subtitle: "Monthly visitors by acquisition channel - 2024",
+    data: [
+      { date: "2024-01-01", "Organic Search": 45000, "Paid Search": 32000, "Social Media": 28000, Email: 19000 },
+      { date: "2024-02-01", "Organic Search": 48000, "Paid Search": 35000, "Social Media": 31000, Email: 21000 },
+      { date: "2024-03-01", "Organic Search": 52000, "Paid Search": 38000, "Social Media": 34000, Email: 23000 },
+      { date: "2024-04-01", "Organic Search": 55000, "Paid Search": 40000, "Social Media": 36000, Email: 25000 },
+      { date: "2024-05-01", "Organic Search": 58000, "Paid Search": 42000, "Social Media": 38000, Email: 27000 },
+      { date: "2024-06-01", "Organic Search": 61000, "Paid Search": 44000, "Social Media": 40000, Email: 29000 },
+      { date: "2024-07-01", "Organic Search": 63000, "Paid Search": 45000, "Social Media": 41000, Email: 30000 },
+      { date: "2024-08-01", "Organic Search": 66000, "Paid Search": 47000, "Social Media": 43000, Email: 32000 },
+      { date: "2024-09-01", "Organic Search": 69000, "Paid Search": 49000, "Social Media": 45000, Email: 34000 },
+      { date: "2024-10-01", "Organic Search": 72000, "Paid Search": 51000, "Social Media": 47000, Email: 36000 },
+      { date: "2024-11-01", "Organic Search": 75000, "Paid Search": 53000, "Social Media": 49000, Email: 38000 },
+      { date: "2024-12-01", "Organic Search": 78000, "Paid Search": 55000, "Social Media": 51000, Email: 40000 },
+    ],
+    metricNames: ["Organic Search", "Paid Search", "Social Media", "Email"],
+    timeScale: "month",
+    defaultSettings: {
+      chartMode: "area",
+      areaOpacity: 0.4,
+      showAreaFill: true,
+    },
+  },
+
+  areaStackedDefault: {
+    name: "Product Revenue (Stacked Area)",
+    description: "Stacked area chart showing cumulative values",
+    chartType: "area-stacked",
+    title: "Product Category Revenue Mix",
+    subtitle: "Monthly revenue composition by product line - 2024",
+    data: [
+      { date: "2024-01-01", Electronics: 28500, Software: 19200, Services: 15800, Accessories: 8900 },
+      { date: "2024-02-01", Electronics: 30200, Software: 20400, Services: 16900, Accessories: 9500 },
+      { date: "2024-03-01", Electronics: 32800, Software: 22100, Services: 18200, Accessories: 10300 },
+      { date: "2024-04-01", Electronics: 34500, Software: 23500, Services: 19100, Accessories: 10900 },
+      { date: "2024-05-01", Electronics: 36200, Software: 24800, Services: 20000, Accessories: 11500 },
+      { date: "2024-06-01", Electronics: 37900, Software: 26100, Services: 20900, Accessories: 12100 },
+      { date: "2024-07-01", Electronics: 39100, Software: 27000, Services: 21500, Accessories: 12500 },
+      { date: "2024-08-01", Electronics: 41200, Software: 28400, Services: 22600, Accessories: 13200 },
+      { date: "2024-09-01", Electronics: 43500, Software: 29900, Services: 23800, Accessories: 13900 },
+      { date: "2024-10-01", Electronics: 45800, Software: 31500, Services: 25100, Accessories: 14600 },
+      { date: "2024-11-01", Electronics: 48100, Software: 33100, Services: 26400, Accessories: 15300 },
+      { date: "2024-12-01", Electronics: 51200, Software: 35200, Services: 28100, Accessories: 16400 },
+    ],
+    metricNames: ["Electronics", "Software", "Services", "Accessories"],
+    timeScale: "month",
+    defaultSettings: {
+      chartMode: "area-stacked",
+      areaOpacity: 0.8,
+      showAreaFill: true,
+      stackAreas: true,
+    },
+  },
+
   // ==================== LINE CHART DATASETS ====================
 
   webTrafficYearly: {

@@ -19,25 +19,54 @@ export function useAddonMode() {
     setIsAddonMode(mode === 'addon');
 
     if (mode === 'addon') {
-      console.log('[Add-on Mode] Initialized');
+      console.log('[DEBUG] Add-on Mode Initialized');
+      console.log('[DEBUG] window object keys:', Object.keys(window).filter(k => k.includes('google')));
 
       // Check for injected API
+      let checkCount = 0;
+      const maxChecks = 20; // Check for 10 seconds max
+
       const checkAPI = () => {
+        checkCount++;
+        console.log(`[DEBUG] Checking for API (attempt ${checkCount}/${maxChecks})...`);
+        console.log('[DEBUG] window.googleSheetsAPI exists:', !!window.googleSheetsAPI);
+
         if (window.googleSheetsAPI) {
-          console.log('[Add-on Mode] Direct API detected!');
+          console.log('[DEBUG] Direct API detected!');
+          console.log('[DEBUG] API keys:', Object.keys(window.googleSheetsAPI));
+
+          // Test the API
+          if (window.googleSheetsAPI.test) {
+            try {
+              const testResult = window.googleSheetsAPI.test();
+              console.log('[DEBUG] API test result:', testResult);
+            } catch (e) {
+              console.error('[DEBUG] API test failed:', e);
+            }
+          }
+
           setUseDirectAPI(true);
           setAddonReady(true);
 
           // Get user info via direct API
+          console.log('[DEBUG] Calling getUserInfo...');
           window.googleSheetsAPI.getUserInfo((error, data) => {
             if (!error && data) {
+              console.log('[DEBUG] User info received:', data);
               setUserInfo(data.user);
               setLicense(data.license);
+            } else {
+              console.error('[DEBUG] Error getting user info:', error);
             }
           });
         } else {
-          console.log('[Add-on Mode] Direct API not available, will check again...');
-          setTimeout(checkAPI, 500);
+          console.log('[DEBUG] Direct API not available yet');
+          if (checkCount < maxChecks) {
+            setTimeout(checkAPI, 500);
+          } else {
+            console.error('[DEBUG] API not found after', maxChecks, 'attempts');
+            alert('[ERROR] Google Sheets API was not injected. Cross-origin restriction may be blocking access.');
+          }
         }
       };
 
@@ -120,23 +149,35 @@ export function useAddonMode() {
 
   // Request sheet data
   const requestSheetData = useCallback(() => {
-    console.log('[Add-on Mode] Requesting sheet data...');
-    console.log('[Add-on Mode] Using direct API:', useDirectAPI);
+    console.log('[DEBUG] ========== REQUEST SHEET DATA CALLED ==========');
+    console.log('[DEBUG] useDirectAPI:', useDirectAPI);
+    console.log('[DEBUG] window.googleSheetsAPI exists:', !!window.googleSheetsAPI);
 
     if (useDirectAPI && window.googleSheetsAPI) {
+      console.log('[DEBUG] Using direct API to get data');
+      console.log('[DEBUG] Calling window.googleSheetsAPI.getSelectedData...');
+
       // Use direct API
       window.googleSheetsAPI.getSelectedData((error, result) => {
+        console.log('[DEBUG] getSelectedData callback fired');
+        console.log('[DEBUG] Error:', error);
+        console.log('[DEBUG] Result:', result);
+
         if (error) {
-          console.error('[Add-on Mode] Error getting data:', error);
-          alert('Error getting data: ' + error.message);
+          console.error('[DEBUG] Error getting data:', error);
+          alert('[ERROR] Error getting data: ' + error.message);
         } else if (result && result.success) {
-          console.log('[Add-on Mode] Data received via direct API');
+          console.log('[DEBUG] Data received successfully via direct API');
+          console.log('[DEBUG] Data:', result.data);
           setSheetData(result.data);
+          alert('[SUCCESS] Data loaded! CSV length: ' + (result.data.csv ? result.data.csv.length : 'N/A'));
         } else {
-          console.error('[Add-on Mode] Invalid data response');
+          console.error('[DEBUG] Invalid data response:', result);
+          alert('[ERROR] Invalid data response from Google Sheets');
         }
       });
     } else {
+      console.log('[DEBUG] Using postMessage fallback');
       // Fallback to postMessage
       sendMessageToAddon({
         type: 'REQUEST_DATA'
@@ -146,23 +187,35 @@ export function useAddonMode() {
 
   // Insert chart to sheet
   const insertChartToSheet = useCallback((imageBase64, format = 'png', chartState = null) => {
-    console.log('[Add-on Mode] Inserting chart...');
-    console.log('[Add-on Mode] Using direct API:', useDirectAPI);
+    console.log('[DEBUG] ========== INSERT CHART CALLED ==========');
+    console.log('[DEBUG] useDirectAPI:', useDirectAPI);
+    console.log('[DEBUG] window.googleSheetsAPI exists:', !!window.googleSheetsAPI);
+    console.log('[DEBUG] format:', format);
+    console.log('[DEBUG] imageBase64 length:', imageBase64 ? imageBase64.length : 0);
 
     if (useDirectAPI && window.googleSheetsAPI) {
+      console.log('[DEBUG] Using direct API to insert chart');
+      console.log('[DEBUG] Calling window.googleSheetsAPI.insertChart...');
+
       // Use direct API
       window.googleSheetsAPI.insertChart(imageBase64, format, chartState, (error, result) => {
+        console.log('[DEBUG] insertChart callback fired');
+        console.log('[DEBUG] Error:', error);
+        console.log('[DEBUG] Result:', result);
+
         if (error) {
-          console.error('[Add-on Mode] Error inserting chart:', error);
-          alert('Error inserting chart: ' + error.message);
+          console.error('[DEBUG] Error inserting chart:', error);
+          alert('[ERROR] Error inserting chart: ' + error.message);
         } else if (result && result.success) {
-          console.log('[Add-on Mode] Chart inserted successfully');
-          if (result.chartId) {
-            alert(`Chart inserted successfully!\n\nChart ID: ${result.chartId}\n\nSave this ID to edit the chart later using "Find&Tell Charts" → "Edit Chart by ID"`);
-          }
+          console.log('[DEBUG] Chart inserted successfully');
+          alert(`[SUCCESS] Chart inserted!\n\nChart ID: ${result.chartId || 'N/A'}\n\nSave this ID to edit the chart later.`);
+        } else {
+          console.error('[DEBUG] Invalid insert response:', result);
+          alert('[ERROR] Invalid response from chart insertion');
         }
       });
     } else {
+      console.log('[DEBUG] Using postMessage fallback');
       // Fallback to postMessage
       sendMessageToAddon({
         type: 'INSERT_CHART',

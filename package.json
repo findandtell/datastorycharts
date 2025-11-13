@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:apps-script": "npm run build && node scripts/build-for-apps-script.js",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
@@ -15,6 +16,8 @@
     "lint": "eslint src --ext .js,.jsx"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
     "d3": "^7.8.5",
     "date-fns": "^4.1.0",
     "papaparse": "^5.4.1",
