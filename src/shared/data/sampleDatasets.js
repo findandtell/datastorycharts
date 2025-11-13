@@ -1110,6 +1110,27 @@ export const sampleDatasets = {
     },
   },
 
+  barGroupedStyledExample: {
+    name: "Regional Sales (Styled)",
+    description: "Styled grouped horizontal bar chart with emphasis",
+    chartType: "bar-grouped-horizontal",
+    title: "Regional Sales Comparison",
+    subtitle: "2023 vs 2024 sales performance by region",
+    stylePreset: "/Examples/regional-sales-comparison-bar-style-2025-11-13.json",
+    data: [
+      { Category: "North America", "2023": 2450000, "2024": 2980000 },
+      { Category: "Europe", "2023": 1890000, "2024": 2280000 },
+      { Category: "Asia Pacific", "2023": 1560000, "2024": 2450000 },
+      { Category: "Latin America", "2023": 980000, "2024": 1250000 },
+      { Category: "Middle East", "2023": 720000, "2024": 950000 },
+    ],
+    defaultSettings: {
+      orientation: "horizontal",
+      barMode: "grouped",
+      percentChangeEnabled: true,
+    },
+  },
+
   // ==================== AREA CHART DATASETS ====================
 
   areaChartDefault: {
@@ -1147,6 +1168,37 @@ export const sampleDatasets = {
     chartType: "area-stacked",
     title: "Product Category Revenue Mix",
     subtitle: "Monthly revenue composition by product line - 2024",
+    data: [
+      { date: "2024-01-01", Electronics: 28500, Software: 19200, Services: 15800, Accessories: 8900 },
+      { date: "2024-02-01", Electronics: 30200, Software: 20400, Services: 16900, Accessories: 9500 },
+      { date: "2024-03-01", Electronics: 32800, Software: 22100, Services: 18200, Accessories: 10300 },
+      { date: "2024-04-01", Electronics: 34500, Software: 23500, Services: 19100, Accessories: 10900 },
+      { date: "2024-05-01", Electronics: 36200, Software: 24800, Services: 20000, Accessories: 11500 },
+      { date: "2024-06-01", Electronics: 37900, Software: 26100, Services: 20900, Accessories: 12100 },
+      { date: "2024-07-01", Electronics: 39100, Software: 27000, Services: 21500, Accessories: 12500 },
+      { date: "2024-08-01", Electronics: 41200, Software: 28400, Services: 22600, Accessories: 13200 },
+      { date: "2024-09-01", Electronics: 43500, Software: 29900, Services: 23800, Accessories: 13900 },
+      { date: "2024-10-01", Electronics: 45800, Software: 31500, Services: 25100, Accessories: 14600 },
+      { date: "2024-11-01", Electronics: 48100, Software: 33100, Services: 26400, Accessories: 15300 },
+      { date: "2024-12-01", Electronics: 51200, Software: 35200, Services: 28100, Accessories: 16400 },
+    ],
+    metricNames: ["Electronics", "Software", "Services", "Accessories"],
+    timeScale: "month",
+    defaultSettings: {
+      chartMode: "area-stacked",
+      areaOpacity: 0.8,
+      showAreaFill: true,
+      stackAreas: true,
+    },
+  },
+
+  areaStackedStyledExample: {
+    name: "Product Revenue Mix (Styled)",
+    description: "Styled stacked area chart with custom formatting",
+    chartType: "area-stacked",
+    title: "Product Category Revenue Mix",
+    subtitle: "Monthly revenue composition by product line - 2024",
+    stylePreset: "/Examples/product-category-revenue-mix-area-stacked-style-2025-11-13.json",
     data: [
       { date: "2024-01-01", Electronics: 28500, Software: 19200, Services: 15800, Accessories: 8900 },
       { date: "2024-02-01", Electronics: 30200, Software: 20400, Services: 16900, Accessories: 9500 },
