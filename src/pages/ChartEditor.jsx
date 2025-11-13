@@ -2168,13 +2168,6 @@ export default function ChartEditor() {
                       >
                         <span>📐</span> Export as SVG
                       </button>
-                      <div className="border-t border-gray-200 my-1"></div>
-                      <button
-                        disabled
-                        className="w-full px-4 py-2 text-left text-gray-400 cursor-not-allowed flex items-center gap-2"
-                      >
-                        <span>💻</span> Export D3 Code (Soon)
-                      </button>
                     </div>
                   )}
                 </div>
