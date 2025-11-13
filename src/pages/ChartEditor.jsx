@@ -42,7 +42,8 @@ import {
   ArrowDownTrayIcon,
   XMarkIcon,
   DocumentTextIcon,
-  ArrowUpTrayIcon
+  ArrowUpTrayIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 
 /**
@@ -2025,12 +2026,21 @@ export default function ChartEditor() {
                           >
                             <PlayCircleIcon className="w-5 h-5" /> Video Tutorials
                           </a>
+                          <a
+                            href="#"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded flex items-center gap-2"
+                            title="Share your feedback (link coming soon)"
+                          >
+                            <ChatBubbleLeftRightIcon className="w-5 h-5" /> Share Feedback
+                          </a>
                         </div>
                       </div>
 
                       {/* Version */}
                       <div className="px-4 py-2">
-                        <div className="text-xs text-gray-400 text-center">Version 1.0.0</div>
+                        <div className="text-xs text-gray-400 text-center">Beta Release 1.0.0</div>
                       </div>
                     </div>
                   )}
@@ -4797,8 +4807,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMinimumAuto ? styleSettings.calculatedAxisMinimum : styleSettings.axisMinimum}
-                    onChange={(e) => {
+                    key={`${styleSettings.axisMinimum}-${styleSettings.axisMinimumAuto}`}
+                    defaultValue={styleSettings.axisMinimumAuto ? styleSettings.calculatedAxisMinimum : styleSettings.axisMinimum}
+                    onBlur={(e) => {
                       styleSettings.setAxisMinimum(Number(e.target.value));
                       if (styleSettings.axisMinimumAuto) {
                         styleSettings.setAxisMinimumAuto(false);
@@ -4823,8 +4834,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMaximumAuto ? styleSettings.calculatedAxisMaximum : styleSettings.axisMaximum}
-                    onChange={(e) => {
+                    key={`${styleSettings.axisMaximum}-${styleSettings.axisMaximumAuto}`}
+                    defaultValue={styleSettings.axisMaximumAuto ? styleSettings.calculatedAxisMaximum : styleSettings.axisMaximum}
+                    onBlur={(e) => {
                       styleSettings.setAxisMaximum(Number(e.target.value));
                       if (styleSettings.axisMaximumAuto) {
                         styleSettings.setAxisMaximumAuto(false);
@@ -4858,14 +4870,16 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMajorUnitAuto ? styleSettings.calculatedAxisMajorUnit : styleSettings.axisMajorUnit}
-                    onChange={(e) => {
+                    key={`${styleSettings.axisMajorUnit}-${styleSettings.axisMajorUnitAuto}`}
+                    defaultValue={styleSettings.axisMajorUnitAuto ? styleSettings.calculatedAxisMajorUnit : styleSettings.axisMajorUnit}
+                    onBlur={(e) => {
                       styleSettings.setAxisMajorUnit(Number(e.target.value));
                       if (styleSettings.axisMajorUnitAuto) {
                         styleSettings.setAxisMajorUnitAuto(false);
                       }
                     }}
-                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                    disabled={styleSettings.axisMajorUnitAuto}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
                   />
                   <label className="flex items-center gap-1 text-sm text-gray-600">
                     <input
@@ -4884,8 +4898,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMinorUnit}
-                    onChange={(e) => styleSettings.setAxisMinorUnit(Number(e.target.value))}
+                    key={`${styleSettings.axisMinorUnit}-${styleSettings.axisMinorUnitAuto}`}
+                    defaultValue={styleSettings.axisMinorUnit}
+                    onBlur={(e) => styleSettings.setAxisMinorUnit(Number(e.target.value))}
                     disabled={styleSettings.axisMinorUnitAuto}
                     className="w-24 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
                   />
@@ -7111,8 +7126,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMinimumAuto ? styleSettings.calculatedAxisMinimum : styleSettings.axisMinimum}
-                    onChange={(e) => {
+                    key={`${styleSettings.axisMinimum}-${styleSettings.axisMinimumAuto}`}
+                    defaultValue={styleSettings.axisMinimumAuto ? styleSettings.calculatedAxisMinimum : styleSettings.axisMinimum}
+                    onBlur={(e) => {
                       styleSettings.setAxisMinimum(Number(e.target.value));
                       if (styleSettings.axisMinimumAuto) {
                         styleSettings.setAxisMinimumAuto(false);
@@ -7137,8 +7153,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMaximumAuto ? styleSettings.calculatedAxisMaximum : styleSettings.axisMaximum}
-                    onChange={(e) => {
+                    key={`${styleSettings.axisMaximum}-${styleSettings.axisMaximumAuto}`}
+                    defaultValue={styleSettings.axisMaximumAuto ? styleSettings.calculatedAxisMaximum : styleSettings.axisMaximum}
+                    onBlur={(e) => {
                       styleSettings.setAxisMaximum(Number(e.target.value));
                       if (styleSettings.axisMaximumAuto) {
                         styleSettings.setAxisMaximumAuto(false);
@@ -7172,14 +7189,16 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMajorUnitAuto ? styleSettings.calculatedAxisMajorUnit : styleSettings.axisMajorUnit}
-                    onChange={(e) => {
+                    key={`${styleSettings.axisMajorUnit}-${styleSettings.axisMajorUnitAuto}`}
+                    defaultValue={styleSettings.axisMajorUnitAuto ? styleSettings.calculatedAxisMajorUnit : styleSettings.axisMajorUnit}
+                    onBlur={(e) => {
                       styleSettings.setAxisMajorUnit(Number(e.target.value));
                       if (styleSettings.axisMajorUnitAuto) {
                         styleSettings.setAxisMajorUnitAuto(false);
                       }
                     }}
-                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
+                    disabled={styleSettings.axisMajorUnitAuto}
+                    className="w-24 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
                   />
                   <label className="flex items-center gap-1 text-sm text-gray-600">
                     <input
@@ -7198,8 +7217,9 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                   </label>
                   <input
                     type="number"
-                    value={styleSettings.axisMinorUnit}
-                    onChange={(e) => styleSettings.setAxisMinorUnit(Number(e.target.value))}
+                    key={`${styleSettings.axisMinorUnit}-${styleSettings.axisMinorUnitAuto}`}
+                    defaultValue={styleSettings.axisMinorUnit}
+                    onBlur={(e) => styleSettings.setAxisMinorUnit(Number(e.target.value))}
                     disabled={styleSettings.axisMinorUnitAuto}
                     className="w-24 px-2 py-1 border border-gray-300 rounded text-sm disabled:bg-gray-100"
                   />

@@ -114,10 +114,11 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
   // Convert axis color brightness (0-100) to hex color at component level
   // 0 = black, 50 = grey, 100 = white
   const computedAxisColor = useMemo(() => {
+    const axisColorBrightness = debouncedStyleSettings?.axisColorBrightness ?? 0;
     const brightness = Math.round((axisColorBrightness / 100) * 255);
     const hex = brightness.toString(16).padStart(2, '0');
     return `#${hex}${hex}${hex}`;
-  }, [axisColorBrightness]);
+  }, [debouncedStyleSettings?.axisColorBrightness]);
 
   // Define theme colors at component level (NOT inside useEffect)
   const themeColors = useMemo(() => {
@@ -962,7 +963,6 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
 
     // Calculate stacked values if stacking is enabled
     // For stacked areas, we need to calculate cumulative values for each point
-    console.log('[LineChart] Stacking config:', { stackAreas, showAreaFill, metricNamesLength: metricNames?.length });
     const stackedData = stackAreas && showAreaFill ? filteredData.map(d => {
       const stackedPoint = { ...d };
       let cumulative = 0;
@@ -974,10 +974,6 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       });
       return stackedPoint;
     }) : null;
-
-    if (stackedData) {
-      console.log('[LineChart] Stacked data sample (first point):', stackedData[0]);
-    }
 
     // Draw lines and points for each metric
     metricNames.forEach((metric, i) => {

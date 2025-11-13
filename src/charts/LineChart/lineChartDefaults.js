@@ -58,7 +58,7 @@ export const defaultStyleSettings = {
   userCustomColors: ['#1e40af', '#0d9488', '#991b1b', '#d97706', '#475569', '#7c3aed', '#059669', '#dc2626'],
 
   // Line styling
-  lineThickness: 2, // 1-7px
+  lineThickness: 3, // 1-7px
   lineStyle: 'solid', // 'solid', 'dashed', 'dotted'
   lineOpacity: 1.0,
   smoothLines: false, // Use curved lines (catmullRom) vs straight segments

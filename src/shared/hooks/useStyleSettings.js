@@ -145,6 +145,9 @@ export const useStyleSettings = (initialTheme = theme) => {
   // Line Chart specific
   const [timeScale, setTimeScale] = useState('month'); // 'year', 'month', 'week', 'day', 'hour'
   const [lineStyle, setLineStyle] = useState('solid'); // 'solid', 'dashed', 'dotted'
+  const [lineChartLineThickness, setLineChartLineThickness] = useState(3); // Line thickness for line charts (1-7px)
+  const [lineChartLineOpacity, setLineChartLineOpacity] = useState(1.0); // Line opacity for line charts (0-1)
+  const [lineChartLineSaturation, setLineChartLineSaturation] = useState(100); // Line color saturation (0-100%)
   const [smoothLines, setSmoothLines] = useState(false);
   const [showPoints, setShowPoints] = useState(true);
   const [pointSize, setPointSize] = useState(4);
@@ -429,6 +432,9 @@ export const useStyleSettings = (initialTheme = theme) => {
           dateFormatCustom,
           // Line styling
           lineStyle,
+          lineThickness: lineChartLineThickness,
+          lineOpacity: lineChartLineOpacity,
+          lineSaturation: lineChartLineSaturation,
           smoothLines,
           // Point styling
           showPoints,
@@ -498,7 +504,7 @@ export const useStyleSettings = (initialTheme = theme) => {
     showXAxisLabels, showYAxisLabels,
     timeScale, aggregationLevel, aggregationMethod, fiscalYearStartMonth,
     xAxisTimeGrouping, xAxisLabelLevels, dateRangeFilter, xAxisPrimaryLabel, xAxisSecondaryLabel,
-    dateFormatPreset, dateFormatCustom, lineStyle, smoothLines,
+    dateFormatPreset, dateFormatCustom, lineStyle, lineChartLineThickness, lineChartLineOpacity, lineChartLineSaturation, smoothLines,
     showPoints, pointSize, pointStyle, pointBorderWidth, excludeZeroValues, showMostRecentPoint,
     showAreaFill, areaOpacity, areaGradient, showXAxis, showYAxis, yAxisFormat,
     showGridLines, gridDirection, gridLineColor, gridLineStyle, gridLineOpacity,
@@ -667,6 +673,9 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (lineSettings.dateFormatCustom !== undefined) setDateFormatCustom(lineSettings.dateFormatCustom);
         // Line styling
         if (lineSettings.lineStyle !== undefined) setLineStyle(lineSettings.lineStyle);
+        if (lineSettings.lineThickness !== undefined) setLineChartLineThickness(lineSettings.lineThickness);
+        if (lineSettings.lineOpacity !== undefined) setLineChartLineOpacity(lineSettings.lineOpacity);
+        if (lineSettings.lineSaturation !== undefined) setLineChartLineSaturation(lineSettings.lineSaturation);
         if (lineSettings.smoothLines !== undefined) setSmoothLines(lineSettings.smoothLines);
         // Point styling
         if (lineSettings.showPoints !== undefined) setShowPoints(lineSettings.showPoints);
@@ -956,6 +965,12 @@ export const useStyleSettings = (initialTheme = theme) => {
     setTimeScale,
     lineStyle,
     setLineStyle,
+    lineThickness: lineChartLineThickness,
+    setLineThickness: setLineChartLineThickness,
+    lineOpacity: lineChartLineOpacity,
+    setLineOpacity: setLineChartLineOpacity,
+    lineSaturation: lineChartLineSaturation,
+    setLineSaturation: setLineChartLineSaturation,
     smoothLines,
     setSmoothLines,
     showPoints,

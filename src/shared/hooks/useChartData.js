@@ -196,7 +196,9 @@ export const useChartData = (chartType = 'funnel') => {
       }
 
       // Determine the field name based on chart type
-      const stageFieldName = chartType === 'line' ? 'date' : (chartType === 'bar' ? 'Category' : 'Stage');
+      const isLineChart = chartType === 'line' || chartType === 'area' || chartType === 'area-stacked';
+      const isBarChart = chartType?.startsWith('bar-');
+      const stageFieldName = isLineChart ? 'date' : (isBarChart ? 'Category' : 'Stage');
       const { data: chartData, periods } = csvToChartData(results.data, fieldOrder, stageFieldName);
 
       setData(chartData);
@@ -259,7 +261,9 @@ export const useChartData = (chartType = 'funnel') => {
       }
 
       // Determine the field name based on chart type
-      const stageFieldName = chartType === 'line' ? 'date' : (chartType === 'bar' ? 'Category' : 'Stage');
+      const isLineChart = chartType === 'line' || chartType === 'area' || chartType === 'area-stacked';
+      const isBarChart = chartType?.startsWith('bar-');
+      const stageFieldName = isLineChart ? 'date' : (isBarChart ? 'Category' : 'Stage');
       const { data: chartData, periods } = csvToChartData(results.data, fieldOrder, stageFieldName);
 
       setData(chartData);
