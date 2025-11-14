@@ -24,6 +24,9 @@ export const serializeChartState = ({
   // Generate default name if not provided
   const defaultName = name || `${chartType}-chart-${new Date().toISOString().split('T')[0]}`;
 
+  // Get structured style settings from exportSettings (same format as style presets)
+  const styleExport = styleSettings.exportSettings ? styleSettings.exportSettings() : {};
+
   const state = {
     // Metadata
     version: CHART_STATE_VERSION,
@@ -50,8 +53,12 @@ export const serializeChartState = ({
       selectedMetrics: styleSettings.selectedMetrics || [],
     },
 
-    // Style Settings - Export everything from styleSettings
-    style: {
+    // Style Settings - Use structured format from exportSettings (for style preset compatibility)
+    ...styleExport,
+
+    // LEGACY: Keep flat style object for backward compatibility with old imports
+    // This can be removed in a future version once all users have migrated
+    style_legacy: {
       // Theme & General
       theme: styleSettings.theme,
       darkMode: styleSettings.darkMode,
@@ -275,15 +282,31 @@ export const applyChartState = async (chartState, setChartType, chartData, style
       chartData.setHiddenPeriods(new Set(chartState.state.hiddenPeriods));
     }
 
-    // 4. Apply all style settings
-    Object.entries(chartState.style).forEach(([key, value]) => {
-      const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-      const setter = styleSettings[setterName];
+    // 4. Apply style settings - Try structured format first (new), then fall back to legacy flat format
+    if (chartState.styleVersion && styleSettings.importSettings) {
+      // New structured format - use importSettings for proper handling
+      styleSettings.importSettings(chartState, chartState.chartType);
+    } else if (chartState.style) {
+      // Legacy flat format - apply each setting individually
+      Object.entries(chartState.style).forEach(([key, value]) => {
+        const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+        const setter = styleSettings[setterName];
 
-      if (setter && typeof setter === 'function') {
-        setter(value);
-      }
-    });
+        if (setter && typeof setter === 'function') {
+          setter(value);
+        }
+      });
+    } else if (chartState.style_legacy) {
+      // Very old format stored in style_legacy
+      Object.entries(chartState.style_legacy).forEach(([key, value]) => {
+        const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+        const setter = styleSettings[setterName];
+
+        if (setter && typeof setter === 'function') {
+          setter(value);
+        }
+      });
+    }
 
     // 5. Restore emphasized elements
     if (chartState.state.emphasizedBars && styleSettings.setEmphasizedBars) {
