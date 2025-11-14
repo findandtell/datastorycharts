@@ -506,7 +506,60 @@ export default function ChartEditor() {
       const chartConfig = getChart(chartType);
       const sampleDataKey = chartConfig?.defaultDataset || 'abTest'; // Fallback to abTest if no default
 
-      chartData.loadSampleData(sampleDataKey);
+      // Get the dataset
+      const dataset = getSampleDataset(sampleDataKey);
+
+      // Check if we should load data from the stylePreset JSON file
+      if (dataset?.loadDataFromPreset && dataset?.stylePreset) {
+        // Load both data and styles from the preset JSON file
+        (async () => {
+          try {
+            const response = await fetch(dataset.stylePreset);
+            if (response.ok) {
+              const presetData = await response.json();
+
+              // Load the CSV data from the preset
+              if (presetData.data?.csv) {
+                await chartData.loadCSVText(presetData.data.csv);
+              }
+
+              // Apply the style settings
+              styleSettings.importSettings(presetData, chartType);
+            } else {
+              console.error('Failed to load preset:', dataset.stylePreset);
+              // Fallback to default sample data
+              chartData.loadSampleData(sampleDataKey);
+            }
+          } catch (error) {
+            console.error('Error loading preset:', error);
+            // Fallback to default sample data
+            chartData.loadSampleData(sampleDataKey);
+          }
+        })();
+      } else {
+        // Load hardcoded sample data (original behavior)
+        chartData.loadSampleData(sampleDataKey);
+
+        if (dataset) {
+          // Load title and subtitle from the sample dataset
+          if (dataset.title) styleSettings.setTitle(dataset.title);
+          if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
+
+          // Load timeScale for line charts
+          if (dataset.timeScale) styleSettings.setTimeScale(dataset.timeScale);
+
+          // Apply default settings from dataset if available
+          if (dataset.defaultSettings) {
+            if (dataset.defaultSettings.orientation) styleSettings.setOrientation(dataset.defaultSettings.orientation);
+            if (dataset.defaultSettings.barMode) styleSettings.setBarMode(dataset.defaultSettings.barMode);
+          }
+
+          // Apply style preset if available (will override title/subtitle if present in style)
+          if (dataset.stylePreset) {
+            applyStylePreset(dataset.stylePreset);
+          }
+        }
+      }
 
       // Store the current sample dataset key
       setCurrentSampleDatasetKey(sampleDataKey);
@@ -535,28 +588,6 @@ export default function ChartEditor() {
         if (settings.xAxisPrimaryLabel) styleSettings.setXAxisPrimaryLabel(settings.xAxisPrimaryLabel);
         if (settings.xAxisSecondaryLabel) styleSettings.setXAxisSecondaryLabel(settings.xAxisSecondaryLabel);
         if (settings.dateFormatPreset) styleSettings.setDateFormatPreset(settings.dateFormatPreset);
-      }
-
-      // Get the dataset
-      const dataset = getSampleDataset(sampleDataKey);
-      if (dataset) {
-        // Load title and subtitle from the sample dataset
-        if (dataset.title) styleSettings.setTitle(dataset.title);
-        if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
-
-        // Load timeScale for line charts
-        if (dataset.timeScale) styleSettings.setTimeScale(dataset.timeScale);
-
-        // Apply default settings from dataset if available
-        if (dataset.defaultSettings) {
-          if (dataset.defaultSettings.orientation) styleSettings.setOrientation(dataset.defaultSettings.orientation);
-          if (dataset.defaultSettings.barMode) styleSettings.setBarMode(dataset.defaultSettings.barMode);
-        }
-
-        // Apply style preset if available (will override title/subtitle if present in style)
-        if (dataset.stylePreset) {
-          applyStylePreset(dataset.stylePreset);
-        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1414,7 +1445,7 @@ export default function ChartEditor() {
   }, [styleSettings, chartType]);
 
   // Handle Reset View
-  const handleResetView = () => {
+  const handleResetView = async () => {
     // Clear all emphasis
     clearEmphasis();
 
@@ -1424,23 +1455,56 @@ export default function ChartEditor() {
 
     // Reload the current sample dataset to reset everything to defaults
     if (currentSampleDatasetKey) {
-      // Reload the same dataset, which will apply its default stylePreset and settings
-      chartData.loadSampleData(currentSampleDatasetKey);
-
-      // Get the dataset to restore its default title and subtitle
+      // Get the dataset
       const dataset = getSampleDataset(currentSampleDatasetKey);
-      if (dataset) {
-        if (dataset.title) styleSettings.setTitle(dataset.title);
-        if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
 
-        // Apply the default style preset after a brief delay to ensure data is loaded
-        setTimeout(() => {
-          if (dataset.stylePreset) {
-            applyStylePreset(dataset.stylePreset);
+      // Check if we should load data from the stylePreset JSON file
+      if (dataset?.loadDataFromPreset && dataset?.stylePreset) {
+        // Load both data and styles from the preset JSON file
+        try {
+          const response = await fetch(dataset.stylePreset);
+          if (response.ok) {
+            const presetData = await response.json();
+
+            // Load the CSV data from the preset
+            if (presetData.data?.csv) {
+              await chartData.loadCSVText(presetData.data.csv);
+            }
+
+            // Apply the style settings
+            styleSettings.importSettings(presetData, chartType);
+
+            // Restore viewport-based sizing
+            setTimeout(() => {
+              applyViewportBasedSizing();
+            }, 100);
+          } else {
+            console.error('Failed to load preset:', dataset.stylePreset);
+            // Fallback to default sample data
+            chartData.loadSampleData(currentSampleDatasetKey);
           }
-          // Restore viewport-based sizing
-          applyViewportBasedSizing();
-        }, 100);
+        } catch (error) {
+          console.error('Error loading preset:', error);
+          // Fallback to default sample data
+          chartData.loadSampleData(currentSampleDatasetKey);
+        }
+      } else {
+        // Reload the same dataset (original behavior)
+        chartData.loadSampleData(currentSampleDatasetKey);
+
+        if (dataset) {
+          if (dataset.title) styleSettings.setTitle(dataset.title);
+          if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
+
+          // Apply the default style preset after a brief delay to ensure data is loaded
+          setTimeout(() => {
+            if (dataset.stylePreset) {
+              applyStylePreset(dataset.stylePreset);
+            }
+            // Restore viewport-based sizing
+            applyViewportBasedSizing();
+          }, 100);
+        }
       }
     } else {
       // If no sample dataset is loaded, just reset settings
@@ -8002,29 +8066,58 @@ function DataTabContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoRefreshEnabled, autoRefreshInterval, googleSheetsUrl]);
 
-  const handleSampleDataSelect = (event) => {
+  const handleSampleDataSelect = async (event) => {
     const key = event.target.value;
     if (key) {
-      chartData.loadSampleData(key);
+      // Get the dataset
+      const dataset = getSampleDataset(key);
+
+      // Check if we should load data from the stylePreset JSON file
+      if (dataset?.loadDataFromPreset && dataset?.stylePreset) {
+        // Load both data and styles from the preset JSON file
+        try {
+          const response = await fetch(dataset.stylePreset);
+          if (response.ok) {
+            const presetData = await response.json();
+
+            // Load the CSV data from the preset
+            if (presetData.data?.csv) {
+              await chartData.loadCSVText(presetData.data.csv);
+            }
+
+            // Apply the style settings
+            styleSettings.importSettings(presetData, chartType);
+          } else {
+            console.error('Failed to load preset:', dataset.stylePreset);
+            // Fallback to default sample data
+            chartData.loadSampleData(key);
+          }
+        } catch (error) {
+          console.error('Error loading preset:', error);
+          // Fallback to default sample data
+          chartData.loadSampleData(key);
+        }
+      } else {
+        // Load hardcoded sample data (original behavior)
+        chartData.loadSampleData(key);
+
+        if (dataset) {
+          // Load title and subtitle from the sample dataset
+          if (dataset.title) styleSettings.setTitle(dataset.title);
+          if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
+
+          // Load timeScale for line charts
+          if (dataset.timeScale) styleSettings.setTimeScale(dataset.timeScale);
+
+          // Apply style preset if available
+          if (dataset.stylePreset) {
+            applyStylePreset(dataset.stylePreset);
+          }
+        }
+      }
 
       // Store the current sample dataset key
       setCurrentSampleDatasetKey(key);
-
-      // Get the dataset
-      const dataset = getSampleDataset(key);
-      if (dataset) {
-        // Load title and subtitle from the sample dataset
-        if (dataset.title) styleSettings.setTitle(dataset.title);
-        if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
-
-        // Load timeScale for line charts
-        if (dataset.timeScale) styleSettings.setTimeScale(dataset.timeScale);
-
-        // Apply style preset if available
-        if (dataset.stylePreset) {
-          applyStylePreset(dataset.stylePreset);
-        }
-      }
 
       event.target.value = '';
     }
