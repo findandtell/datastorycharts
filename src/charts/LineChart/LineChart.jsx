@@ -271,6 +271,10 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       emphasisValuePrefix,
       emphasisValueSuffix,
       emphasisDecimalPlaces,
+      // Sum labels (area charts)
+      showSumLabels,
+      sumLabelPosition,
+      sumLabelFontSize,
     } = settings;
 
     // Calculate dynamic right margin for direct labels
@@ -412,6 +416,13 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
 
       filteredData = sortedData.slice(startIndex, endIndex);
     }
+
+    // Calculate sums for each metric (for sum labels)
+    const metricSums = showSumLabels ? metricNames.reduce((sums, metric) => {
+      const sum = filteredData.reduce((total, d) => total + (d[metric] || 0), 0);
+      sums[metric] = sum;
+      return sums;
+    }, {}) : {};
 
     // Get all values for Y scale
     // For stacked areas, we need to use cumulative sums instead of individual values
@@ -1392,16 +1403,31 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           ? yScale(lastPoint[`${metric}_y1`])
           : yScale(lastPoint[metric]);
 
+        // Prepare label text - metric name plus optional sum
+        let labelText = metric;
+        if (showSumLabels && sumLabelPosition === 'direct') {
+          const sum = metricSums[metric];
+          const formattedSum = formatNumber(
+            sum,
+            compactNumbers,
+            valuePrefix,
+            valueSuffix,
+            valueDecimalPlaces,
+            valueFormat
+          );
+          labelText = `${metric}: ${formattedSum}`;
+        }
+
         chartGroup
           .append('text')
           .attr('x', x + 10)
           .attr('y', y)
           .attr('dy', '0.35em')
           .attr('font-family', fontFamily)
-          .attr('font-size', directLabelFontSize || 14)
+          .attr('font-size', showSumLabels && sumLabelPosition === 'direct' ? (sumLabelFontSize || 14) : (directLabelFontSize || 14))
           .attr('font-weight', 700) // Always bold
           .attr('fill', lineColor)
-          .text(metric)
+          .text(labelText)
           .style('cursor', 'pointer')
           .on('click', function(event) {
             event.stopPropagation();
@@ -1411,6 +1437,69 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
           });
       }
     });
+
+    // Draw sum labels in center of areas if enabled
+    if (showSumLabels && sumLabelPosition === 'center' && (chartMode === 'area' || chartMode === 'area-stacked' || showAreaFill)) {
+      metricNames.forEach((metric, i) => {
+        const sum = metricSums[metric];
+        const formattedSum = formatNumber(
+          sum,
+          compactNumbers,
+          valuePrefix,
+          valueSuffix,
+          valueDecimalPlaces,
+          valueFormat
+        );
+
+        // Calculate center X position (midpoint of the data range)
+        const centerX = chartWidth / 2;
+
+        // Calculate center Y position
+        let centerY;
+        if (stackAreas && showAreaFill) {
+          // For stacked areas, calculate the average midpoint between y0 and y1 across all data points
+          const avgMidpoint = stackedData.reduce((sum, d) => {
+            const y0 = d[`${metric}_y0`] || 0;
+            const y1 = d[`${metric}_y1`] || 0;
+            const midpoint = (y0 + y1) / 2;
+            return sum + midpoint;
+          }, 0) / stackedData.length;
+          centerY = yScale(avgMidpoint);
+        } else {
+          // For regular areas, use the average value
+          const avgValue = sum / filteredData.length;
+          centerY = yScale(avgValue);
+        }
+
+        const lineColor = getLineColor(metric, i, settings, comparisonPalettes);
+
+        // Add semi-transparent background for better readability
+        const textElement = chartGroup
+          .append('text')
+          .attr('x', centerX)
+          .attr('y', centerY)
+          .attr('text-anchor', 'middle')
+          .attr('font-family', fontFamily)
+          .attr('font-size', sumLabelFontSize || 14)
+          .attr('font-weight', 700)
+          .attr('fill', lineColor)
+          .text(formattedSum);
+
+        // Get text bounding box to create background
+        const bbox = textElement.node().getBBox();
+
+        // Insert background rectangle before text
+        chartGroup
+          .insert('rect', () => textElement.node())
+          .attr('x', bbox.x - 4)
+          .attr('y', bbox.y - 2)
+          .attr('width', bbox.width + 8)
+          .attr('height', bbox.height + 4)
+          .attr('fill', backgroundColor)
+          .attr('opacity', 0.85)
+          .attr('rx', 3);
+      });
+    }
 
     // Draw legend if enabled
     if (showLegend && legendPosition === 'top') {
