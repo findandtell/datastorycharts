@@ -1708,6 +1708,9 @@ export default function ChartEditor() {
     showDirectLabels: styleSettings.showDirectLabels !== undefined ? styleSettings.showDirectLabels : true,
     labelFontSize: styleSettings.labelFontSize || 12,
     directLabelFontSize: styleSettings.directLabelFontSize || 14,
+    showSumLabels: styleSettings.showSumLabels || false,
+    sumLabelPosition: styleSettings.sumLabelPosition || 'direct',
+    sumLabelFontSize: styleSettings.sumLabelFontSize || 14,
     compactNumbers: styleSettings.compactNumbers !== undefined ? styleSettings.compactNumbers : true,
 
     // Axes
@@ -6321,6 +6324,66 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                     </span>
                   </div>
                 </div>
+              )}
+
+              {/* Sum Labels for Area Charts */}
+              {(chartType === 'area' || chartType === 'area-stacked') && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                      Show Sum Labels
+                      <InfoTooltip text="Display the total value for each metric across all time periods" />
+                    </label>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={styleSettings.showSumLabels || false}
+                        onChange={(e) => styleSettings.setShowSumLabels?.(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                    </label>
+                  </div>
+
+                  {styleSettings.showSumLabels && (
+                    <>
+                      <div>
+                        <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                          Sum Label Position
+                          <InfoTooltip text="Where to display the sum label - in center of area or on direct label" />
+                        </label>
+                        <select
+                          value={styleSettings.sumLabelPosition || 'direct'}
+                          onChange={(e) => styleSettings.setSumLabelPosition?.(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                        >
+                          <option value="direct">On Direct Label</option>
+                          <option value="center">Center of Area</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-2">
+                          Sum Label Font Size
+                          <InfoTooltip text="Font size for the sum value labels" />
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="range"
+                            min="8"
+                            max="24"
+                            value={styleSettings.sumLabelFontSize || 14}
+                            onChange={(e) => styleSettings.setSumLabelFontSize?.(Number(e.target.value))}
+                            className="flex-1"
+                          />
+                          <span className="text-sm font-medium text-gray-700 w-12 text-right">
+                            {styleSettings.sumLabelFontSize || 14}px
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
               )}
 
               {styleSettings.legendPosition === 'top' && (

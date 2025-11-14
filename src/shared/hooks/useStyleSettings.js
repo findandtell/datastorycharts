@@ -167,6 +167,9 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [gridLineOpacity, setGridLineOpacity] = useState(0.5);
   const [showDirectLabels, setShowDirectLabels] = useState(true);
   const [directLabelFontSize, setDirectLabelFontSize] = useState(14); // Direct label font size (Line Chart)
+  const [showSumLabels, setShowSumLabels] = useState(false); // Show sum labels for area charts
+  const [sumLabelPosition, setSumLabelPosition] = useState('direct'); // 'center' or 'direct'
+  const [sumLabelFontSize, setSumLabelFontSize] = useState(14); // Sum label font size
   const [yAxisFormat, setYAxisFormat] = useState('auto');
   const [excludeZeroValues, setExcludeZeroValues] = useState(true); // Exclude zero/null values from plotting
   const [showMostRecentPoint, setShowMostRecentPoint] = useState(false); // Show point marker on most recent value
@@ -464,6 +467,10 @@ export const useStyleSettings = (initialTheme = theme) => {
           // Direct labels
           showDirectLabels,
           directLabelFontSize,
+          // Sum labels (area charts)
+          showSumLabels,
+          sumLabelPosition,
+          sumLabelFontSize,
           // Emphasis
           emphasizedPoints,
           emphasizedMetric,
@@ -509,6 +516,7 @@ export const useStyleSettings = (initialTheme = theme) => {
     showAreaFill, areaOpacity, areaGradient, showXAxis, showYAxis, yAxisFormat,
     showGridLines, gridDirection, gridLineColor, gridLineStyle, gridLineOpacity,
     showDirectLabels, directLabelFontSize,
+    showSumLabels, sumLabelPosition, sumLabelFontSize,
     emphasizedPoints, emphasizedMetric, emphasisLabelPosition, emphasisLabelFontSize,
     showEmphasisDate, emphasisCompactNumbers, emphasisValuePrefix, emphasisValueSuffix,
     emphasisDecimalPlaces, showEmphasisVerticalLine,
@@ -705,6 +713,10 @@ export const useStyleSettings = (initialTheme = theme) => {
         // Direct labels
         if (lineSettings.showDirectLabels !== undefined) setShowDirectLabels(lineSettings.showDirectLabels);
         if (lineSettings.directLabelFontSize !== undefined) setDirectLabelFontSize(lineSettings.directLabelFontSize);
+        // Sum labels (area charts)
+        if (lineSettings.showSumLabels !== undefined) setShowSumLabels(lineSettings.showSumLabels);
+        if (lineSettings.sumLabelPosition !== undefined) setSumLabelPosition(lineSettings.sumLabelPosition);
+        if (lineSettings.sumLabelFontSize !== undefined) setSumLabelFontSize(lineSettings.sumLabelFontSize);
         // Emphasis
         if (lineSettings.emphasizedPoints !== undefined) setEmphasizedPoints(lineSettings.emphasizedPoints);
         if (lineSettings.emphasizedMetric !== undefined) setEmphasizedMetric(lineSettings.emphasizedMetric);
@@ -1009,6 +1021,12 @@ export const useStyleSettings = (initialTheme = theme) => {
     setShowDirectLabels,
     directLabelFontSize,
     setDirectLabelFontSize,
+    showSumLabels,
+    setShowSumLabels,
+    sumLabelPosition,
+    setSumLabelPosition,
+    sumLabelFontSize,
+    setSumLabelFontSize,
     yAxisFormat,
     setYAxisFormat,
     excludeZeroValues,
