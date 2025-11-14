@@ -591,6 +591,7 @@ export const useStyleSettings = (initialTheme = theme) => {
 
     // Chart-specific settings (smart import based on current chart type)
     if (settings.chartSpecific) {
+      // Check for slope chart
       if (currentChartType === 'slope' && settings.chartSpecific.slope) {
         const slopeSettings = settings.chartSpecific.slope;
         if (slopeSettings.colorMode !== undefined) setColorMode(slopeSettings.colorMode);
@@ -615,7 +616,9 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (slopeSettings.slopeAxisLineWidth !== undefined) setSlopeAxisLineWidth(slopeSettings.slopeAxisLineWidth);
         if (slopeSettings.slopeAxisLineStyle !== undefined) setSlopeAxisLineStyle(slopeSettings.slopeAxisLineStyle);
         if (slopeSettings.axisEnds !== undefined) setAxisEnds(slopeSettings.axisEnds);
-      } else if (currentChartType === 'bar' && settings.chartSpecific.bar) {
+      }
+      // Check for bar charts (all variants: bar-horizontal, bar-vertical, bar-grouped-horizontal, bar-grouped-vertical)
+      else if (currentChartType.startsWith('bar') && settings.chartSpecific.bar) {
         const barSettings = settings.chartSpecific.bar;
         if (barSettings.barMode !== undefined) setBarMode(barSettings.barMode);
         if (barSettings.labelMode !== undefined) setLabelMode(barSettings.labelMode);
@@ -665,7 +668,9 @@ export const useStyleSettings = (initialTheme = theme) => {
         else if (barSettings.valueDecimalPlaces !== undefined) setAxisValueDecimalPlaces(barSettings.valueDecimalPlaces);
         if (barSettings.axisValueFormat !== undefined) setAxisValueFormat(barSettings.axisValueFormat);
         else if (barSettings.valueFormat !== undefined) setAxisValueFormat(barSettings.valueFormat);
-      } else if (currentChartType === 'line' && settings.chartSpecific.line) {
+      }
+      // Check for line/area charts (line, area, area-stacked all use LineChart component)
+      else if ((currentChartType === 'line' || currentChartType === 'area' || currentChartType === 'area-stacked') && settings.chartSpecific.line) {
         const lineSettings = settings.chartSpecific.line;
         // Time settings
         if (lineSettings.timeScale !== undefined) setTimeScale(lineSettings.timeScale);
@@ -728,7 +733,9 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (lineSettings.emphasisValueSuffix !== undefined) setEmphasisValueSuffix(lineSettings.emphasisValueSuffix);
         if (lineSettings.emphasisDecimalPlaces !== undefined) setEmphasisDecimalPlaces(lineSettings.emphasisDecimalPlaces);
         if (lineSettings.showEmphasisVerticalLine !== undefined) setShowEmphasisVerticalLine(lineSettings.showEmphasisVerticalLine);
-      } else if (currentChartType === 'funnel' && settings.chartSpecific.funnel) {
+      }
+      // Check for funnel chart
+      else if (currentChartType === 'funnel' && settings.chartSpecific.funnel) {
         // Apply funnel-specific settings when importing to a funnel chart
         // This will be populated when funnel chart settings are defined
       }
