@@ -1,10 +1,138 @@
 # Example Charts Guide
 
-This guide explains how to create, save, and manage example charts for the production gallery.
+This guide explains how to create, save, and manage example charts for the production gallery, and how to create custom gallery defaults.
 
 ## Overview
 
 Example charts are pre-styled, production-ready charts that users can browse in the Gallery and load with one click. Each example demonstrates best practices for chart design and showcases different use cases.
+
+**Two Types of Charts:**
+1. **Gallery Defaults**: The default chart that loads when a user clicks a chart type (e.g., "Bar Chart Horizontal")
+2. **Gallery Examples**: Additional example charts users can browse and load from the gallery
+
+---
+
+## 🎯 Creating Gallery Defaults (NEW!)
+
+Gallery defaults are the first chart users see when they select a chart type. As of v2.0, you can now load these directly from saved JSON files!
+
+### Quick Start
+
+**1. Create Your Chart**
+- Open the app in production
+- Select the chart type
+- Design it exactly how you want:
+  - Load or create your data
+  - Sort/organize the data the way you want it displayed
+  - Set colors, fonts, labels, axes, gridlines
+  - Configure all styling settings
+  - Set professional title and subtitle
+
+**2. Save the Chart**
+- Click **"Save Chart"** button
+- This downloads a complete JSON file with:
+  - ✅ Data (in your sorted/edited order)
+  - ✅ All style settings (colors, fonts, layout)
+  - ✅ Chart-specific configurations (axes, labels, etc.)
+
+**3. Copy to Public Folder**
+```bash
+# Copy your saved JSON to the Examples folder
+cp "your-chart-name.json" "public/Examples/[chart-type]-default.json"
+```
+
+**File naming convention for gallery defaults:**
+- `bar-horizontal-default.json`
+- `bar-vertical-default.json`
+- `line-chart-default.json`
+- `area-chart-default.json`
+- etc.
+
+**4. Update Dataset Definition**
+
+Edit `src/shared/data/sampleDatasets.js`:
+
+```javascript
+barHorizontalStyled: {
+  name: "Regional Sales (Styled)",
+  description: "Styled horizontal bar chart with professional defaults",
+  chartType: "bar-horizontal",
+  title: "Regional Sales",
+  subtitle: "Units sold by region - January 2024",
+  stylePreset: "/Examples/bar-horizontal-default.json",
+  loadDataFromPreset: true,  // ← This is the magic flag!
+  // NO hardcoded data array needed - it loads from the JSON!
+  defaultSettings: {
+    orientation: "horizontal",
+    barMode: "grouped",
+  },
+},
+```
+
+**Key Changes:**
+- ✅ Add `loadDataFromPreset: true`
+- ✅ Remove the hardcoded `data: [ ... ]` array
+- ✅ Point `stylePreset` to your JSON file
+- ✅ That's it! The data AND styles load from the JSON
+
+**5. Test**
+- Go to Chart Gallery
+- Click your chart type
+- Verify it loads with your custom styling and sorted data
+- Test "Reset View" button to ensure it reloads correctly
+
+### Chart Types & Default Datasets
+
+| Chart Type | Registry Key | Dataset Name | Current File |
+|------------|-------------|--------------|--------------|
+| **Bar Horizontal** | `bar-horizontal` | `barHorizontalStyled` | ✅ `bar-horizontal-default.json` |
+| **Bar Vertical** | `bar-vertical` | `barVerticalSingle` | `bar-vertical-default.json` |
+| **Grouped Bar H** | `bar-grouped-horizontal` | `barGroupedHorizontal` | `bar-grouped-h-default.json` |
+| **Grouped Bar V** | `bar-grouped-vertical` | `barGroupedVertical` | `bar-grouped-v-default.json` |
+| **Line Chart** | `line` | `marketingChannelRevenue` | `line-chart-default.json` |
+| **Area Chart** | `area` | `marketingChannelRevenue` | `area-chart-default.json` |
+| **Stacked Area** | `area-stacked` | `areaStackedDefault` | `area-stacked-default.json` |
+| **Slope Chart** | `slope` | `tufteSlope` | `slope-chart-default.json` |
+| **Funnel Chart** | `funnel` | `abTest` | `funnel-default.json` |
+
+### Benefits of loadDataFromPreset
+
+**✅ Single Source of Truth**
+- JSON file contains both data AND styles
+- No duplication between dataset definition and JSON file
+
+**✅ Easy Updates**
+- Just save a new chart and copy the JSON
+- No need to manually edit hardcoded data arrays
+
+**✅ Data Order Preserved**
+- Sorted data stays sorted
+- Manual edits are preserved
+- Drag & drop reorders are maintained
+
+**✅ Future-Proof**
+- Any saved chart can become a gallery default
+- Makes it easy to update defaults as design trends change
+
+### Example Workflow
+
+```bash
+# 1. Create chart in the app, save it as "regional-sales.json"
+
+# 2. Copy to public folder with standard naming
+cp regional-sales.json public/Examples/bar-horizontal-default.json
+
+# 3. Update sampleDatasets.js
+# Find the dataset (e.g., barHorizontalStyled)
+# Add: loadDataFromPreset: true
+# Remove: the data array
+
+# 4. Commit and deploy
+git add public/Examples/bar-horizontal-default.json src/shared/data/sampleDatasets.js
+git commit -m "Update bar horizontal default with new styling"
+git push
+npx vercel --prod
+```
 
 ---
 
@@ -369,12 +497,37 @@ npx jsonlint modern-sales-dashboard.json
 
 # Optimize SVG
 npx svgo modern-sales-dashboard.svg
+
+# Copy saved chart to public folder (for gallery defaults)
+cp "my-chart.json" "public/Examples/bar-horizontal-default.json"
 ```
 
 ### Folder Structure Quick Copy
 ```bash
 mkdir -p example-charts/{bar-horizontal,bar-vertical,bar-grouped-horizontal,bar-grouped-vertical,bar-stacked-horizontal,bar-stacked-vertical,line,area,area-stacked,slope,funnel}
 ```
+
+### Gallery Defaults Quick Reference
+
+```javascript
+// In sampleDatasets.js, for ANY dataset that should load from JSON:
+
+myDataset: {
+  name: "Chart Name",
+  chartType: "chart-type",
+  title: "Title",
+  subtitle: "Subtitle",
+  stylePreset: "/Examples/my-chart-default.json",
+  loadDataFromPreset: true,  // ← Add this!
+  // Remove the data: [...] array
+  defaultSettings: { ... }
+}
+```
+
+**Three locations in ChartEditor.jsx automatically handle loadDataFromPreset:**
+1. Initial chart type load (useEffect)
+2. Sample data selector dropdown
+3. Reset View button
 
 ---
 
@@ -388,6 +541,14 @@ mkdir -p example-charts/{bar-horizontal,bar-vertical,bar-grouped-horizontal,bar-
 ---
 
 ## Changelog
+
+### v2.0 (2025-11-14)
+- **NEW**: Added `loadDataFromPreset` feature for gallery defaults
+- Gallery defaults can now load data directly from saved JSON files
+- Added comprehensive workflow for creating custom gallery defaults
+- Added chart types reference table with dataset names
+- Updated Quick Reference with gallery defaults commands
+- No more data duplication between datasets and JSON files!
 
 ### v1.0 (2025-01-13)
 - Initial guide created
