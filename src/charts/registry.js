@@ -48,7 +48,7 @@ export const chartRegistry = {
       barMode: 'grouped',
       showGrid: true,
     },
-    defaultDataset: 'barHorizontalSingle',
+    defaultDataset: 'barHorizontalStyled',
   },
 
   'bar-vertical': {

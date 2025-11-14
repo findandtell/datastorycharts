@@ -1055,6 +1055,27 @@ export const sampleDatasets = {
     },
   },
 
+  barHorizontalStyled: {
+    name: "Regional Sales (Styled)",
+    description: "Styled horizontal bar chart with professional defaults",
+    chartType: "bar-horizontal",
+    title: "Regional Sales",
+    subtitle: "Units sold by region - January 2024",
+    stylePreset: "/Examples/regional-sales-bar-horizontal.json",
+    data: [
+      { Category: "North America", Revenue: 425000 },
+      { Category: "Europe", Revenue: 380000 },
+      { Category: "Asia Pacific", Revenue: 520000 },
+      { Category: "Latin America", Revenue: 185000 },
+      { Category: "Middle East", Revenue: 240000 },
+      { Category: "Africa", Revenue: 95000 },
+    ],
+    defaultSettings: {
+      orientation: "horizontal",
+      barMode: "grouped",
+    },
+  },
+
   barVerticalSingle: {
     name: "Top Products by Sales (Vertical)",
     description: "Single-series vertical bar chart - Product sales ranking",

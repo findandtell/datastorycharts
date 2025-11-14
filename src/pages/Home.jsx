@@ -27,7 +27,7 @@ export default function Home() {
       key: 'bar-horizontal',
       name: 'Bar Chart Horizontal',
       description: 'Horizontal bar chart for comparing categories side-by-side.',
-      image: '/Examples/bar_chart_revenue_asia_latinamerica.svg',
+      image: '/Examples/regional-sales-bar-horizontal.svg',
     },
     {
       key: 'bar-vertical',
