@@ -128,15 +128,11 @@ export const deserializeChartState = (stateObj) => {
     throw new Error('Invalid chart state: missing data');
   }
 
+  // Return the entire stateObj with validation flags
+  // This preserves all structured style properties (styleVersion, typography, colors, etc.)
   return {
+    ...stateObj,
     isValid: true,
-    version: stateObj.version,
-    chartType: stateObj.chartType,
-    name: stateObj.name || 'Untitled Chart',
-    timestamp: stateObj.timestamp,
-    data: stateObj.data,
-    state: stateObj.state || {},
-    style: stateObj.style || {},
   };
 };
 
