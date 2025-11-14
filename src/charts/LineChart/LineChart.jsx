@@ -475,6 +475,51 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
       yScale.nice();
     }
 
+    // Format number with all user settings (using Value/Label Number Styling)
+    const formatValueNumber = (value) => {
+      if (value == null) return '';
+
+      // Handle percentage format
+      if (valueFormat === 'percentage') {
+        const percentValue = value * 100;
+        let formattedValue;
+
+        if (compactNumbers) {
+          const absValue = Math.abs(percentValue);
+          if (absValue >= 1000000) {
+            formattedValue = (percentValue / 1000000).toFixed(valueDecimalPlaces) + 'M';
+          } else if (absValue >= 1000) {
+            formattedValue = (percentValue / 1000).toFixed(valueDecimalPlaces) + 'K';
+          } else {
+            formattedValue = percentValue.toFixed(valueDecimalPlaces);
+          }
+        } else {
+          formattedValue = percentValue.toFixed(valueDecimalPlaces);
+        }
+
+        return `${valuePrefix || ''}${formattedValue}%${valueSuffix || ''}`;
+      }
+
+      // Handle number format
+      let formattedValue;
+
+      if (compactNumbers) {
+        const absValue = Math.abs(value);
+        if (absValue >= 1000000) {
+          formattedValue = (value / 1000000).toFixed(valueDecimalPlaces) + 'M';
+        } else if (absValue >= 1000) {
+          formattedValue = (value / 1000).toFixed(valueDecimalPlaces) + 'K';
+        } else {
+          formattedValue = value.toFixed(valueDecimalPlaces);
+        }
+      } else {
+        formattedValue = value.toFixed(valueDecimalPlaces);
+      }
+
+      // Apply prefix and suffix
+      return `${valuePrefix || ''}${formattedValue}${valueSuffix || ''}`;
+    };
+
     // Create line generator
     // PERFORMANCE: Auto-disable smooth lines for large datasets (expensive curve calculations)
     const shouldSmooth = smoothLines && parsedData.length <= 500;
@@ -1407,14 +1452,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         let labelText = metric;
         if (showSumLabels && sumLabelPosition === 'direct') {
           const sum = metricSums[metric];
-          const formattedSum = formatNumber(
-            sum,
-            compactNumbers,
-            valuePrefix,
-            valueSuffix,
-            valueDecimalPlaces,
-            valueFormat
-          );
+          const formattedSum = formatValueNumber(sum);
           labelText = `${metric}: ${formattedSum}`;
         }
 
@@ -1442,14 +1480,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
     if (showSumLabels && sumLabelPosition === 'center' && (chartMode === 'area' || chartMode === 'area-stacked' || showAreaFill)) {
       metricNames.forEach((metric, i) => {
         const sum = metricSums[metric];
-        const formattedSum = formatNumber(
-          sum,
-          compactNumbers,
-          valuePrefix,
-          valueSuffix,
-          valueDecimalPlaces,
-          valueFormat
-        );
+        const formattedSum = formatValueNumber(sum);
 
         // Calculate center X position (midpoint of the data range)
         const centerX = chartWidth / 2;
