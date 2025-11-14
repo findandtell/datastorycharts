@@ -7,6 +7,32 @@
 const CHART_STATE_VERSION = '1.0';
 
 /**
+ * Convert data array to CSV string
+ * Preserves sorts, reorders, and manual edits
+ * @param {Array} data - Array of data objects
+ * @param {Array} periodNames - Array of period/column names
+ * @returns {string} CSV string
+ */
+const dataToCSV = (data, periodNames) => {
+  if (!data || data.length === 0) return '';
+
+  // Create header row: Category + period names
+  const headers = ['Category', ...periodNames];
+  const csvRows = [headers.join(',')];
+
+  // Add data rows
+  data.forEach(row => {
+    const values = [
+      row.Category || '',
+      ...periodNames.map(period => row[period] !== undefined ? row[period] : '')
+    ];
+    csvRows.push(values.join(','));
+  });
+
+  return csvRows.join('\n');
+};
+
+/**
  * Serialize chart state to JSON-compatible object
  * @param {Object} params - Chart state parameters
  * @param {string} params.chartType - Type of chart (bar, funnel, slope, line)
@@ -27,6 +53,12 @@ export const serializeChartState = ({
   // Get structured style settings from exportSettings (same format as style presets)
   const styleExport = styleSettings.exportSettings ? styleSettings.exportSettings() : {};
 
+  // Convert editableData to CSV to preserve sorts, edits, and reorders
+  // Falls back to rawCSV if editableData is not available
+  const csvData = chartData.editableData && chartData.editableData.length > 0
+    ? dataToCSV(chartData.editableData, chartData.periodNames)
+    : chartData.rawCSV || '';
+
   const state = {
     // Metadata
     version: CHART_STATE_VERSION,
@@ -34,13 +66,13 @@ export const serializeChartState = ({
     timestamp: new Date().toISOString(),
     name: defaultName,
 
-    // Data
+    // Data - Save editableData (with sorts/edits applied) instead of rawCSV
     data: {
-      csv: chartData.rawCSV || '',
+      csv: csvData,
       source: chartData.source || 'unknown',
       googleSheetsUrl: chartData.googleSheetsUrl || null,
       periodNames: chartData.periodNames || [],
-      stageCount: chartData.stageCount || 0,
+      stageCount: chartData.editableData ? chartData.editableData.length : (chartData.stageCount || 0),
       periodCount: chartData.periodCount || 0,
       isComparisonMode: chartData.isComparisonMode || false,
     },
@@ -50,7 +82,6 @@ export const serializeChartState = ({
       hiddenPeriods: chartData.hiddenPeriods ? Array.from(chartData.hiddenPeriods) : [],
       emphasizedBars: styleSettings.emphasizedBars || [],
       emphasizedLines: styleSettings.emphasizedLines || [],
-      selectedMetrics: styleSettings.selectedMetrics || [],
     },
 
     // Style Settings - Use structured format from exportSettings (same format as style presets)
@@ -150,9 +181,6 @@ export const applyChartState = async (chartState, setChartType, chartData, style
     }
     if (chartState.state.emphasizedLines && styleSettings.setEmphasizedLines) {
       styleSettings.setEmphasizedLines(chartState.state.emphasizedLines);
-    }
-    if (chartState.state.selectedMetrics && styleSettings.setSelectedMetrics) {
-      styleSettings.setSelectedMetrics(chartState.state.selectedMetrics);
     }
 
     return { success: true, message: 'Chart loaded successfully' };
