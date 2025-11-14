@@ -53,154 +53,8 @@ export const serializeChartState = ({
       selectedMetrics: styleSettings.selectedMetrics || [],
     },
 
-    // Style Settings - Use structured format from exportSettings (for style preset compatibility)
+    // Style Settings - Use structured format from exportSettings (same format as style presets)
     ...styleExport,
-
-    // LEGACY: Keep flat style object for backward compatibility with old imports
-    // This can be removed in a future version once all users have migrated
-    style_legacy: {
-      // Theme & General
-      theme: styleSettings.theme,
-      darkMode: styleSettings.darkMode,
-      backgroundColor: styleSettings.backgroundColor,
-
-      // Canvas & Layout
-      canvasWidth: styleSettings.canvasWidth,
-      canvasHeight: styleSettings.canvasHeight,
-      chartWidth: styleSettings.chartWidth,
-      chartHeight: styleSettings.chartHeight,
-      chartPadding: styleSettings.chartPadding,
-
-      // Title & Subtitle
-      title: styleSettings.title,
-      subtitle: styleSettings.subtitle,
-      titleFontSize: styleSettings.titleFontSize,
-      subtitleFontSize: styleSettings.subtitleFontSize,
-      titleAlignment: styleSettings.titleAlignment,
-
-      // Typography
-      fontFamily: styleSettings.fontFamily,
-      segmentLabelFontSize: styleSettings.segmentLabelFontSize,
-      metricLabelFontSize: styleSettings.metricLabelFontSize,
-      periodLabelFontSize: styleSettings.periodLabelFontSize,
-
-      // Colors
-      comparisonPalette: styleSettings.comparisonPalette,
-      userCustomColors: styleSettings.userCustomColors,
-
-      // Bar Chart Specific
-      barMode: styleSettings.barMode,
-      labelMode: styleSettings.labelMode,
-      legendPosition: styleSettings.legendPosition,
-      directLabelContent: styleSettings.directLabelContent,
-      orientation: styleSettings.orientation,
-      showValueLabels: styleSettings.showValueLabels,
-      showMetricLabels: styleSettings.showMetricLabels,
-      showPeriodLabels: styleSettings.showPeriodLabels,
-      metricLabelPosition: styleSettings.metricLabelPosition,
-      periodLabelDisplay: styleSettings.periodLabelDisplay,
-      barWidth: styleSettings.barWidth,
-      stageGap: styleSettings.stageGap,
-      percentChangeEnabled: styleSettings.percentChangeEnabled,
-      percentChangeLabelFormat: styleSettings.percentChangeLabelFormat,
-      percentChangeBracketDistance: styleSettings.percentChangeBracketDistance,
-      showTotalLabels: styleSettings.showTotalLabels,
-      boldTotal: styleSettings.boldTotal,
-
-      // Funnel Chart Specific
-      metricEmphasis: styleSettings.metricEmphasis,
-      normalizeToHundred: styleSettings.normalizeToHundred,
-      compactNumbers: styleSettings.compactNumbers,
-      showLegend: styleSettings.showLegend,
-      inStageLabelFontSize: styleSettings.inStageLabelFontSize,
-
-      // Slope Chart Specific
-      colorMode: styleSettings.colorMode,
-      singleColor: styleSettings.singleColor,
-      lineColor: styleSettings.lineColor,
-      showDots: styleSettings.showDots,
-      dotSize: styleSettings.dotSize,
-      lineWidth: styleSettings.lineWidth,
-      leftLabelFontSize: styleSettings.leftLabelFontSize,
-      rightLabelFontSize: styleSettings.rightLabelFontSize,
-      headerLabelFontSize: styleSettings.headerLabelFontSize,
-      lineThickness: styleSettings.lineThickness,
-      lineOpacity: styleSettings.lineOpacity,
-      lineSaturation: styleSettings.lineSaturation,
-      endpointSize: styleSettings.endpointSize,
-      endpointStyle: styleSettings.endpointStyle,
-      labelPosition: styleSettings.labelPosition,
-      showCategoryLabels: styleSettings.showCategoryLabels,
-
-      // Line Chart Specific
-      timeScale: styleSettings.timeScale,
-      aggregationLevel: styleSettings.aggregationLevel,
-      aggregationMethod: styleSettings.aggregationMethod,
-      fiscalYearStartMonth: styleSettings.fiscalYearStartMonth,
-      lineStyle: styleSettings.lineStyle,
-      smoothLines: styleSettings.smoothLines,
-      showPoints: styleSettings.showPoints,
-      pointSize: styleSettings.pointSize,
-      pointStyle: styleSettings.pointStyle,
-      pointBorderWidth: styleSettings.pointBorderWidth,
-      excludeZeroValues: styleSettings.excludeZeroValues,
-      showMostRecentPoint: styleSettings.showMostRecentPoint,
-      showAreaFill: styleSettings.showAreaFill,
-      areaOpacity: styleSettings.areaOpacity,
-      areaGradient: styleSettings.areaGradient,
-      stackAreas: styleSettings.stackAreas,
-      showMarkers: styleSettings.showMarkers,
-      markerSize: styleSettings.markerSize,
-      showArea: styleSettings.showArea,
-      showMovingAverage: styleSettings.showMovingAverage,
-      movingAveragePeriod: styleSettings.movingAveragePeriod,
-      movingAverageColor: styleSettings.movingAverageColor,
-      baselines: styleSettings.baselines,
-      emphasizedPoints: styleSettings.emphasizedPoints,
-      emphasizedMetric: styleSettings.emphasizedMetric,
-      emphasisLabelPosition: styleSettings.emphasisLabelPosition,
-      emphasisLabelFontSize: styleSettings.emphasisLabelFontSize,
-      dateFormatPreset: styleSettings.dateFormatPreset,
-      dateFormatCustom: styleSettings.dateFormatCustom,
-      showXAxis: styleSettings.showXAxis,
-      showYAxis: styleSettings.showYAxis,
-      yAxisFormat: styleSettings.yAxisFormat,
-
-      // Axes & Gridlines
-      showHorizontalGridlines: styleSettings.showHorizontalGridlines,
-      showVerticalGridlines: styleSettings.showVerticalGridlines,
-      axisMinimum: styleSettings.axisMinimum,
-      axisMinimumAuto: styleSettings.axisMinimumAuto,
-      axisMaximum: styleSettings.axisMaximum,
-      axisMaximumAuto: styleSettings.axisMaximumAuto,
-      axisMajorUnit: styleSettings.axisMajorUnit,
-      axisMajorUnitAuto: styleSettings.axisMajorUnitAuto,
-      axisMinorUnit: styleSettings.axisMinorUnit,
-      axisMinorUnitAuto: styleSettings.axisMinorUnitAuto,
-      axisMajorTickType: styleSettings.axisMajorTickType,
-      axisMinorTickType: styleSettings.axisMinorTickType,
-      xAxisFontSize: styleSettings.xAxisFontSize,
-      yAxisFontSize: styleSettings.yAxisFontSize,
-      axisLabel: styleSettings.axisLabel,
-      axisLabelFontSize: styleSettings.axisLabelFontSize,
-      xAxisLabelRotation: styleSettings.xAxisLabelRotation,
-      compactAxisNumbers: styleSettings.compactAxisNumbers,
-
-      // Number Formatting (Labels)
-      valuePrefix: styleSettings.valuePrefix,
-      valueSuffix: styleSettings.valueSuffix,
-      valueDecimalPlaces: styleSettings.valueDecimalPlaces,
-      valueFormat: styleSettings.valueFormat,
-
-      // Number Formatting (Axis)
-      axisValuePrefix: styleSettings.axisValuePrefix,
-      axisValueSuffix: styleSettings.axisValueSuffix,
-      axisValueDecimalPlaces: styleSettings.axisValueDecimalPlaces,
-      axisValueFormat: styleSettings.axisValueFormat,
-
-      // Branding
-      userTier: styleSettings.userTier,
-    },
   };
 
   return state;
@@ -282,30 +136,12 @@ export const applyChartState = async (chartState, setChartType, chartData, style
       chartData.setHiddenPeriods(new Set(chartState.state.hiddenPeriods));
     }
 
-    // 4. Apply style settings - Try structured format first (new), then fall back to legacy flat format
+    // 4. Apply style settings using importSettings
     if (chartState.styleVersion && styleSettings.importSettings) {
-      // New structured format - use importSettings for proper handling
+      // Use importSettings for proper structured format handling
       styleSettings.importSettings(chartState, chartState.chartType);
-    } else if (chartState.style) {
-      // Legacy flat format - apply each setting individually
-      Object.entries(chartState.style).forEach(([key, value]) => {
-        const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-        const setter = styleSettings[setterName];
-
-        if (setter && typeof setter === 'function') {
-          setter(value);
-        }
-      });
-    } else if (chartState.style_legacy) {
-      // Very old format stored in style_legacy
-      Object.entries(chartState.style_legacy).forEach(([key, value]) => {
-        const setterName = `set${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-        const setter = styleSettings[setterName];
-
-        if (setter && typeof setter === 'function') {
-          setter(value);
-        }
-      });
+    } else {
+      console.warn('Chart file missing styleVersion - may not load correctly');
     }
 
     // 5. Restore emphasized elements
