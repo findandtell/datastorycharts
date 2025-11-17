@@ -857,9 +857,10 @@ export default function ChartEditor() {
     const viewBox = `0 0 ${originalWidth} ${originalHeight}`;
 
     // Replace the SVG tag with properly sized thumbnail version
+    // IMPORTANT: Must include xmlns for standalone SVG images
     const thumbnailSVG = svgString.replace(
       /<svg([^>]*)>/,
-      `<svg width="${thumbnailWidth}" height="${thumbnailHeight}" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet">`
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${thumbnailWidth}" height="${thumbnailHeight}" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet">`
     );
 
     return thumbnailSVG;
