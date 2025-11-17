@@ -170,7 +170,7 @@ export default function Home() {
       className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-cyan-400"
     >
       {/* Chart Preview Image */}
-      <div className="bg-white border-b border-gray-200 relative overflow-hidden p-4" style={{ height: '192px' }}>
+      <div className="border-b border-gray-200 relative overflow-hidden p-4" style={{ height: '192px', backgroundColor: 'transparent' }}>
         <ChartThumbnail
           chartKey={chart.key}
           fallbackImage={chart.image}
