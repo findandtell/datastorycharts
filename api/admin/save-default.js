@@ -56,6 +56,12 @@ export default async function handler(req, res) {
     // Get chart type, configuration, and optional SVG thumbnail from request
     const { chartType, configuration, svgThumbnail } = req.body;
 
+    // Debug logging
+    console.log('[save-default API] Received request for chartType:', chartType);
+    console.log('[save-default API] emphasizedBars:', configuration?.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+    console.log('[save-default API] percentChangeBracketDistance:', configuration?.styleSettings?.chartSpecific?.bar?.percentChangeBracketDistance);
+    console.log('[save-default API] percentChangeEnabled:', configuration?.styleSettings?.display?.percentChangeEnabled);
+
     // Validate input
     if (!chartType || typeof chartType !== 'string') {
       return res.status(400).json({

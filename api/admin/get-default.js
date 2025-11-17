@@ -48,6 +48,12 @@ export default async function handler(req, res) {
       });
     }
 
+    // Debug logging
+    console.log('[get-default API] Retrieved config for chartType:', chartType);
+    console.log('[get-default API] emphasizedBars:', defaultConfig.configuration?.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+    console.log('[get-default API] percentChangeBracketDistance:', defaultConfig.configuration?.styleSettings?.chartSpecific?.bar?.percentChangeBracketDistance);
+    console.log('[get-default API] percentChangeEnabled:', defaultConfig.configuration?.styleSettings?.display?.percentChangeEnabled);
+
     res.status(200).json({
       success: true,
       chartType,
