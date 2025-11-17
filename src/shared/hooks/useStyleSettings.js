@@ -119,9 +119,10 @@ export const useStyleSettings = (initialTheme = theme) => {
 
   // Wrapped setter with logging to track ALL calls to setPercentChangeEnabled
   const setPercentChangeEnabled = useCallback((value) => {
-    console.log('[setPercentChangeEnabled] ⚡ CALLED with value:', value, '(current:', percentChangeEnabled, ')');
+    console.log('[setPercentChangeEnabled] ⚡ CALLED with value:', value);
+    console.trace('[setPercentChangeEnabled] Stack trace:');
     _setPercentChangeEnabled(value);
-  }, [percentChangeEnabled]);
+  }, []);
   const [axisMajorUnit, setAxisMajorUnit] = useState(10000);
   const [axisMajorUnitAuto, setAxisMajorUnitAuto] = useState(true);
   const [axisMinorUnit, setAxisMinorUnit] = useState(5);
@@ -232,6 +233,9 @@ export const useStyleSettings = (initialTheme = theme) => {
    * Reset all settings to defaults
    */
   const resetToDefaults = useCallback(() => {
+    console.log('[resetToDefaults] ⚠️ CALLED - This will reset ALL settings including percentChangeEnabled to false');
+    console.trace('[resetToDefaults] Stack trace:');
+
     setTitle("Units Produced by Region");
     setSubtitle("Production units by regional location (January)");
     setFontFamily(initialTheme.typography.families[0]);
