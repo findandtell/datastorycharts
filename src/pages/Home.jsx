@@ -12,10 +12,35 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
   const [hasError, setHasError] = useState(false);
 
   const handleError = (e) => {
-    console.log(`[ChartThumbnail] Error loading thumbnail for ${chartKey}:`, e);
+    console.error(`[ChartThumbnail] Error loading thumbnail for ${chartKey}:`, {
+      event: e,
+      currentSrc: imageSrc,
+      useDefault,
+      errorType: e.type,
+      target: e.target
+    });
     if (useDefault) {
       // Default thumbnail not found, fall back to static image
       console.log(`[ChartThumbnail] Falling back to static image: ${fallbackImage}`);
+
+      // Try fetching the thumbnail directly to see the actual error
+      fetch(`/api/admin/get-thumbnail?chartType=${chartKey}`)
+        .then(res => {
+          console.log(`[ChartThumbnail] Fetch response for ${chartKey}:`, {
+            status: res.status,
+            statusText: res.statusText,
+            contentType: res.headers.get('content-type'),
+            ok: res.ok
+          });
+          return res.text();
+        })
+        .then(text => {
+          console.log(`[ChartThumbnail] Response body for ${chartKey} (first 500 chars):`, text.substring(0, 500));
+        })
+        .catch(err => {
+          console.error(`[ChartThumbnail] Fetch error for ${chartKey}:`, err);
+        });
+
       setImageSrc(fallbackImage);
       setUseDefault(false);
       setHasError(true);
