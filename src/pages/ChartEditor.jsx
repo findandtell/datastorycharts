@@ -184,34 +184,12 @@ export default function ChartEditor() {
             console.log('[AutoLoad] Before import - emphasizedBars:', styleSettings.emphasizedBars);
             styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
 
-            // WORKAROUND: Manually set bar chart emphasis and bracket settings AFTER importSettings completes
-            // Wait for next tick to ensure importSettings state updates have been applied
+            // Debug: Check values after import completes
             setTimeout(() => {
-              if (chartType.startsWith('bar')) {
-                const barSettings = configuration.styleSettings.chartSpecific?.bar;
-                if (barSettings) {
-                  if (barSettings.emphasizedBars !== undefined) {
-                    console.log('[AutoLoad] Manually setting emphasizedBars:', barSettings.emphasizedBars);
-                    styleSettings.setEmphasizedBars(barSettings.emphasizedBars);
-                  }
-                  if (barSettings.percentChangeBracketDistance !== undefined) {
-                    console.log('[AutoLoad] Manually setting percentChangeBracketDistance:', barSettings.percentChangeBracketDistance);
-                    styleSettings.setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
-                  }
-                }
-                if (configuration.styleSettings.display?.percentChangeEnabled !== undefined) {
-                  console.log('[AutoLoad] Manually setting percentChangeEnabled:', configuration.styleSettings.display.percentChangeEnabled);
-                  styleSettings.setPercentChangeEnabled(configuration.styleSettings.display.percentChangeEnabled);
-                }
-
-                // Check values after setting
-                setTimeout(() => {
-                  console.log('[AutoLoad] After manual set - emphasizedBars:', styleSettings.emphasizedBars);
-                  console.log('[AutoLoad] After manual set - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
-                  console.log('[AutoLoad] After manual set - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-                }, 100);
-              }
-            }, 0);
+              console.log('[AutoLoad] After import - emphasizedBars:', styleSettings.emphasizedBars);
+              console.log('[AutoLoad] After import - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
+              console.log('[AutoLoad] After import - percentChangeEnabled:', styleSettings.percentChangeEnabled);
+            }, 100);
           }
 
           // Flag is already set to true above (before async call)
