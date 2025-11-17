@@ -76,7 +76,7 @@ export default async function handler(req, res) {
 
     // Return processed SVG with proper content type
     res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate'); // Always check for updates
     res.status(200).send(processedSvg);
 
   } catch (error) {
