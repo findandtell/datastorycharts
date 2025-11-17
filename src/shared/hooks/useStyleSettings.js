@@ -654,7 +654,10 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.emphasizedBars !== undefined) {
           console.log('[importSettings] Calling setEmphasizedBars with:', barSettings.emphasizedBars);
           setEmphasizedBars(barSettings.emphasizedBars);
+        } else {
+          console.log('[importSettings] emphasizedBars is undefined, not setting');
         }
+
         if (barSettings.xAxisFontSize !== undefined) setXAxisFontSize(barSettings.xAxisFontSize);
         if (barSettings.yAxisFontSize !== undefined) setYAxisFontSize(barSettings.yAxisFontSize);
         if (barSettings.axisLabel !== undefined) setAxisLabel(barSettings.axisLabel);
@@ -682,7 +685,14 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.showPeriodLabels !== undefined) setShowPeriodLabels(barSettings.showPeriodLabels);
         if (barSettings.metricLabelPosition !== undefined) setMetricLabelPosition(barSettings.metricLabelPosition);
         if (barSettings.periodLabelDisplay !== undefined) setPeriodLabelDisplay(barSettings.periodLabelDisplay);
-        if (barSettings.percentChangeBracketDistance !== undefined) setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
+
+        if (barSettings.percentChangeBracketDistance !== undefined) {
+          console.log('[importSettings] Calling setPercentChangeBracketDistance with:', barSettings.percentChangeBracketDistance);
+          setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
+        } else {
+          console.log('[importSettings] percentChangeBracketDistance is undefined, not setting');
+        }
+
         if (barSettings.showTotalLabels !== undefined) setShowTotalLabels(barSettings.showTotalLabels);
         if (barSettings.boldTotal !== undefined) setBoldTotal(barSettings.boldTotal);
         if (barSettings.xAxisSecondaryFontSize !== undefined) setXAxisSecondaryFontSize(barSettings.xAxisSecondaryFontSize);
@@ -699,6 +709,8 @@ export const useStyleSettings = (initialTheme = theme) => {
         else if (barSettings.valueDecimalPlaces !== undefined) setAxisValueDecimalPlaces(barSettings.valueDecimalPlaces);
         if (barSettings.axisValueFormat !== undefined) setAxisValueFormat(barSettings.axisValueFormat);
         else if (barSettings.valueFormat !== undefined) setAxisValueFormat(barSettings.valueFormat);
+
+        console.log('[importSettings] ✅ Finished importing bar settings');
       }
       // Check for line/area charts (line, area, area-stacked all use LineChart component)
       else if ((currentChartType === 'line' || currentChartType === 'area' || currentChartType === 'area-stacked') && settings.chartSpecific.line) {
