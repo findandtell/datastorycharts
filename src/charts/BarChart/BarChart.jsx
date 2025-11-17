@@ -197,6 +197,38 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     }
   }, [onClearEmphasis]);
 
+  // Sync emphasizedBars with selectedBarsForComparison for percentage change brackets
+  useEffect(() => {
+    if (percentChangeEnabled && emphasizedBars && emphasizedBars.length >= 2 && data && periodNames) {
+      // Convert emphasizedBars (array of barIds like "Google Ads-Jan") into bar data objects
+      const barsForComparison = emphasizedBars.slice(0, 2).map(barId => {
+        // Parse barId format: "Category-Period"
+        const lastDashIndex = barId.lastIndexOf('-');
+        const category = barId.substring(0, lastDashIndex);
+        const period = barId.substring(lastDashIndex + 1);
+
+        // Find the data row for this category
+        const dataRow = data.find(row => row.Category === category);
+        if (!dataRow) return null;
+
+        const value = dataRow[period];
+        if (value === undefined) return null;
+
+        return {
+          barId,
+          category,
+          period,
+          value: parseFloat(value)
+        };
+      }).filter(Boolean);
+
+      if (barsForComparison.length >= 2) {
+        console.log('[BarChart] Auto-populating selectedBarsForComparison from emphasizedBars:', barsForComparison);
+        setSelectedBarsForComparison(barsForComparison);
+      }
+    }
+  }, [emphasizedBars, percentChangeEnabled, data, periodNames]);
+
   // Main chart rendering
   useEffect(() => {
     if (!data || data.length === 0 || !periodNames || periodNames.length === 0 || dimensions.width === 0) {
