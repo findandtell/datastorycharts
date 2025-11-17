@@ -200,10 +200,22 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
   // Sync emphasizedBars with selectedBarsForComparison for percentage change brackets
   // ONLY on initial load when selectedBarsForComparison is empty
   useEffect(() => {
+    console.log('[BarChart] 🔄 Auto-population useEffect triggered');
+    console.log('  - selectedBarsForComparison.length:', selectedBarsForComparison.length);
+    console.log('  - percentChangeEnabled:', percentChangeEnabled);
+    console.log('  - emphasizedBars:', emphasizedBars);
+    console.log('  - emphasizedBars.length:', emphasizedBars?.length);
+    console.log('  - data exists:', !!data);
+    console.log('  - periodNames exists:', !!periodNames);
+
     // Don't override if user has already selected bars manually
-    if (selectedBarsForComparison.length > 0) return;
+    if (selectedBarsForComparison.length > 0) {
+      console.log('[BarChart] ⏭️ Skipping auto-population - bars already selected');
+      return;
+    }
 
     if (percentChangeEnabled && emphasizedBars && emphasizedBars.length >= 2 && data && periodNames) {
+      console.log('[BarChart] ✅ All conditions met - proceeding with auto-population');
       // Convert emphasizedBars (array of barIds like "Google Ads-Jan") into bar data objects
       const barsForComparison = emphasizedBars.slice(0, 2).map(barId => {
         // Parse barId format: "Category-Period"
@@ -213,10 +225,16 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
 
         // Find the data row for this category
         const dataRow = data.find(row => row.Category === category);
-        if (!dataRow) return null;
+        if (!dataRow) {
+          console.log('[BarChart] ⚠️ Could not find data row for category:', category);
+          return null;
+        }
 
         const value = dataRow[period];
-        if (value === undefined) return null;
+        if (value === undefined) {
+          console.log('[BarChart] ⚠️ Could not find value for period:', period, 'in category:', category);
+          return null;
+        }
 
         return {
           barId,
@@ -226,10 +244,21 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         };
       }).filter(Boolean);
 
+      console.log('[BarChart] 📊 Converted barsForComparison:', barsForComparison);
+
       if (barsForComparison.length >= 2) {
-        console.log('[BarChart] Auto-populating selectedBarsForComparison from emphasizedBars on initial load:', barsForComparison);
+        console.log('[BarChart] ✨ Auto-populating selectedBarsForComparison from emphasizedBars on initial load:', barsForComparison);
         setSelectedBarsForComparison(barsForComparison);
+      } else {
+        console.log('[BarChart] ❌ Not enough valid bars for comparison. Length:', barsForComparison.length);
       }
+    } else {
+      console.log('[BarChart] ❌ Conditions not met for auto-population:');
+      console.log('    percentChangeEnabled:', percentChangeEnabled);
+      console.log('    emphasizedBars:', emphasizedBars);
+      console.log('    emphasizedBars.length >= 2:', emphasizedBars?.length >= 2);
+      console.log('    data exists:', !!data);
+      console.log('    periodNames exists:', !!periodNames);
     }
   }, [emphasizedBars, percentChangeEnabled, data, periodNames, selectedBarsForComparison.length]);
 
