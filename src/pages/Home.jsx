@@ -18,12 +18,11 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
   };
 
   return (
-    <object
-      data={imageSrc}
-      type="image/svg+xml"
-      className="pointer-events-none w-full h-full object-contain"
-      style={{ objectFit: 'contain' }}
-      aria-label={alt}
+    <img
+      src={imageSrc}
+      alt={alt}
+      className="pointer-events-none max-w-full max-h-full object-contain"
+      style={{ maxWidth: '100%', maxHeight: '100%' }}
       onError={handleError}
     />
   );
