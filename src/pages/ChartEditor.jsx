@@ -140,6 +140,41 @@ export default function ChartEditor() {
     }
   }, [license.hasAccess, styleSettings.setUserTier]);
 
+  // Auto-load default configuration on mount (if available)
+  useEffect(() => {
+    const loadDefaultOnMount = async () => {
+      try {
+        const configuration = await admin.loadDefault(chartType);
+
+        if (configuration) {
+          console.log('[ChartEditor] Loading default configuration for', chartType);
+
+          // Apply loaded configuration
+          if (configuration.data && configuration.periodNames) {
+            chartData.loadSnapshotData(configuration.data, configuration.periodNames);
+          }
+
+          if (configuration.styleSettings) {
+            styleSettings.loadSettings(configuration.styleSettings);
+          }
+        }
+      } catch (error) {
+        // Silently fail - defaults are optional
+        console.log('[ChartEditor] No default configuration found for', chartType);
+      }
+    };
+
+    // Only load defaults if we're not loading from other sources
+    // Check URL params for sheetsUrl, imported chart, etc.
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSheetsUrl = urlParams.has('sheetsUrl');
+    const hasImportedChart = sessionStorage.getItem('importedChart');
+
+    if (!hasSheetsUrl && !hasImportedChart) {
+      loadDefaultOnMount();
+    }
+  }, [chartType]); // Only run when chartType changes
+
   // Refs for resize state to avoid stale closures
   const resizeStateRef = useRef({
     isResizing: false,
