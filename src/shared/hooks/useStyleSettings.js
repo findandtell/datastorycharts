@@ -113,9 +113,15 @@ export const useStyleSettings = (initialTheme = theme) => {
   const [axisMaximumAuto, setAxisMaximumAuto] = useState(true);
 
   // Percent Change Emphasis
-  const [percentChangeEnabled, setPercentChangeEnabled] = useState(false);
+  const [percentChangeEnabled, _setPercentChangeEnabled] = useState(false);
   const [percentChangeLabelFormat, setPercentChangeLabelFormat] = useState('percent'); // 'percent' or 'percent-volume'
   const [percentChangeBracketDistance, setPercentChangeBracketDistance] = useState(100); // 0-100, controls how far brackets extend from bars
+
+  // Wrapped setter with logging to track ALL calls to setPercentChangeEnabled
+  const setPercentChangeEnabled = useCallback((value) => {
+    console.log('[setPercentChangeEnabled] ⚡ CALLED with value:', value, '(current:', percentChangeEnabled, ')');
+    _setPercentChangeEnabled(value);
+  }, [percentChangeEnabled]);
   const [axisMajorUnit, setAxisMajorUnit] = useState(10000);
   const [axisMajorUnitAuto, setAxisMajorUnitAuto] = useState(true);
   const [axisMinorUnit, setAxisMinorUnit] = useState(5);
