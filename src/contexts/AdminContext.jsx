@@ -80,6 +80,11 @@ export const AdminProvider = ({ children }) => {
     const response = await fetch(`/api/admin/get-default?chartType=${chartType}`);
     const data = await response.json();
 
+    // Debug logging
+    console.log('[AdminContext loadDefault] Raw response data:', data);
+    console.log('[AdminContext loadDefault] configuration:', data.configuration);
+    console.log('[AdminContext loadDefault] emphasizedBars:', data.configuration?.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+
     if (!response.ok || !data.success) {
       // Not found is okay - means no default is set yet
       if (response.status === 404) {
