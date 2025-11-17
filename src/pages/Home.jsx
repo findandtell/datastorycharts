@@ -6,14 +6,25 @@ import { useNavigate } from 'react-router-dom';
  * Tries to load custom default thumbnail first, falls back to static image
  */
 const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
-  const [imageSrc, setImageSrc] = useState(`/api/admin/get-thumbnail?chartType=${chartKey}`);
+  // Add cache buster to force reload of thumbnails
+  const [imageSrc, setImageSrc] = useState(`/api/admin/get-thumbnail?chartType=${chartKey}&t=${Date.now()}`);
   const [useDefault, setUseDefault] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
-  const handleError = () => {
+  const handleError = (e) => {
+    console.log(`[ChartThumbnail] Error loading thumbnail for ${chartKey}:`, e);
     if (useDefault) {
       // Default thumbnail not found, fall back to static image
+      console.log(`[ChartThumbnail] Falling back to static image: ${fallbackImage}`);
       setImageSrc(fallbackImage);
       setUseDefault(false);
+      setHasError(true);
+    }
+  };
+
+  const handleLoad = () => {
+    if (useDefault) {
+      console.log(`[ChartThumbnail] Successfully loaded default thumbnail for ${chartKey}`);
     }
   };
 
@@ -31,6 +42,7 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
           objectFit: 'contain'
         }}
         onError={handleError}
+        onLoad={handleLoad}
       />
     </div>
   );
