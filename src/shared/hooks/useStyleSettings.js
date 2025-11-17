@@ -293,6 +293,11 @@ export const useStyleSettings = (initialTheme = theme) => {
    * Export settings as JSON (complete structure for cross-chart compatibility)
    */
   const exportSettings = useCallback(() => {
+    // Debug logging
+    console.log('[exportSettings] emphasizedBars state value:', emphasizedBars);
+    console.log('[exportSettings] percentChangeBracketDistance state value:', percentChangeBracketDistance);
+    console.log('[exportSettings] percentChangeEnabled state value:', percentChangeEnabled);
+
     return {
       styleVersion: "1.0",
       appVersion: "2.0.0",
