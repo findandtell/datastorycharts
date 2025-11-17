@@ -42,8 +42,11 @@ export const AdminProvider = ({ children }) => {
 
   /**
    * Save default chart configuration
+   * @param {string} chartType - The type of chart (e.g., 'line', 'bar-vertical')
+   * @param {object} configuration - The chart configuration object
+   * @param {string} svgThumbnail - Optional SVG string for gallery thumbnail
    */
-  const saveDefault = useCallback(async (chartType, configuration) => {
+  const saveDefault = useCallback(async (chartType, configuration, svgThumbnail = null) => {
     if (!adminToken) {
       throw new Error('Not authenticated as admin');
     }
@@ -56,7 +59,8 @@ export const AdminProvider = ({ children }) => {
       },
       body: JSON.stringify({
         chartType,
-        configuration
+        configuration,
+        svgThumbnail
       })
     });
 

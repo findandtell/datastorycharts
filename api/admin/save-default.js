@@ -53,8 +53,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get chart type and configuration from request
-    const { chartType, configuration } = req.body;
+    // Get chart type, configuration, and optional SVG thumbnail from request
+    const { chartType, configuration, svgThumbnail } = req.body;
 
     // Validate input
     if (!chartType || typeof chartType !== 'string') {
@@ -72,18 +72,25 @@ export default async function handler(req, res) {
     }
 
     // Save configuration to Vercel KV
-    const key = `default:${chartType}`;
-    await kv.set(key, {
+    const configKey = `default:${chartType}`;
+    await kv.set(configKey, {
       chartType,
       configuration,
       updatedAt: new Date().toISOString(),
       updatedBy: 'admin'
     });
 
+    // If SVG thumbnail provided, save it separately for fast gallery loading
+    if (svgThumbnail && typeof svgThumbnail === 'string') {
+      const thumbnailKey = `default:thumbnail:${chartType}`;
+      await kv.set(thumbnailKey, svgThumbnail);
+    }
+
     res.status(200).json({
       success: true,
       message: `Default configuration saved for ${chartType}`,
-      chartType
+      chartType,
+      thumbnailSaved: !!svgThumbnail
     });
 
   } catch (error) {

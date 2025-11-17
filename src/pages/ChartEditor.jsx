@@ -841,7 +841,14 @@ export default function ChartEditor() {
         styleSettings: styleSettings.exportSettings(), // Use exportSettings() method to get complete config
       };
 
-      await admin.saveDefault(chartType, configuration);
+      // Capture the chart SVG for gallery thumbnail
+      let svgThumbnail = null;
+      const svgElement = svgRef.current?.querySelector('svg');
+      if (svgElement) {
+        svgThumbnail = new XMLSerializer().serializeToString(svgElement);
+      }
+
+      await admin.saveDefault(chartType, configuration, svgThumbnail);
     } catch (error) {
       console.error('[ChartEditor] Error saving default:', error);
       throw error;

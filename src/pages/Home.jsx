@@ -1,5 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+/**
+ * Chart Thumbnail Component
+ * Tries to load custom default thumbnail first, falls back to static image
+ */
+const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
+  const [imageSrc, setImageSrc] = useState(`/api/admin/get-thumbnail?chartType=${chartKey}`);
+  const [useDefault, setUseDefault] = useState(true);
+
+  const handleError = () => {
+    if (useDefault) {
+      // Default thumbnail not found, fall back to static image
+      setImageSrc(fallbackImage);
+      setUseDefault(false);
+    }
+  };
+
+  return (
+    <object
+      data={imageSrc}
+      type="image/svg+xml"
+      className="pointer-events-none w-full h-full"
+      aria-label={alt}
+      onError={handleError}
+    />
+  );
+};
 
 /**
  * Home Page - Chart Gallery
@@ -99,11 +126,10 @@ export default function Home() {
     >
       {/* Chart Preview Image */}
       <div className="bg-white border-b border-gray-200 relative h-48 overflow-hidden">
-        <object
-          data={chart.image}
-          type="image/svg+xml"
-          className="pointer-events-none w-full h-full"
-          aria-label={`${chart.name} Example`}
+        <ChartThumbnail
+          chartKey={chart.key}
+          fallbackImage={chart.image}
+          alt={`${chart.name} Example`}
         />
       </div>
 
