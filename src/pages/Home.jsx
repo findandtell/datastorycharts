@@ -21,8 +21,8 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
     <img
       src={imageSrc}
       alt={alt}
-      className="pointer-events-none max-w-full max-h-full object-contain"
-      style={{ maxWidth: '100%', maxHeight: '100%' }}
+      className="pointer-events-none w-auto h-auto object-contain"
+      style={{ maxWidth: '100%', maxHeight: '160px' }}
       onError={handleError}
     />
   );
