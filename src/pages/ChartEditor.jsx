@@ -155,7 +155,7 @@ export default function ChartEditor() {
           }
 
           if (configuration.styleSettings) {
-            styleSettings.loadSettings(configuration.styleSettings);
+            styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
           }
         }
       } catch (error) {
@@ -838,7 +838,7 @@ export default function ChartEditor() {
       const configuration = {
         data: chartData.editableData,
         periodNames: chartData.periodNames,
-        styleSettings: styleSettings.settings,
+        styleSettings: styleSettings.exportSettings(), // Use exportSettings() method to get complete config
       };
 
       await admin.saveDefault(chartType, configuration);
@@ -863,7 +863,7 @@ export default function ChartEditor() {
       }
 
       if (configuration.styleSettings) {
-        styleSettings.loadSettings(configuration.styleSettings);
+        styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
       }
 
       return true; // Successfully loaded
