@@ -95,6 +95,9 @@ export default function ChartEditor() {
   const [isAdminSaving, setIsAdminSaving] = useState(false);
   const [isAdminLoading, setIsAdminLoading] = useState(false);
 
+  // Track whether a default configuration was loaded from the database
+  const [hasLoadedDefaultFromDB, setHasLoadedDefaultFromDB] = useState(false);
+
   // Ref to track if we're currently loading a style preset
   const isLoadingPresetRef = useRef(false);
   const [expandedSections, setExpandedSections] = useState({
@@ -146,6 +149,9 @@ export default function ChartEditor() {
 
   // Auto-load default configuration on mount (if available)
   useEffect(() => {
+    // Reset flag at the start so each chart type gets a fresh check
+    setHasLoadedDefaultFromDB(false);
+
     const loadDefaultOnMount = async () => {
       try {
         const configuration = await admin.loadDefault(chartType);
@@ -192,10 +198,16 @@ export default function ChartEditor() {
               console.log('[AutoLoad] After manual set - percentChangeEnabled:', styleSettings.percentChangeEnabled);
             }, 100);
           }
+
+          // Mark that we've successfully loaded a default from the database
+          // This prevents the sample data loading useEffect from overwriting it
+          setHasLoadedDefaultFromDB(true);
         }
       } catch (error) {
         // Silently fail - defaults are optional
         console.log('[ChartEditor] No default configuration found for', chartType);
+        // No default found, so allow sample data loading to proceed
+        setHasLoadedDefaultFromDB(false);
       }
     };
 
@@ -581,6 +593,13 @@ export default function ChartEditor() {
       needsNewData = true;
     }
 
+    // IMPORTANT: Don't load sample data if we've loaded a default from the database
+    // This prevents the sample data from overwriting the admin-saved defaults
+    if (hasLoadedDefaultFromDB) {
+      console.log('[SampleData] Skipping sample data load - default loaded from database');
+      return;
+    }
+
     if (needsNewData) {
       // Load appropriate sample data based on chart type from registry
       const chartConfig = getChart(chartType);
@@ -671,7 +690,7 @@ export default function ChartEditor() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartType]);
+  }, [chartType, hasLoadedDefaultFromDB]);
 
   // Set initial chart size based on viewport dimensions (only on mount)
   useEffect(() => {
@@ -987,6 +1006,10 @@ export default function ChartEditor() {
         console.log('[LoadDefault] After import - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
         console.log('[LoadDefault] After import - percentChangeEnabled:', styleSettings.percentChangeEnabled);
       }
+
+      // Mark that we've loaded a default from the database
+      // This prevents the sample data loading useEffect from overwriting it
+      setHasLoadedDefaultFromDB(true);
 
       return true; // Successfully loaded
     } catch (error) {
