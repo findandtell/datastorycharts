@@ -21,7 +21,7 @@ import LineChart from '../charts/LineChart/LineChart';
 import SnapshotGallery from '../components/SnapshotGallery';
 import SnapshotModal from '../components/SnapshotModal';
 import SpreadsheetDataTable from '../components/SpreadsheetDataTable';
-import AdminControls from '../components/AdminControls';
+import AdminLogin from '../components/AdminLogin';
 import { useAdmin } from '../contexts/AdminContext';
 import { getSectionOrder, getSectionMetadata } from '../config/chartStylingConfig';
 import {
@@ -90,6 +90,10 @@ export default function ChartEditor() {
   const [googleSheetsError, setGoogleSheetsError] = useState('');
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(5); // minutes
+  const [showAdminLoginModal, setShowAdminLoginModal] = useState(false);
+  const [adminMessage, setAdminMessage] = useState('');
+  const [isAdminSaving, setIsAdminSaving] = useState(false);
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
 
   // Ref to track if we're currently loading a style preset
   const isLoadingPresetRef = useRef(false);
@@ -924,6 +928,41 @@ export default function ChartEditor() {
     } catch (error) {
       console.error('[ChartEditor] Error loading default:', error);
       throw error;
+    }
+  };
+
+  // Admin menu handlers with loading states
+  const handleAdminSaveDefault = async () => {
+    setIsAdminSaving(true);
+    setAdminMessage('');
+    try {
+      await handleSaveAsDefault();
+      setAdminMessage('Default saved successfully!');
+      setTimeout(() => setAdminMessage(''), 3000);
+    } catch (error) {
+      setAdminMessage(`Error: ${error.message}`);
+      setTimeout(() => setAdminMessage(''), 5000);
+    } finally {
+      setIsAdminSaving(false);
+    }
+  };
+
+  const handleAdminLoadDefault = async () => {
+    setIsAdminLoading(true);
+    setAdminMessage('');
+    try {
+      const loaded = await handleLoadDefault();
+      if (loaded) {
+        setAdminMessage('Default loaded successfully!');
+      } else {
+        setAdminMessage('No default configuration found');
+      }
+      setTimeout(() => setAdminMessage(''), 3000);
+    } catch (error) {
+      setAdminMessage(`Error: ${error.message}`);
+      setTimeout(() => setAdminMessage(''), 5000);
+    } finally {
+      setIsAdminLoading(false);
     }
   };
 
@@ -2252,6 +2291,53 @@ export default function ChartEditor() {
                       <div className="px-4 py-2">
                         <div className="text-xs text-gray-400 text-center">Beta Release 1.0.0</div>
                       </div>
+
+                      {/* Admin Controls */}
+                      {!admin.isAdmin ? (
+                        <div className="border-t border-gray-200 pt-2">
+                          <button
+                            onClick={() => setShowAdminLoginModal(true)}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                          >
+                            Admin Login
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="border-t border-gray-200 pt-2">
+                          <div className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 mb-1">
+                            Admin Mode
+                          </div>
+                          <button
+                            onClick={handleAdminLoadDefault}
+                            disabled={isAdminLoading}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded disabled:opacity-50"
+                          >
+                            {isAdminLoading ? 'Loading...' : 'Load Default'}
+                          </button>
+                          <button
+                            onClick={handleAdminSaveDefault}
+                            disabled={isAdminSaving}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded disabled:opacity-50"
+                          >
+                            {isAdminSaving ? 'Saving...' : 'Save as Default'}
+                          </button>
+                          <button
+                            onClick={admin.logout}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                          >
+                            Logout
+                          </button>
+                          {adminMessage && (
+                            <div className={`mx-3 my-2 px-2 py-1 text-xs rounded ${
+                              adminMessage.includes('Error')
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-green-50 text-green-700'
+                            }`}>
+                              {adminMessage}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2340,13 +2426,6 @@ export default function ChartEditor() {
                 accept=".json"
                 onChange={handleChartFileChange}
                 className="hidden"
-              />
-
-              {/* Admin Controls */}
-              <AdminControls
-                chartType={chartType}
-                onSaveDefault={handleSaveAsDefault}
-                onLoadDefault={handleLoadDefault}
               />
 
               {/* Export - In Figma mode: direct button, otherwise dropdown */}
@@ -2759,6 +2838,9 @@ export default function ChartEditor() {
           hasPrevious={snapshots.findIndex(s => s.id === selectedSnapshot.id) > 0}
         />
       )}
+
+      {/* Admin Login Modal */}
+      <AdminLogin isOpen={showAdminLoginModal} onClose={() => setShowAdminLoginModal(false)} />
 
       {/* Transparent Overlay During Resize - Captures all mouse events */}
       {isResizingWindow && (
