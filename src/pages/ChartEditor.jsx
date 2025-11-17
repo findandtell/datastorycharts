@@ -95,11 +95,12 @@ export default function ChartEditor() {
   const [isAdminSaving, setIsAdminSaving] = useState(false);
   const [isAdminLoading, setIsAdminLoading] = useState(false);
 
-  // Track whether a default configuration was loaded from the database
-  const [hasLoadedDefaultFromDB, setHasLoadedDefaultFromDB] = useState(false);
-
   // Ref to track if we're currently loading a style preset
   const isLoadingPresetRef = useRef(false);
+
+  // Ref to track whether a default configuration was loaded from the database
+  // Using ref instead of state to avoid triggering re-renders
+  const hasLoadedDefaultFromDB = useRef(false);
   const [expandedSections, setExpandedSections] = useState({
     theme: false,
     chartStructure: false,
@@ -149,8 +150,20 @@ export default function ChartEditor() {
 
   // Auto-load default configuration on mount (if available)
   useEffect(() => {
-    // Reset flag at the start so each chart type gets a fresh check
-    setHasLoadedDefaultFromDB(false);
+    // Only try to load defaults if we're not loading from other sources
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSheetsUrl = urlParams.has('sheetsUrl');
+    const hasImportedChart = sessionStorage.getItem('importedChart');
+
+    if (hasSheetsUrl || hasImportedChart) {
+      // Not loading from defaults, allow sample data to load
+      hasLoadedDefaultFromDB.current = false;
+      return;
+    }
+
+    // Set flag IMMEDIATELY (before async call) to block sample data loading
+    // We'll clear it if no default is found
+    hasLoadedDefaultFromDB.current = true;
 
     const loadDefaultOnMount = async () => {
       try {
@@ -199,27 +212,22 @@ export default function ChartEditor() {
             }, 100);
           }
 
-          // Mark that we've successfully loaded a default from the database
-          // This prevents the sample data loading useEffect from overwriting it
-          setHasLoadedDefaultFromDB(true);
+          // Flag is already set to true above (before async call)
+          // Keep it true to prevent sample data from loading
+        } else {
+          // No configuration found, clear flag to allow sample data loading
+          console.log('[ChartEditor] No default configuration found for', chartType);
+          hasLoadedDefaultFromDB.current = false;
         }
       } catch (error) {
         // Silently fail - defaults are optional
-        console.log('[ChartEditor] No default configuration found for', chartType);
+        console.log('[ChartEditor] Error loading default for', chartType, error);
         // No default found, so allow sample data loading to proceed
-        setHasLoadedDefaultFromDB(false);
+        hasLoadedDefaultFromDB.current = false;
       }
     };
 
-    // Only load defaults if we're not loading from other sources
-    // Check URL params for sheetsUrl, imported chart, etc.
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasSheetsUrl = urlParams.has('sheetsUrl');
-    const hasImportedChart = sessionStorage.getItem('importedChart');
-
-    if (!hasSheetsUrl && !hasImportedChart) {
-      loadDefaultOnMount();
-    }
+    loadDefaultOnMount();
   }, [chartType]); // Only run when chartType changes
 
   // Refs for resize state to avoid stale closures
@@ -593,9 +601,9 @@ export default function ChartEditor() {
       needsNewData = true;
     }
 
-    // IMPORTANT: Don't load sample data if we've loaded a default from the database
+    // IMPORTANT: Don't load sample data if we've loaded (or are loading) a default from the database
     // This prevents the sample data from overwriting the admin-saved defaults
-    if (hasLoadedDefaultFromDB) {
+    if (hasLoadedDefaultFromDB.current) {
       console.log('[SampleData] Skipping sample data load - default loaded from database');
       return;
     }
@@ -690,7 +698,7 @@ export default function ChartEditor() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartType, hasLoadedDefaultFromDB]);
+  }, [chartType]);
 
   // Set initial chart size based on viewport dimensions (only on mount)
   useEffect(() => {
@@ -1009,7 +1017,7 @@ export default function ChartEditor() {
 
       // Mark that we've loaded a default from the database
       // This prevents the sample data loading useEffect from overwriting it
-      setHasLoadedDefaultFromDB(true);
+      hasLoadedDefaultFromDB.current = true;
 
       return true; // Successfully loaded
     } catch (error) {
