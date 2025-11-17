@@ -831,6 +831,40 @@ export default function ChartEditor() {
     setShowExportMenu(false);
   };
 
+  // Helper function to create a properly sized thumbnail SVG
+  const createThumbnailSVG = (svgElement) => {
+    if (!svgElement) return null;
+
+    // Get the original SVG string
+    const svgString = new XMLSerializer().serializeToString(svgElement);
+
+    // Extract width and height from the SVG
+    const widthMatch = svgString.match(/width="([^"]+)"/);
+    const heightMatch = svgString.match(/height="([^"]+)"/);
+
+    if (!widthMatch || !heightMatch) return svgString;
+
+    const originalWidth = parseFloat(widthMatch[1]);
+    const originalHeight = parseFloat(heightMatch[1]);
+
+    // Calculate thumbnail dimensions (max 400px wide, maintain aspect ratio)
+    const maxWidth = 400;
+    const aspectRatio = originalHeight / originalWidth;
+    const thumbnailWidth = Math.min(maxWidth, originalWidth);
+    const thumbnailHeight = thumbnailWidth * aspectRatio;
+
+    // Create viewBox from original dimensions
+    const viewBox = `0 0 ${originalWidth} ${originalHeight}`;
+
+    // Replace the SVG tag with properly sized thumbnail version
+    const thumbnailSVG = svgString.replace(
+      /<svg([^>]*)>/,
+      `<svg width="${thumbnailWidth}" height="${thumbnailHeight}" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet">`
+    );
+
+    return thumbnailSVG;
+  };
+
   // Handle Save as Default (Admin only)
   const handleSaveAsDefault = async () => {
     try {
@@ -841,11 +875,11 @@ export default function ChartEditor() {
         styleSettings: styleSettings.exportSettings(), // Use exportSettings() method to get complete config
       };
 
-      // Capture the chart SVG for gallery thumbnail
+      // Create a properly sized thumbnail SVG for the gallery
       let svgThumbnail = null;
       const svgElement = svgRef.current?.querySelector('svg');
       if (svgElement) {
-        svgThumbnail = new XMLSerializer().serializeToString(svgElement);
+        svgThumbnail = createThumbnailSVG(svgElement);
       }
 
       await admin.saveDefault(chartType, configuration, svgThumbnail);
