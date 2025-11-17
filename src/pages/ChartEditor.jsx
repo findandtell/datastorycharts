@@ -101,10 +101,6 @@ export default function ChartEditor() {
   // Ref to track whether a default configuration was loaded from the database
   // Using ref instead of state to avoid triggering re-renders
   const hasLoadedDefaultFromDB = useRef(false);
-
-  // State to track if we're loading defaults (prevents initial render blink)
-  const [isLoadingDefaults, setIsLoadingDefaults] = useState(true);
-
   const [expandedSections, setExpandedSections] = useState({
     theme: false,
     chartStructure: false,
@@ -154,9 +150,6 @@ export default function ChartEditor() {
 
   // Auto-load default configuration on mount (if available)
   useEffect(() => {
-    // Start loading state
-    setIsLoadingDefaults(true);
-
     // Only try to load defaults if we're not loading from other sources
     const urlParams = new URLSearchParams(window.location.search);
     const hasSheetsUrl = urlParams.has('sheetsUrl');
@@ -165,7 +158,6 @@ export default function ChartEditor() {
     if (hasSheetsUrl || hasImportedChart) {
       // Not loading from defaults, allow sample data to load
       hasLoadedDefaultFromDB.current = false;
-      setIsLoadingDefaults(false);
       return;
     }
 
@@ -217,15 +209,9 @@ export default function ChartEditor() {
                   console.log('[AutoLoad] After manual set - emphasizedBars:', styleSettings.emphasizedBars);
                   console.log('[AutoLoad] After manual set - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
                   console.log('[AutoLoad] After manual set - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-
-                  // End loading state after everything is applied
-                  setIsLoadingDefaults(false);
                 }, 100);
               }
             }, 0);
-          } else {
-            // No setTimeout needed, end loading immediately
-            setIsLoadingDefaults(false);
           }
 
           // Flag is already set to true above (before async call)
@@ -234,14 +220,12 @@ export default function ChartEditor() {
           // No configuration found, clear flag to allow sample data loading
           console.log('[ChartEditor] No default configuration found for', chartType);
           hasLoadedDefaultFromDB.current = false;
-          setIsLoadingDefaults(false);
         }
       } catch (error) {
         // Silently fail - defaults are optional
         console.log('[ChartEditor] Error loading default for', chartType, error);
         // No default found, so allow sample data loading to proceed
         hasLoadedDefaultFromDB.current = false;
-        setIsLoadingDefaults(false);
       }
     };
 
@@ -852,18 +836,6 @@ export default function ChartEditor() {
           >
             Back to Gallery
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading state while defaults are being loaded (prevents initial blink)
-  if (isLoadingDefaults) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading chart...</p>
         </div>
       </div>
     );
