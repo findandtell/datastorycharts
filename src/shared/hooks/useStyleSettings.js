@@ -581,6 +581,8 @@ export const useStyleSettings = (initialTheme = theme) => {
 
     // Display (universal - applies to all charts)
     if (settings.display) {
+      console.log('[importSettings] display.percentChangeEnabled value:', settings.display.percentChangeEnabled);
+
       if (settings.display.emphasis !== undefined) setEmphasis(settings.display.emphasis);
       if (settings.display.metricEmphasis !== undefined) setMetricEmphasis(settings.display.metricEmphasis);
       if (settings.display.normalizeToHundred !== undefined) setNormalizeToHundred(settings.display.normalizeToHundred);
@@ -590,7 +592,14 @@ export const useStyleSettings = (initialTheme = theme) => {
       if (settings.display.showSparklines !== undefined) setShowSparklines(settings.display.showSparklines);
       if (settings.display.sparklineType !== undefined) setSparklineType(settings.display.sparklineType);
       if (settings.display.userTier !== undefined) setUserTier(settings.display.userTier);
-      if (settings.display.percentChangeEnabled !== undefined) setPercentChangeEnabled(settings.display.percentChangeEnabled);
+
+      if (settings.display.percentChangeEnabled !== undefined) {
+        console.log('[importSettings] Calling setPercentChangeEnabled with:', settings.display.percentChangeEnabled);
+        setPercentChangeEnabled(settings.display.percentChangeEnabled);
+      } else {
+        console.log('[importSettings] percentChangeEnabled is undefined, not setting');
+      }
+
       if (settings.display.percentChangeLabelFormat !== undefined) setPercentChangeLabelFormat(settings.display.percentChangeLabelFormat);
     }
 
@@ -625,10 +634,17 @@ export const useStyleSettings = (initialTheme = theme) => {
       // Check for bar charts (all variants: bar-horizontal, bar-vertical, bar-grouped-horizontal, bar-grouped-vertical)
       else if (currentChartType.startsWith('bar') && settings.chartSpecific.bar) {
         const barSettings = settings.chartSpecific.bar;
+        console.log('[importSettings] bar.emphasizedBars value:', barSettings.emphasizedBars);
+        console.log('[importSettings] bar.percentChangeBracketDistance value:', barSettings.percentChangeBracketDistance);
+
         if (barSettings.barMode !== undefined) setBarMode(barSettings.barMode);
         if (barSettings.labelMode !== undefined) setLabelMode(barSettings.labelMode);
         if (barSettings.directLabelContent !== undefined) setDirectLabelContent(barSettings.directLabelContent);
-        if (barSettings.emphasizedBars !== undefined) setEmphasizedBars(barSettings.emphasizedBars);
+
+        if (barSettings.emphasizedBars !== undefined) {
+          console.log('[importSettings] Calling setEmphasizedBars with:', barSettings.emphasizedBars);
+          setEmphasizedBars(barSettings.emphasizedBars);
+        }
         if (barSettings.xAxisFontSize !== undefined) setXAxisFontSize(barSettings.xAxisFontSize);
         if (barSettings.yAxisFontSize !== undefined) setYAxisFontSize(barSettings.yAxisFontSize);
         if (barSettings.axisLabel !== undefined) setAxisLabel(barSettings.axisLabel);
