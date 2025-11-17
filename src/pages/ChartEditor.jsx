@@ -152,6 +152,9 @@ export default function ChartEditor() {
 
         if (configuration) {
           console.log('[ChartEditor] Loading default configuration for', chartType);
+          console.log('[AutoLoad] emphasizedBars from config:', configuration.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+          console.log('[AutoLoad] percentChangeBracketDistance from config:', configuration.styleSettings?.chartSpecific?.bar?.percentChangeBracketDistance);
+          console.log('[AutoLoad] percentChangeEnabled from config:', configuration.styleSettings?.display?.percentChangeEnabled);
 
           // Apply loaded configuration
           if (configuration.data && configuration.periodNames) {
@@ -159,7 +162,15 @@ export default function ChartEditor() {
           }
 
           if (configuration.styleSettings) {
+            console.log('[AutoLoad] Before import - emphasizedBars:', styleSettings.emphasizedBars);
             styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
+
+            // Wait a tick for state to update, then log
+            setTimeout(() => {
+              console.log('[AutoLoad] After import - emphasizedBars:', styleSettings.emphasizedBars);
+              console.log('[AutoLoad] After import - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
+              console.log('[AutoLoad] After import - percentChangeEnabled:', styleSettings.percentChangeEnabled);
+            }, 100);
           }
         }
       } catch (error) {
