@@ -20,6 +20,9 @@ import BarChart from '../charts/BarChart/BarChart';
 import LineChart from '../charts/LineChart/LineChart';
 import SnapshotGallery from '../components/SnapshotGallery';
 import SnapshotModal from '../components/SnapshotModal';
+import SpreadsheetDataTable from '../components/SpreadsheetDataTable';
+import AdminControls from '../components/AdminControls';
+import { useAdmin } from '../contexts/AdminContext';
 import { getSectionOrder, getSectionMetadata } from '../config/chartStylingConfig';
 import {
   ChevronDownIcon,
@@ -110,10 +113,17 @@ export default function ChartEditor() {
   });
 
   const chartData = useChartData(chartType);
+
+  // Create a serialized version of hiddenPeriods for forcing re-renders
+  const hiddenPeriodsKey = useMemo(() => {
+    return Array.from(chartData.hiddenPeriods || []).sort().join(',');
+  }, [chartData.hiddenPeriods]);
+
   const styleSettings = useStyleSettings();
   const addon = useAddonMode();
   const figma = useFigmaMode();
   const license = useLicense();
+  const admin = useAdmin();
   const svgRef = useRef(null);
   const exportMenuRef = useRef(null);
   const hamburgerMenuRef = useRef(null);
@@ -784,6 +794,48 @@ export default function ChartEditor() {
     }
 
     setShowExportMenu(false);
+  };
+
+  // Handle Save as Default (Admin only)
+  const handleSaveAsDefault = async () => {
+    try {
+      // Create configuration object with both data and style settings
+      const configuration = {
+        data: chartData.editableData,
+        periodNames: chartData.periodNames,
+        styleSettings: styleSettings.settings,
+      };
+
+      await admin.saveDefault(chartType, configuration);
+    } catch (error) {
+      console.error('[ChartEditor] Error saving default:', error);
+      throw error;
+    }
+  };
+
+  // Handle Load Default
+  const handleLoadDefault = async () => {
+    try {
+      const configuration = await admin.loadDefault(chartType);
+
+      if (!configuration) {
+        return false; // No default found
+      }
+
+      // Apply loaded configuration
+      if (configuration.data && configuration.periodNames) {
+        chartData.loadSnapshotData(configuration.data, configuration.periodNames);
+      }
+
+      if (configuration.styleSettings) {
+        styleSettings.loadSettings(configuration.styleSettings);
+      }
+
+      return true; // Successfully loaded
+    } catch (error) {
+      console.error('[ChartEditor] Error loading default:', error);
+      throw error;
+    }
   };
 
   // Handle License Activation
@@ -2201,6 +2253,13 @@ export default function ChartEditor() {
                 className="hidden"
               />
 
+              {/* Admin Controls */}
+              <AdminControls
+                chartType={chartType}
+                onSaveDefault={handleSaveAsDefault}
+                onLoadDefault={handleLoadDefault}
+              />
+
               {/* Export - In Figma mode: direct button, otherwise dropdown */}
               {figma.isFigmaMode ? (
                 /* Direct Insert to Figma button - no dropdown needed */
@@ -2252,13 +2311,13 @@ export default function ChartEditor() {
         <div
           className="flex-1 flex items-center justify-center overflow-auto"
           style={{
-            cursor: isPanning ? 'grabbing' : 'grab',
+            cursor: showDataTable ? 'default' : (isPanning ? 'grabbing' : 'grab'),
           }}
           ref={chartContainerRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseDown={showDataTable ? undefined : handleMouseDown}
+          onMouseMove={showDataTable ? undefined : handleMouseMove}
+          onMouseUp={showDataTable ? undefined : handleMouseUp}
+          onMouseLeave={showDataTable ? undefined : handleMouseUp}
         >
           {/* Toggle Controls Button - Top Right */}
           {!showPanel && (
@@ -2356,6 +2415,7 @@ export default function ChartEditor() {
                 >
                   {/* Front: Chart */}
                   <div
+                    key={hiddenPeriodsKey}
                     className="absolute inset-0 bg-white rounded-2xl shadow-lg border border-gray-200 flex items-center justify-center"
                     style={{
                       backfaceVisibility: 'hidden',
@@ -2375,7 +2435,8 @@ export default function ChartEditor() {
                       padding: '20px',
                     }}
                   >
-                    <EditDataTable
+                    {/* Use SpreadsheetDataTable for all chart types */}
+                    <SpreadsheetDataTable
                       chartData={chartData}
                       chartType={chartType}
                       onClose={() => setShowDataTable(false)}

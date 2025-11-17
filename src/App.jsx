@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import ChartEditor from './pages/ChartEditor';
 import GoogleSheetsBanner from './shared/components/GoogleSheetsBanner';
+import { AdminProvider } from './contexts/AdminContext';
 
 /**
  * Main App Component with Routing
@@ -12,12 +13,14 @@ import GoogleSheetsBanner from './shared/components/GoogleSheetsBanner';
  */
 export default function App() {
   return (
-    <Router>
-      <GoogleSheetsBanner />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/chart/:chartType" element={<ChartEditor />} />
-      </Routes>
-    </Router>
+    <AdminProvider>
+      <Router>
+        <GoogleSheetsBanner />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/chart/:chartType" element={<ChartEditor />} />
+        </Routes>
+      </Router>
+    </AdminProvider>
   );
 }

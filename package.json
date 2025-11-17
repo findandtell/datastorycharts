@@ -18,6 +18,9 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
+    "@vercel/kv": "^3.0.0",
+    "ag-grid-community": "^34.3.1",
+    "ag-grid-react": "^34.3.1",
     "d3": "^7.8.5",
     "date-fns": "^4.1.0",
     "papaparse": "^5.4.1",

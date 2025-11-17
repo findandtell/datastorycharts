@@ -1,0 +1,459 @@
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
+
+// Register all AG Grid Community modules
+ModuleRegistry.registerModules([AllCommunityModule]);
+
+/**
+ * Spreadsheet-style Data Table using AG Grid
+ * Provides Excel-like editing experience with copy/paste support
+ */
+function SpreadsheetDataTable({ chartData, chartType, onClose }) {
+  const gridRef = useRef();
+  const [newColumnName, setNewColumnName] = useState('');
+  const [newRowName, setNewRowName] = useState('');
+
+  // Detect chart type labels
+  const isBarChart = chartType?.startsWith('bar-');
+  const isLineChart = chartType === 'line' || chartType === 'area' || chartType === 'area-stacked';
+  const rowLabel = isLineChart ? 'Date' : (isBarChart ? 'Category' : 'Stage');
+  const colLabel = isLineChart ? 'Metric' : (isBarChart ? 'Value' : 'Period');
+
+  // Convert chartData to AG Grid format
+  const rowData = useMemo(() => {
+    return chartData.editableData.map((row, index) => ({
+      _id: index, // Internal ID for row tracking
+      ...row
+    }));
+  }, [chartData.editableData]);
+
+  // Helper function to convert column index to Excel letter (0=A, 1=B, etc.)
+  const getColumnLetter = (index) => {
+    let letter = '';
+    while (index >= 0) {
+      letter = String.fromCharCode((index % 26) + 65) + letter;
+      index = Math.floor(index / 26) - 1;
+    }
+    return letter;
+  };
+
+  // Define columns
+  const columnDefs = useMemo(() => {
+    if (!chartData.editableData || chartData.editableData.length === 0) return [];
+
+    const firstRow = chartData.editableData[0];
+    const fields = Object.keys(firstRow);
+
+    // Add checkbox column at the beginning
+    const checkboxColumn = {
+      headerName: '',
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      width: 50,
+      pinned: 'left',
+      lockPosition: true,
+      suppressMenu: true,
+      filter: false,
+      sortable: false,
+      resizable: false,
+    };
+
+    const dataColumns = fields.map((field, index) => {
+      const isCategory = field === 'Category' || field === 'Stage' || field === 'date';
+      const columnLetter = getColumnLetter(index);
+
+      // Create a column group with letter header at top
+      return {
+        headerName: columnLetter,
+        headerGroupComponent: ColumnLetterHeader,
+        headerGroupComponentParams: {
+          letter: columnLetter,
+          onDelete: () => handleColumnDelete(field),
+          onHide: () => handleColumnHide(field),
+          onSort: (ascending) => handleColumnSort(field, ascending),
+          isCategory: isCategory,
+        },
+        children: [
+          {
+            field: field,
+            headerName: field,
+            editable: true,
+            sortable: true,
+            resizable: true,
+            filter: true,
+            cellClass: isCategory ? 'bg-gray-50 font-medium' : '',
+            minWidth: 120,
+            // Enable copy/paste
+            valueParser: (params) => {
+              // Try to parse as number for numeric columns
+              if (!isCategory && params.newValue) {
+                const num = parseFloat(params.newValue);
+                return isNaN(num) ? params.newValue : num;
+              }
+              return params.newValue;
+            },
+            // Custom header component for editable column name
+            headerComponent: EditableColumnName,
+            headerComponentParams: {
+              onRename: (newName) => handleColumnRename(field, newName),
+              columnName: field,
+              isCategory: isCategory,
+            }
+          }
+        ]
+      };
+    });
+
+    // Return checkbox column + data columns
+    return [checkboxColumn, ...dataColumns];
+  }, [chartData.editableData, chartData]);
+
+  // Handle cell value change
+  const onCellValueChanged = useCallback((event) => {
+    const { data, colDef, newValue } = event;
+    const rowIndex = data._id;
+    const columnName = colDef.field;
+
+    // Update the data through chartData hook
+    chartData.updateDataValue(rowIndex, columnName, newValue);
+  }, [chartData]);
+
+  // Handle column rename
+  const handleColumnRename = (oldName, newName) => {
+    if (newName && newName !== oldName) {
+      chartData.updatePeriodName(oldName, newName);
+    }
+  };
+
+  // Handle column delete
+  const handleColumnDelete = (columnName) => {
+    if (confirm(`Delete column "${columnName}"?`)) {
+      chartData.removePeriod(columnName);
+    }
+  };
+
+  // Handle column hide
+  const handleColumnHide = (columnName) => {
+    chartData.togglePeriodHidden(columnName, true);
+  };
+
+  // Handle column sort
+  const handleColumnSort = (columnName, ascending) => {
+    chartData.sortByPeriod(columnName, ascending);
+  };
+
+  // Handle add new column
+  const handleAddColumn = () => {
+    if (newColumnName.trim()) {
+      chartData.addPeriod(newColumnName.trim());
+      setNewColumnName('');
+    }
+  };
+
+  // Handle add new row
+  const handleAddRow = () => {
+    if (newRowName.trim()) {
+      const stageFieldName = isLineChart ? 'date' : (isBarChart ? 'Category' : 'Stage');
+      chartData.addStage(newRowName.trim(), stageFieldName);
+      setNewRowName('');
+    }
+  };
+
+  // Handle delete row
+  const handleDeleteSelectedRows = () => {
+    const selectedRows = gridRef.current.api.getSelectedRows();
+    if (selectedRows.length > 0) {
+      if (confirm(`Delete ${selectedRows.length} row(s)?`)) {
+        selectedRows.forEach(row => {
+          chartData.removeStage(row._id);
+        });
+      }
+    }
+  };
+
+  // Handle paste from clipboard (Excel support)
+  const onPasteStart = useCallback((params) => {
+    console.log('Paste started', params);
+  }, []);
+
+  const onPasteEnd = useCallback((params) => {
+    console.log('Paste ended', params);
+  }, []);
+
+  // Default column definitions
+  const defaultColDef = useMemo(() => ({
+    editable: true,
+    sortable: true,
+    filter: true,
+    resizable: true,
+    minWidth: 100,
+    flex: 1,
+  }), []);
+
+  // Grid options with clipboard support
+  const gridOptions = {
+    undoRedoCellEditing: true, // Enable undo/redo
+    undoRedoCellEditingLimit: 20,
+    rowSelection: 'multiple', // Allow multiple row selection
+    rowMultiSelectWithClick: true, // Allow selecting multiple rows with Ctrl+Click
+    animateRows: true,
+    enableCellTextSelection: true, // Allow text selection in cells
+    ensureDomOrder: true,
+    // Clipboard configuration for Excel-like copy/paste
+    enableRangeSelection: true, // Enable selecting multiple cells
+    enableRangeHandle: true, // Enable fill handle (drag corner to copy)
+    suppressCopyRowsToClipboard: false, // Allow copying rows
+    suppressCopySingleCellRanges: false, // Allow copying single cells
+    copyHeadersToClipboard: false, // Don't copy headers
+    processCellForClipboard: (params) => params.value, // Process cells for clipboard
+    processCellFromClipboard: (params) => {
+      // Parse pasted values - try to convert to number if possible
+      const value = params.value;
+      if (value === null || value === undefined || value === '') return '';
+      const num = parseFloat(value);
+      return isNaN(num) ? value : num;
+    },
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-gray-900">Edit Data</h2>
+          <button
+            onClick={handleDeleteSelectedRows}
+            className="px-3 py-1.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 flex items-center gap-1"
+            title="Delete selected rows"
+          >
+            🗑️ Delete Selected
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              chartData.applyEdits();
+              onClose();
+            }}
+            className="px-4 py-2 bg-cyan-600 text-white text-sm font-semibold rounded-lg hover:bg-cyan-700"
+          >
+            Apply Changes
+          </button>
+          <button
+            onClick={chartData.resetEdits}
+            className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300"
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Add Column/Row Controls */}
+      <div className="mb-4 flex gap-4">
+        {/* Add Column */}
+        <div className="flex gap-2 flex-1">
+          <input
+            type="text"
+            value={newColumnName}
+            onChange={(e) => setNewColumnName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleAddColumn()}
+            placeholder={`New ${colLabel.toLowerCase()} name...`}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          <button
+            onClick={handleAddColumn}
+            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 whitespace-nowrap"
+          >
+            + {colLabel}
+          </button>
+        </div>
+
+        {/* Add Row */}
+        <div className="flex gap-2 flex-1">
+          <input
+            type="text"
+            value={newRowName}
+            onChange={(e) => setNewRowName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleAddRow()}
+            placeholder={`New ${rowLabel.toLowerCase()} name...`}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+          <button
+            onClick={handleAddRow}
+            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 whitespace-nowrap"
+          >
+            + {rowLabel}
+          </button>
+        </div>
+      </div>
+
+      {/* AG Grid Table */}
+      <div className="flex-1 ag-theme-alpine" style={{ width: '100%', height: '100%' }}>
+        <AgGridReact
+          ref={gridRef}
+          rowData={rowData}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          gridOptions={gridOptions}
+          onCellValueChanged={onCellValueChanged}
+          onPasteStart={onPasteStart}
+          onPasteEnd={onPasteEnd}
+          rowSelection="multiple"
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Column Letter Header Component (Top Row: A, B, C, etc.)
+ * Contains sort arrows and menu with hide/delete controls
+ */
+function ColumnLetterHeader(props) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const handleSort = (ascending) => {
+    props.onSort(ascending);
+    setShowMenu(false);
+  };
+
+  const handleHide = () => {
+    props.onHide();
+    setShowMenu(false);
+  };
+
+  const handleDelete = () => {
+    props.onDelete();
+    setShowMenu(false);
+  };
+
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = () => setShowMenu(false);
+    if (showMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showMenu]);
+
+  // Category columns don't have controls
+  if (props.isCategory) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-100 border-b border-gray-300">
+        <span className="text-xs font-bold text-gray-500">{props.letter}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full bg-gray-50 border-b border-gray-300">
+      <div className="flex items-center justify-between px-2 h-full">
+        <span className="text-xs font-bold text-gray-600">{props.letter}</span>
+
+        {/* Sort Arrows */}
+        <div className="flex flex-col items-center -space-y-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSort(true);
+            }}
+            className="text-gray-400 hover:text-cyan-600 text-xs leading-none"
+            title="Sort Ascending"
+          >
+            ▲
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSort(false);
+            }}
+            className="text-gray-400 hover:text-cyan-600 text-xs leading-none"
+            title="Sort Descending"
+          >
+            ▼
+          </button>
+        </div>
+
+        {/* Menu Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowMenu(!showMenu);
+          }}
+          className="text-gray-500 hover:text-gray-700 px-1 font-bold text-sm"
+          title="Column menu"
+        >
+          ⋮
+        </button>
+      </div>
+
+      {/* Dropdown Menu */}
+      {showMenu && (
+        <div
+          className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-xl z-[9999] min-w-[140px]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={handleHide}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 border-b border-gray-100"
+          >
+            <span className="text-base">👁️</span>
+            <span className="font-medium">Hide</span>
+          </button>
+          <button
+            onClick={handleDelete}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2 font-medium"
+          >
+            <span className="text-base">🗑️</span>
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Editable Column Name Component (Bottom Row)
+ * Allows double-click to rename
+ */
+function EditableColumnName(props) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [headerName, setHeaderName] = useState(props.columnName);
+
+  const handleRename = () => {
+    if (headerName !== props.columnName) {
+      props.onRename(headerName);
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="w-full px-2 py-1">
+      {isEditing ? (
+        <input
+          type="text"
+          value={headerName}
+          onChange={(e) => setHeaderName(e.target.value)}
+          onBlur={handleRename}
+          onKeyPress={(e) => e.key === 'Enter' && handleRename()}
+          className="w-full px-1 py-0.5 text-sm border border-cyan-500 rounded focus:outline-none"
+          autoFocus
+        />
+      ) : (
+        <div
+          className="text-sm font-medium text-gray-700 cursor-pointer hover:text-cyan-600"
+          onDoubleClick={() => setIsEditing(true)}
+          title="Double-click to rename"
+        >
+          {headerName}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default SpreadsheetDataTable;

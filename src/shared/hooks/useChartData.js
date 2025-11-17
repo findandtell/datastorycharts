@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { getSampleDataset, isComparisonDataset } from "../data/sampleDatasets";
 import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtils";
 
@@ -47,6 +47,14 @@ export const useChartData = (chartType = 'funnel') => {
   const [rawCSV, setRawCSV] = useState('');
   const [source, setSource] = useState('sample'); // 'sample', 'csv-upload', 'csv-paste', 'google-sheets'
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('');
+
+  // Automatically filter hidden rows from chart data
+  useEffect(() => {
+    if (editableData && editableData.length > 0) {
+      const visibleData = editableData.filter(row => !row.hidden);
+      setData(structuredClone(visibleData));
+    }
+  }, [editableData]);
 
   /**
    * Detect if data is in flattened grouped-stacked format
@@ -457,11 +465,56 @@ export const useChartData = (chartType = 'funnel') => {
   }, []);
 
   /**
+   * Set period order from an array of period names
+   */
+  const setPeriodOrder = useCallback((newOrder) => {
+    setPeriodNames(newOrder);
+  }, []);
+
+  /**
    * Toggle comparison mode
    */
   const toggleComparisonMode = useCallback(() => {
     setIsComparisonMode((prev) => !prev);
   }, []);
+
+  /**
+   * Transpose data - swap rows and columns
+   */
+  const transposeData = useCallback(() => {
+    if (!editableData || editableData.length === 0) return;
+
+    const firstRow = editableData[0];
+    const categoryField = Object.keys(firstRow).find(
+      key => key === 'Category' || key === 'Stage' || key === 'date'
+    );
+
+    if (!categoryField) return;
+
+    // Get all period/column names (excluding category field and hidden)
+    const periods = Object.keys(firstRow).filter(
+      key => key !== categoryField && key !== 'hidden' && key !== '_id'
+    );
+
+    // Build transposed data
+    const transposedData = periods.map(period => {
+      const newRow = { [categoryField]: period };
+
+      editableData.forEach(row => {
+        const categoryValue = row[categoryField];
+        newRow[categoryValue] = row[period];
+      });
+
+      return newRow;
+    });
+
+    // Update period names to the old category values
+    const newPeriodNames = editableData.map(row => row[categoryField]);
+
+    // Update both editableData and periodNames
+    setEditableData(transposedData);
+    setPeriodNames(newPeriodNames);
+  }, [editableData]);
 
   /**
    * Apply edited data to main data (filtering out hidden rows)
@@ -589,9 +642,11 @@ export const useChartData = (chartType = 'funnel') => {
     addStage,
     removeStage,
     reorderPeriods,
+    setPeriodOrder,
     reorderStages,
     sortByPeriod,
     toggleComparisonMode,
+    transposeData,
     applyEdits,
     resetEdits,
     clearData,
