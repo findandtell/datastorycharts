@@ -856,11 +856,23 @@ export default function ChartEditor() {
     // Create viewBox from original dimensions
     const viewBox = `0 0 ${originalWidth} ${originalHeight}`;
 
+    // Get background color from style settings (default to white if not set)
+    const bgColor = styleSettings.backgroundColor || '#ffffff';
+
+    // Create background rectangle that will be inserted as first child of SVG
+    const backgroundRect = `<rect x="0" y="0" width="${originalWidth}" height="${originalHeight}" fill="${bgColor}"/>`;
+
     // Replace the SVG tag with properly sized thumbnail version
     // IMPORTANT: Must include xmlns for standalone SVG images
-    const thumbnailSVG = svgString.replace(
+    let thumbnailSVG = svgString.replace(
       /<svg([^>]*)>/,
       `<svg xmlns="http://www.w3.org/2000/svg" width="${thumbnailWidth}" height="${thumbnailHeight}" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet">`
+    );
+
+    // Insert background rectangle right after the opening SVG tag
+    thumbnailSVG = thumbnailSVG.replace(
+      /(<svg[^>]*>)/,
+      `$1${backgroundRect}`
     );
 
     return thumbnailSVG;
