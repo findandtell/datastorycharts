@@ -892,6 +892,12 @@ export default function ChartEditor() {
         styleSettings: styleSettings.exportSettings(), // Use exportSettings() method to get complete config
       };
 
+      // Debug logging for bar chart settings
+      console.log('[SaveDefault] Saving configuration for', chartType);
+      console.log('[SaveDefault] emphasizedBars:', configuration.styleSettings.chartSpecific?.bar?.emphasizedBars);
+      console.log('[SaveDefault] percentChangeBracketDistance:', configuration.styleSettings.chartSpecific?.bar?.percentChangeBracketDistance);
+      console.log('[SaveDefault] percentChangeEnabled:', configuration.styleSettings.display?.percentChangeEnabled);
+
       // Create a properly sized thumbnail SVG for the gallery
       let svgThumbnail = null;
       const svgElement = svgRef.current?.querySelector('svg');
@@ -915,6 +921,12 @@ export default function ChartEditor() {
         return false; // No default found
       }
 
+      // Debug logging for loaded configuration
+      console.log('[LoadDefault] Loading configuration for', chartType);
+      console.log('[LoadDefault] emphasizedBars from config:', configuration.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+      console.log('[LoadDefault] percentChangeBracketDistance from config:', configuration.styleSettings?.chartSpecific?.bar?.percentChangeBracketDistance);
+      console.log('[LoadDefault] percentChangeEnabled from config:', configuration.styleSettings?.display?.percentChangeEnabled);
+
       // Apply loaded configuration
       if (configuration.data && configuration.periodNames) {
         chartData.loadSnapshotData(configuration.data, configuration.periodNames);
@@ -922,6 +934,11 @@ export default function ChartEditor() {
 
       if (configuration.styleSettings) {
         styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
+
+        // Verify settings after import
+        console.log('[LoadDefault] After import - emphasizedBars:', styleSettings.emphasizedBars);
+        console.log('[LoadDefault] After import - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
+        console.log('[LoadDefault] After import - percentChangeEnabled:', styleSettings.percentChangeEnabled);
       }
 
       return true; // Successfully loaded
