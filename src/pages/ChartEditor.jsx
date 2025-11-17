@@ -165,11 +165,31 @@ export default function ChartEditor() {
             console.log('[AutoLoad] Before import - emphasizedBars:', styleSettings.emphasizedBars);
             styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
 
+            // WORKAROUND: Manually set bar chart emphasis and bracket settings
+            // These aren't being applied by importSettings for some reason
+            if (chartType.startsWith('bar')) {
+              const barSettings = configuration.styleSettings.chartSpecific?.bar;
+              if (barSettings) {
+                if (barSettings.emphasizedBars !== undefined) {
+                  console.log('[AutoLoad] Manually setting emphasizedBars:', barSettings.emphasizedBars);
+                  styleSettings.setEmphasizedBars(barSettings.emphasizedBars);
+                }
+                if (barSettings.percentChangeBracketDistance !== undefined) {
+                  console.log('[AutoLoad] Manually setting percentChangeBracketDistance:', barSettings.percentChangeBracketDistance);
+                  styleSettings.setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
+                }
+              }
+              if (configuration.styleSettings.display?.percentChangeEnabled !== undefined) {
+                console.log('[AutoLoad] Manually setting percentChangeEnabled:', configuration.styleSettings.display.percentChangeEnabled);
+                styleSettings.setPercentChangeEnabled(configuration.styleSettings.display.percentChangeEnabled);
+              }
+            }
+
             // Wait a tick for state to update, then log
             setTimeout(() => {
-              console.log('[AutoLoad] After import - emphasizedBars:', styleSettings.emphasizedBars);
-              console.log('[AutoLoad] After import - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
-              console.log('[AutoLoad] After import - percentChangeEnabled:', styleSettings.percentChangeEnabled);
+              console.log('[AutoLoad] After manual set - emphasizedBars:', styleSettings.emphasizedBars);
+              console.log('[AutoLoad] After manual set - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
+              console.log('[AutoLoad] After manual set - percentChangeEnabled:', styleSettings.percentChangeEnabled);
             }, 100);
           }
         }
@@ -945,6 +965,22 @@ export default function ChartEditor() {
 
       if (configuration.styleSettings) {
         styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
+
+        // WORKAROUND: Manually set bar chart emphasis and bracket settings
+        if (chartType.startsWith('bar')) {
+          const barSettings = configuration.styleSettings.chartSpecific?.bar;
+          if (barSettings) {
+            if (barSettings.emphasizedBars !== undefined) {
+              styleSettings.setEmphasizedBars(barSettings.emphasizedBars);
+            }
+            if (barSettings.percentChangeBracketDistance !== undefined) {
+              styleSettings.setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
+            }
+          }
+          if (configuration.styleSettings.display?.percentChangeEnabled !== undefined) {
+            styleSettings.setPercentChangeEnabled(configuration.styleSettings.display.percentChangeEnabled);
+          }
+        }
 
         // Verify settings after import
         console.log('[LoadDefault] After import - emphasizedBars:', styleSettings.emphasizedBars);
