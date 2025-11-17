@@ -18,13 +18,21 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
   };
 
   return (
-    <img
-      src={imageSrc}
-      alt={alt}
-      className="pointer-events-none w-auto h-auto object-contain"
-      style={{ maxWidth: '100%', maxHeight: '160px' }}
-      onError={handleError}
-    />
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <img
+        src={imageSrc}
+        alt={alt}
+        className="pointer-events-none"
+        style={{
+          maxWidth: '100%',
+          maxHeight: '100%',
+          width: 'auto',
+          height: 'auto',
+          objectFit: 'contain'
+        }}
+        onError={handleError}
+      />
+    </div>
   );
 };
 
@@ -125,7 +133,7 @@ export default function Home() {
       className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-cyan-400"
     >
       {/* Chart Preview Image */}
-      <div className="bg-white border-b border-gray-200 relative h-48 overflow-hidden flex items-center justify-center p-4">
+      <div className="bg-white border-b border-gray-200 relative overflow-hidden p-4" style={{ height: '192px' }}>
         <ChartThumbnail
           chartKey={chart.key}
           fallbackImage={chart.image}
