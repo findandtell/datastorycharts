@@ -198,7 +198,11 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
   }, [onClearEmphasis]);
 
   // Sync emphasizedBars with selectedBarsForComparison for percentage change brackets
+  // ONLY on initial load when selectedBarsForComparison is empty
   useEffect(() => {
+    // Don't override if user has already selected bars manually
+    if (selectedBarsForComparison.length > 0) return;
+
     if (percentChangeEnabled && emphasizedBars && emphasizedBars.length >= 2 && data && periodNames) {
       // Convert emphasizedBars (array of barIds like "Google Ads-Jan") into bar data objects
       const barsForComparison = emphasizedBars.slice(0, 2).map(barId => {
@@ -223,11 +227,11 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       }).filter(Boolean);
 
       if (barsForComparison.length >= 2) {
-        console.log('[BarChart] Auto-populating selectedBarsForComparison from emphasizedBars:', barsForComparison);
+        console.log('[BarChart] Auto-populating selectedBarsForComparison from emphasizedBars on initial load:', barsForComparison);
         setSelectedBarsForComparison(barsForComparison);
       }
     }
-  }, [emphasizedBars, percentChangeEnabled, data, periodNames]);
+  }, [emphasizedBars, percentChangeEnabled, data, periodNames, selectedBarsForComparison.length]);
 
   // Main chart rendering
   useEffect(() => {
