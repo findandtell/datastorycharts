@@ -21,7 +21,8 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
     <object
       data={imageSrc}
       type="image/svg+xml"
-      className="pointer-events-none w-full h-full"
+      className="pointer-events-none w-full h-full object-contain"
+      style={{ objectFit: 'contain' }}
       aria-label={alt}
       onError={handleError}
     />
@@ -125,7 +126,7 @@ export default function Home() {
       className="bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-cyan-400"
     >
       {/* Chart Preview Image */}
-      <div className="bg-white border-b border-gray-200 relative h-48 overflow-hidden">
+      <div className="bg-white border-b border-gray-200 relative h-48 overflow-hidden flex items-center justify-center p-4">
         <ChartThumbnail
           chartKey={chart.key}
           fallbackImage={chart.image}
@@ -151,9 +152,16 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+    <>
+      {/* Google Fonts for SVG thumbnail rendering */}
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Lato:wght@300;400;700&family=Poppins:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600;700&family=Raleway:wght@300;400;500;600;700&family=Economica:wght@400;700&family=Newsreader:wght@300;400;500;600;700&display=swap"
+      />
+
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-8 py-12">
           <div className="flex flex-col items-center mb-6">
             <img
