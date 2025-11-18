@@ -81,6 +81,10 @@ const FunnelChart = ({
     (baseColor, count) => {
       if (isComparisonMode) {
         const palette = comparisonPalettes[styleSettings.comparisonPalette];
+        // Defensive: handle missing palette
+        if (!palette && styleSettings.comparisonPalette !== "user") {
+          return [baseColor]; // Fallback to base color if palette not found
+        }
         const colors =
           styleSettings.comparisonPalette === "user"
             ? styleSettings.userCustomColors
