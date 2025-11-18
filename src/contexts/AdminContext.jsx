@@ -77,22 +77,28 @@ export const AdminProvider = ({ children }) => {
    * Load default chart configuration
    */
   const loadDefault = useCallback(async (chartType) => {
+    console.log('[AdminContext loadDefault] 🔍 Fetching default for chartType:', chartType);
     const response = await fetch(`/api/admin/get-default?chartType=${chartType}`);
+    console.log('[AdminContext loadDefault] 📡 Response status:', response.status, response.ok);
     const data = await response.json();
 
     // Debug logging
-    console.log('[AdminContext loadDefault] Raw response data:', data);
+    console.log('[AdminContext loadDefault] 📦 Raw response data:', data);
+    console.log('[AdminContext loadDefault] data.success:', data.success);
     console.log('[AdminContext loadDefault] configuration:', data.configuration);
     console.log('[AdminContext loadDefault] emphasizedBars:', data.configuration?.styleSettings?.chartSpecific?.bar?.emphasizedBars);
 
     if (!response.ok || !data.success) {
       // Not found is okay - means no default is set yet
       if (response.status === 404) {
+        console.log('[AdminContext loadDefault] ⚠️ No default found (404), returning null');
         return null;
       }
+      console.log('[AdminContext loadDefault] ❌ Error loading default:', data.error);
       throw new Error(data.error || 'Failed to load default configuration');
     }
 
+    console.log('[AdminContext loadDefault] ✅ Successfully loaded configuration');
     return data.configuration;
   }, []);
 

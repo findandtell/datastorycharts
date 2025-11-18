@@ -167,10 +167,12 @@ export default function ChartEditor() {
 
     const loadDefaultOnMount = async () => {
       try {
+        console.log('[ChartEditor] 🔍 Attempting to load default for chartType:', chartType);
         const configuration = await admin.loadDefault(chartType);
+        console.log('[ChartEditor] 📦 Received configuration:', configuration);
 
         if (configuration) {
-          console.log('[ChartEditor] Loading default configuration for', chartType);
+          console.log('[ChartEditor] ✅ Loading default configuration for', chartType);
           console.log('[AutoLoad] emphasizedBars from config:', configuration.styleSettings?.chartSpecific?.bar?.emphasizedBars);
           console.log('[AutoLoad] percentChangeBracketDistance from config:', configuration.styleSettings?.chartSpecific?.bar?.percentChangeBracketDistance);
           console.log('[AutoLoad] percentChangeEnabled from config:', configuration.styleSettings?.display?.percentChangeEnabled);
