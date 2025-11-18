@@ -574,11 +574,27 @@ export const useStyleSettings = (initialTheme = theme) => {
       // Validate comparisonPalette before setting
       if (settings.colors.comparisonPalette !== undefined) {
         const paletteValue = settings.colors.comparisonPalette;
-        // Allow 'user' or any palette that exists in comparisonPalettes
-        if (paletteValue === 'user' || comparisonPalettes[paletteValue]) {
+        console.log(`[importSettings] Validating palette: "${paletteValue}"`);
+
+        // Allow 'user' or validate that palette exists AND has valid colors array
+        if (paletteValue === 'user') {
+          console.log(`[importSettings] ✓ Using user custom colors`);
           setComparisonPalette(paletteValue);
+        } else if (comparisonPalettes[paletteValue]) {
+          const palette = comparisonPalettes[paletteValue];
+          console.log(`[importSettings] Palette object:`, palette);
+          console.log(`[importSettings] Palette.colors:`, palette.colors);
+
+          // Extra validation: ensure .colors exists and is a non-empty array
+          if (palette.colors && Array.isArray(palette.colors) && palette.colors.length > 0) {
+            console.log(`[importSettings] ✓ Palette "${paletteValue}" is valid`);
+            setComparisonPalette(paletteValue);
+          } else {
+            console.warn(`[importSettings] ⚠️ Palette "${paletteValue}" has invalid colors array, using default "observable10"`);
+            setComparisonPalette('observable10');
+          }
         } else {
-          console.warn(`[importSettings] Invalid palette "${paletteValue}", using default "observable10"`);
+          console.warn(`[importSettings] ⚠️ Palette "${paletteValue}" not found, using default "observable10"`);
           setComparisonPalette('observable10');
         }
       }
