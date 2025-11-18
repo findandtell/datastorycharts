@@ -13,6 +13,8 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
   const svgRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [selectedBarsForComparison, setSelectedBarsForComparison] = useState([]);
+  const renderedBarsDataRef = useRef({}); // Store all rendered bar data with coordinates
+  const hasAutoPopulatedRef = useRef(false); // Track if we've auto-populated
 
   // Destructure style settings with defaults
   const {
@@ -197,98 +199,20 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     }
   }, [onClearEmphasis]);
 
-  // Sync emphasizedBars with selectedBarsForComparison for percentage change brackets
-  // ONLY on initial load when selectedBarsForComparison is empty
+  // OLD AUTO-POPULATION (DISABLED) - This created incomplete bar objects without coordinates
+  // Now using POST-RENDER auto-population in main useEffect that includes labelX/labelY
+  // Keeping this commented out for reference
+  /*
   useEffect(() => {
-    try {
-      console.log('[BarChart] 🔄 Auto-population useEffect triggered');
-      console.log('  - selectedBarsForComparison.length:', selectedBarsForComparison.length);
-      console.log('  - percentChangeEnabled:', percentChangeEnabled);
-      console.log('  - emphasizedBars:', emphasizedBars);
-      console.log('  - emphasizedBars.length:', emphasizedBars?.length);
-      console.log('  - data exists:', !!data);
-      console.log('  - periodNames exists:', !!periodNames);
-
-      // Don't override if user has already selected bars manually
-      if (selectedBarsForComparison.length > 0) {
-        console.log('[BarChart] ⏭️ Skipping auto-population - bars already selected');
-        return;
-      }
-
-      // Additional validation: ensure data is an array and has elements
-      if (percentChangeEnabled &&
-          emphasizedBars &&
-          Array.isArray(emphasizedBars) &&
-          emphasizedBars.length >= 2 &&
-          data &&
-          Array.isArray(data) &&
-          data.length > 0 &&
-          periodNames &&
-          Array.isArray(periodNames) &&
-          periodNames.length > 0) {
-      console.log('[BarChart] ✅ All conditions met - proceeding with auto-population');
-
-      // Filter out any null/undefined values from emphasizedBars
-      const validEmphasizedBars = emphasizedBars.filter(barId => barId != null && typeof barId === 'string');
-      if (validEmphasizedBars.length < 2) {
-        console.log('[BarChart] ⚠️ Not enough valid barIds after filtering:', validEmphasizedBars);
-        return;
-      }
-
-      // Convert emphasizedBars (array of barIds like "Google Ads-Jan") into bar data objects
-      const barsForComparison = validEmphasizedBars.slice(0, 2).map(barId => {
-
-        // Parse barId format: "Category-Period"
-        const lastDashIndex = barId.lastIndexOf('-');
-        if (lastDashIndex === -1) {
-          console.log('[BarChart] ⚠️ barId missing dash separator:', barId);
-          return null;
-        }
-
-        const category = barId.substring(0, lastDashIndex);
-        const period = barId.substring(lastDashIndex + 1);
-
-        // Find the data row for this category
-        const dataRow = data.find(row => row && row.Category === category);
-        if (!dataRow) {
-          console.log('[BarChart] ⚠️ Could not find data row for category:', category);
-          return null;
-        }
-
-        const value = dataRow[period];
-        if (value === undefined) {
-          console.log('[BarChart] ⚠️ Could not find value for period:', period, 'in category:', category);
-          return null;
-        }
-
-        return {
-          barId,
-          category,
-          period,
-          value: parseFloat(value)
-        };
-      }).filter(Boolean);
-
-      console.log('[BarChart] 📊 Converted barsForComparison:', barsForComparison);
-
-      if (barsForComparison.length >= 2) {
-        console.log('[BarChart] ✨ Auto-populating selectedBarsForComparison from emphasizedBars on initial load:', barsForComparison);
-        setSelectedBarsForComparison(barsForComparison);
-      } else {
-        console.log('[BarChart] ❌ Not enough valid bars for comparison. Length:', barsForComparison.length);
-      }
-      } else {
-        console.log('[BarChart] ❌ Conditions not met for auto-population:');
-        console.log('    percentChangeEnabled:', percentChangeEnabled);
-        console.log('    emphasizedBars:', emphasizedBars);
-        console.log('    emphasizedBars.length >= 2:', emphasizedBars?.length >= 2);
-        console.log('    data exists:', !!data);
-        console.log('    periodNames exists:', !!periodNames);
-      }
-    } catch (error) {
-      console.error('[BarChart] ❌ Error in auto-population useEffect:', error);
-    }
+    // ... old incomplete auto-population code ...
   }, [emphasizedBars, percentChangeEnabled, data, periodNames, selectedBarsForComparison.length]);
+  */
+
+  // Reset auto-population flag when emphasizedBars or percentChangeEnabled changes
+  useEffect(() => {
+    hasAutoPopulatedRef.current = false;
+    console.log('[BarChart] 🔄 Reset hasAutoPopulatedRef due to emphasizedBars/percentChangeEnabled change');
+  }, [emphasizedBars, percentChangeEnabled]);
 
   // Main chart rendering
   useEffect(() => {
@@ -904,7 +828,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
                   // For positive values, position at the top (end) of the bar
                   labelY = metricLabelPosition === 'inside' ? y + valueFontSize + 5 : y - 5;
                 }
-                handleBarClickForComparison({
+                const barData = {
                   category: categoryValue,
                   period,
                   value,
@@ -916,8 +840,26 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
                   labelX,
                   labelY,
                   orientation: 'vertical'
-                });
+                };
+                handleBarClickForComparison(barData);
               });
+
+              // Store bar data for auto-population (after rendering)
+              renderedBarsDataRef.current[barId] = {
+                category: categoryValue,
+                period,
+                value,
+                barId,
+                x,
+                y,
+                barWidth,
+                height,
+                labelX: x + barWidth / 2,
+                labelY: value < 0
+                  ? (metricLabelPosition === 'inside' ? y + height - 5 : y + height + valueFontSize + 5)
+                  : (metricLabelPosition === 'inside' ? y + valueFontSize + 5 : y - 5),
+                orientation: 'vertical'
+              };
 
             // Labels (direct or value)
             // Show label if: (1) showValueLabels is on and labelMode is direct, OR (2) bar is emphasized (clicked)
@@ -1030,7 +972,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
                   labelX = metricLabelPosition === 'inside' ? x + width - 15 : x + width + 5;
                 }
                 const labelY = y + barWidth / 2;
-                handleBarClickForComparison({
+                const barData = {
                   category: categoryValue,
                   period,
                   value,
@@ -1042,8 +984,26 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
                   labelX,
                   labelY,
                   orientation: 'horizontal'
-                });
+                };
+                handleBarClickForComparison(barData);
               });
+
+              // Store bar data for auto-population (after rendering)
+              renderedBarsDataRef.current[barId] = {
+                category: categoryValue,
+                period,
+                value,
+                barId,
+                x: 0,
+                y,
+                width,
+                barWidth,
+                labelX: value < 0
+                  ? (metricLabelPosition === 'inside' ? x + 15 : x - 5)
+                  : (metricLabelPosition === 'inside' ? x + width - 15 : x + width + 5),
+                labelY: y + barWidth / 2,
+                orientation: 'horizontal'
+              };
 
             // Labels (direct or value)
             // Show label if: (1) showValueLabels is on and labelMode is direct, OR (2) bar is emphasized (clicked)
@@ -1981,7 +1941,33 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         });
     }
 
-  }, [data, periodNames, dimensions, orientation, barMode, colorScheme, styleSettings, selectedBarsForComparison, percentChangeEnabled, percentChangeLabelFormat, percentChangeBracketDistance]);
+    // Auto-populate selectedBarsForComparison from emphasizedBars AFTER rendering
+    // This ensures we have coordinate data (labelX, labelY) for bracket rendering
+    if (percentChangeEnabled &&
+        emphasizedBars &&
+        emphasizedBars.length >= 2 &&
+        !hasAutoPopulatedRef.current &&
+        Object.keys(renderedBarsDataRef.current).length > 0) {
+
+      console.log('[BarChart] 🎯 POST-RENDER: Auto-populating from emphasizedBars with coordinates');
+      console.log('[BarChart] emphasizedBars:', emphasizedBars);
+      console.log('[BarChart] renderedBarsData keys:', Object.keys(renderedBarsDataRef.current));
+
+      const barsWithCoordinates = emphasizedBars
+        .slice(0, 2)
+        .map(barId => renderedBarsDataRef.current[barId])
+        .filter(Boolean);
+
+      if (barsWithCoordinates.length >= 2) {
+        console.log('[BarChart] ✅ Setting selectedBarsForComparison with coordinates:', barsWithCoordinates);
+        setSelectedBarsForComparison(barsWithCoordinates);
+        hasAutoPopulatedRef.current = true;
+      } else {
+        console.log('[BarChart] ⚠️ Could not find rendered bar data for emphasizedBars:', emphasizedBars);
+      }
+    }
+
+  }, [data, periodNames, dimensions, orientation, barMode, colorScheme, styleSettings, selectedBarsForComparison, percentChangeEnabled, percentChangeLabelFormat, percentChangeBracketDistance, emphasizedBars]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
