@@ -200,26 +200,38 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
   // Sync emphasizedBars with selectedBarsForComparison for percentage change brackets
   // ONLY on initial load when selectedBarsForComparison is empty
   useEffect(() => {
-    console.log('[BarChart] 🔄 Auto-population useEffect triggered');
-    console.log('  - selectedBarsForComparison.length:', selectedBarsForComparison.length);
-    console.log('  - percentChangeEnabled:', percentChangeEnabled);
-    console.log('  - emphasizedBars:', emphasizedBars);
-    console.log('  - emphasizedBars.length:', emphasizedBars?.length);
-    console.log('  - data exists:', !!data);
-    console.log('  - periodNames exists:', !!periodNames);
+    try {
+      console.log('[BarChart] 🔄 Auto-population useEffect triggered');
+      console.log('  - selectedBarsForComparison.length:', selectedBarsForComparison.length);
+      console.log('  - percentChangeEnabled:', percentChangeEnabled);
+      console.log('  - emphasizedBars:', emphasizedBars);
+      console.log('  - emphasizedBars.length:', emphasizedBars?.length);
+      console.log('  - data exists:', !!data);
+      console.log('  - periodNames exists:', !!periodNames);
 
-    // Don't override if user has already selected bars manually
-    if (selectedBarsForComparison.length > 0) {
-      console.log('[BarChart] ⏭️ Skipping auto-population - bars already selected');
-      return;
-    }
+      // Don't override if user has already selected bars manually
+      if (selectedBarsForComparison.length > 0) {
+        console.log('[BarChart] ⏭️ Skipping auto-population - bars already selected');
+        return;
+      }
 
-    if (percentChangeEnabled && emphasizedBars && emphasizedBars.length >= 2 && data && periodNames) {
+      if (percentChangeEnabled && emphasizedBars && emphasizedBars.length >= 2 && data && periodNames) {
       console.log('[BarChart] ✅ All conditions met - proceeding with auto-population');
       // Convert emphasizedBars (array of barIds like "Google Ads-Jan") into bar data objects
       const barsForComparison = emphasizedBars.slice(0, 2).map(barId => {
+        // Validate barId is a string
+        if (typeof barId !== 'string') {
+          console.log('[BarChart] ⚠️ Invalid barId type:', typeof barId, barId);
+          return null;
+        }
+
         // Parse barId format: "Category-Period"
         const lastDashIndex = barId.lastIndexOf('-');
+        if (lastDashIndex === -1) {
+          console.log('[BarChart] ⚠️ barId missing dash separator:', barId);
+          return null;
+        }
+
         const category = barId.substring(0, lastDashIndex);
         const period = barId.substring(lastDashIndex + 1);
 
@@ -252,13 +264,16 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       } else {
         console.log('[BarChart] ❌ Not enough valid bars for comparison. Length:', barsForComparison.length);
       }
-    } else {
-      console.log('[BarChart] ❌ Conditions not met for auto-population:');
-      console.log('    percentChangeEnabled:', percentChangeEnabled);
-      console.log('    emphasizedBars:', emphasizedBars);
-      console.log('    emphasizedBars.length >= 2:', emphasizedBars?.length >= 2);
-      console.log('    data exists:', !!data);
-      console.log('    periodNames exists:', !!periodNames);
+      } else {
+        console.log('[BarChart] ❌ Conditions not met for auto-population:');
+        console.log('    percentChangeEnabled:', percentChangeEnabled);
+        console.log('    emphasizedBars:', emphasizedBars);
+        console.log('    emphasizedBars.length >= 2:', emphasizedBars?.length >= 2);
+        console.log('    data exists:', !!data);
+        console.log('    periodNames exists:', !!periodNames);
+      }
+    } catch (error) {
+      console.error('[BarChart] ❌ Error in auto-population useEffect:', error);
     }
   }, [emphasizedBars, percentChangeEnabled, data, periodNames, selectedBarsForComparison.length]);
 
