@@ -215,15 +215,28 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         return;
       }
 
-      if (percentChangeEnabled && emphasizedBars && emphasizedBars.length >= 2 && data && periodNames) {
+      // Additional validation: ensure data is an array and has elements
+      if (percentChangeEnabled &&
+          emphasizedBars &&
+          Array.isArray(emphasizedBars) &&
+          emphasizedBars.length >= 2 &&
+          data &&
+          Array.isArray(data) &&
+          data.length > 0 &&
+          periodNames &&
+          Array.isArray(periodNames) &&
+          periodNames.length > 0) {
       console.log('[BarChart] ✅ All conditions met - proceeding with auto-population');
+
+      // Filter out any null/undefined values from emphasizedBars
+      const validEmphasizedBars = emphasizedBars.filter(barId => barId != null && typeof barId === 'string');
+      if (validEmphasizedBars.length < 2) {
+        console.log('[BarChart] ⚠️ Not enough valid barIds after filtering:', validEmphasizedBars);
+        return;
+      }
+
       // Convert emphasizedBars (array of barIds like "Google Ads-Jan") into bar data objects
-      const barsForComparison = emphasizedBars.slice(0, 2).map(barId => {
-        // Validate barId is a string
-        if (typeof barId !== 'string') {
-          console.log('[BarChart] ⚠️ Invalid barId type:', typeof barId, barId);
-          return null;
-        }
+      const barsForComparison = validEmphasizedBars.slice(0, 2).map(barId => {
 
         // Parse barId format: "Category-Period"
         const lastDashIndex = barId.lastIndexOf('-');
@@ -236,7 +249,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         const period = barId.substring(lastDashIndex + 1);
 
         // Find the data row for this category
-        const dataRow = data.find(row => row.Category === category);
+        const dataRow = data.find(row => row && row.Category === category);
         if (!dataRow) {
           console.log('[BarChart] ⚠️ Could not find data row for category:', category);
           return null;
