@@ -1717,7 +1717,14 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     }
 
     // Render Percent Change Brackets
+    console.log('[BarChart RENDER] 🎨 About to check bracket rendering:', {
+      percentChangeEnabled,
+      selectedBarsCount: selectedBarsForComparison.length,
+      selectedBars: selectedBarsForComparison
+    });
+
     if (percentChangeEnabled && selectedBarsForComparison.length >= 2) {
+      console.log('[BarChart RENDER] ✅ RENDERING BRACKETS - conditions met!');
       // Build comparison pairs (every 2 clicks = 1 pair)
       const pairs = [];
       for (let i = 0; i < selectedBarsForComparison.length - 1; i += 2) {
