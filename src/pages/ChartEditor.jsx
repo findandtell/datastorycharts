@@ -2212,7 +2212,17 @@ export default function ChartEditor() {
       ...barSettings,
       ...lineSettings,
     };
-  }, [styleSettings, chartType, chartData.hiddenPeriods]);
+  }, [
+    styleSettings,
+    chartType,
+    chartData.hiddenPeriods,
+    // CRITICAL: Add individual state values that change frequently
+    // The styleSettings object reference doesn't change when state values change,
+    // so we need to explicitly list critical values to trigger memo recalculation
+    styleSettings.percentChangeEnabled,
+    styleSettings.emphasizedBars,
+    styleSettings.percentChangeBracketDistance,
+  ]);
 
   // Render chart component based on type
   const renderChart = () => {
