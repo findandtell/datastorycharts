@@ -145,10 +145,14 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       if (colorPalette === 'user' && customColors.length > 0) {
         return customColors;
       }
-      return comparisonPalettes[colorPalette]?.colors || comparisonPalettes.observable10.colors;
+      // Defensive: ensure comparisonPalettes exists and has the requested palette
+      // Fallback chain: requested palette -> observable10 -> hardcoded colors
+      return comparisonPalettes?.[colorPalette]?.colors ||
+             comparisonPalettes?.observable10?.colors ||
+             ['#4269d0', '#efb118', '#ff725c', '#6cc5b0', '#3ca951', '#ff8ab7', '#a463f2', '#97bbf5', '#9c6b4e', '#9498a0'];
     } else {
       // Single-color mode: use barColor for all bars
-      return [barColor];
+      return [barColor || '#1e40af'];
     }
   }, [isComparisonMode, customColors, colorPalette, barColor, periodNames]);
 

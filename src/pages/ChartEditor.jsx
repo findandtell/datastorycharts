@@ -101,6 +101,9 @@ export default function ChartEditor() {
   // Ref to track whether a default configuration was loaded from the database
   // Using ref instead of state to avoid triggering re-renders
   const hasLoadedDefaultFromDB = useRef(false);
+
+  // State to track initial admin default loading (prevents chart flash on mount)
+  const [isLoadingInitialDefault, setIsLoadingInitialDefault] = useState(true);
   const [expandedSections, setExpandedSections] = useState({
     theme: false,
     chartStructure: false,
@@ -170,6 +173,7 @@ export default function ChartEditor() {
       // Not loading from defaults, allow sample data to load
       console.log('[AutoLoad useEffect] ⏭️ Skipping - has sheets URL or imported chart');
       hasLoadedDefaultFromDB.current = false;
+      setIsLoadingInitialDefault(false); // Not loading defaults, allow chart to render
       return;
     }
 
@@ -227,11 +231,13 @@ export default function ChartEditor() {
           // Flag is already set to true above (before async call)
           // Keep it true to prevent sample data from loading
           console.log('[AutoLoad useEffect] ✅ COMPLETED - keeping hasLoadedDefaultFromDB.current = true');
+          setIsLoadingInitialDefault(false); // Done loading, allow chart to render
         } else {
           // No configuration found, clear flag to allow sample data loading
           console.log('[AutoLoad useEffect] ⚠️ No default configuration found for', chartType);
           console.log('[AutoLoad useEffect] Setting hasLoadedDefaultFromDB.current = false');
           hasLoadedDefaultFromDB.current = false;
+          setIsLoadingInitialDefault(false); // Done checking, allow chart to render
         }
       } catch (error) {
         // Silently fail - defaults are optional
@@ -239,10 +245,22 @@ export default function ChartEditor() {
         console.log('[AutoLoad useEffect] Setting hasLoadedDefaultFromDB.current = false');
         // No default found, so allow sample data loading to proceed
         hasLoadedDefaultFromDB.current = false;
+        setIsLoadingInitialDefault(false); // Done checking, allow chart to render
       }
     };
 
     loadDefaultOnMount();
+
+    // Safety timeout: ensure loading state doesn't get stuck
+    // If admin API is slow or fails, force loading to complete after 500ms
+    // This is fast enough for a good UX but slow enough for admin API to respond
+    const safetyTimeout = setTimeout(() => {
+      console.log('[AutoLoad] ⏰ Safety timeout triggered - forcing loading complete');
+      setIsLoadingInitialDefault(false);
+    }, 500);
+
+    // Cleanup timeout on unmount
+    return () => clearTimeout(safetyTimeout);
   }, [chartType]); // Only run when chartType changes
 
   // Refs for resize state to avoid stale closures
@@ -622,7 +640,15 @@ export default function ChartEditor() {
     // IMPORTANT: Don't load sample data if we've loaded (or are loading) a default from the database
     // This prevents the sample data from overwriting the admin-saved defaults
     console.log('[SampleData useEffect] 🔍 Checking hasLoadedDefaultFromDB.current:', hasLoadedDefaultFromDB.current);
+    console.log('[SampleData useEffect] 🔍 Checking isLoadingInitialDefault:', isLoadingInitialDefault);
     console.log('[SampleData useEffect] 🔍 needsNewData:', needsNewData);
+
+    // Wait for admin default check to complete before loading sample data
+    if (isLoadingInitialDefault) {
+      console.log('[SampleData useEffect] ⏳ WAITING - admin default check in progress');
+      return;
+    }
+
     if (hasLoadedDefaultFromDB.current) {
       console.log('[SampleData useEffect] ⏭️ SKIPPING - default loaded from database');
       console.log('[SampleData useEffect] This useEffect will NOT load sample data or reset style settings');
@@ -722,7 +748,7 @@ export default function ChartEditor() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartType]);
+  }, [chartType, isLoadingInitialDefault]); // Re-run when loading state changes
 
   // Set initial chart size based on viewport dimensions (only on mount)
   useEffect(() => {
@@ -2202,6 +2228,12 @@ export default function ChartEditor() {
 
   // Render chart component based on type
   const renderChart = () => {
+    // Wait for admin default check to complete (prevents flash of wrong data)
+    if (isLoadingInitialDefault) {
+      return null; // Empty - no chart renders during loading
+    }
+
+    // Don't render until we have data
     if (!chartData.hasData) return null;
 
     // Handle bar chart variants (all use BarChart component)
