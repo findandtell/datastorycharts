@@ -127,6 +127,14 @@ export default function ChartEditor() {
     return Array.from(chartData.hiddenPeriods || []).sort().join(',');
   }, [chartData.hiddenPeriods]);
 
+  // Track component mount/unmount
+  useEffect(() => {
+    console.log('[ChartEditor] 🎬 Component MOUNTED for chartType:', chartType);
+    return () => {
+      console.log('[ChartEditor] 💀 Component UNMOUNTING for chartType:', chartType);
+    };
+  }, []); // Empty deps = only on mount/unmount
+
   const styleSettings = useStyleSettings();
   const addon = useAddonMode();
   const figma = useFigmaMode();
