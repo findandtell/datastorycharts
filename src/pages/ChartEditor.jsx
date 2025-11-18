@@ -184,14 +184,38 @@ export default function ChartEditor() {
 
           if (configuration.styleSettings) {
             console.log('[AutoLoad] Before import - emphasizedBars:', styleSettings.emphasizedBars);
-            styleSettings.importSettings(configuration.styleSettings, chartType); // Use importSettings() method
 
-            // Debug: Check values after import completes
+            // Import settings immediately
+            styleSettings.importSettings(configuration.styleSettings, chartType);
+
+            // CRITICAL FIX: Re-apply critical bar settings after a delay to ensure they stick
+            // This works around timing issues where sample data loading or other initialization
+            // code might reset these values before the chart renders
             setTimeout(() => {
-              console.log('[AutoLoad] After import - emphasizedBars:', styleSettings.emphasizedBars);
-              console.log('[AutoLoad] After import - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
-              console.log('[AutoLoad] After import - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-            }, 100);
+              console.log('[AutoLoad] 🔄 Re-applying critical settings to ensure they stick...');
+
+              if (configuration.styleSettings.display?.percentChangeEnabled !== undefined) {
+                console.log('[AutoLoad] Re-setting percentChangeEnabled to:', configuration.styleSettings.display.percentChangeEnabled);
+                styleSettings.setPercentChangeEnabled(configuration.styleSettings.display.percentChangeEnabled);
+              }
+
+              if (configuration.styleSettings.chartSpecific?.bar?.emphasizedBars !== undefined) {
+                console.log('[AutoLoad] Re-setting emphasizedBars to:', configuration.styleSettings.chartSpecific.bar.emphasizedBars);
+                styleSettings.setEmphasizedBars(configuration.styleSettings.chartSpecific.bar.emphasizedBars);
+              }
+
+              if (configuration.styleSettings.chartSpecific?.bar?.percentChangeBracketDistance !== undefined) {
+                console.log('[AutoLoad] Re-setting percentChangeBracketDistance to:', configuration.styleSettings.chartSpecific.bar.percentChangeBracketDistance);
+                styleSettings.setPercentChangeBracketDistance(configuration.styleSettings.chartSpecific.bar.percentChangeBracketDistance);
+              }
+
+              // Debug: Verify values stuck
+              setTimeout(() => {
+                console.log('[AutoLoad] ✅ Final verification - emphasizedBars:', styleSettings.emphasizedBars);
+                console.log('[AutoLoad] ✅ Final verification - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
+                console.log('[AutoLoad] ✅ Final verification - percentChangeEnabled:', styleSettings.percentChangeEnabled);
+              }, 100);
+            }, 150);
           }
 
           // Flag is already set to true above (before async call)
