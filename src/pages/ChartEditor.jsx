@@ -585,12 +585,15 @@ export default function ChartEditor() {
 
     // IMPORTANT: Don't load sample data if we've loaded (or are loading) a default from the database
     // This prevents the sample data from overwriting the admin-saved defaults
+    console.log('[SampleData] 🔍 Checking hasLoadedDefaultFromDB.current:', hasLoadedDefaultFromDB.current);
+    console.log('[SampleData] 🔍 needsNewData:', needsNewData);
     if (hasLoadedDefaultFromDB.current) {
-      console.log('[SampleData] Skipping sample data load - default loaded from database');
+      console.log('[SampleData] ⏭️ Skipping sample data load - default loaded from database');
       return;
     }
 
     if (needsNewData) {
+      console.log('[SampleData] 📊 Loading sample data for chartType:', chartType);
       // Load appropriate sample data based on chart type from registry
       const chartConfig = getChart(chartType);
       const sampleDataKey = chartConfig?.defaultDataset || 'abTest'; // Fallback to abTest if no default
