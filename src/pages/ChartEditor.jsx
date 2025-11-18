@@ -210,35 +210,54 @@ export default function ChartEditor() {
               }
             };
 
-            // Re-apply at strategic intervals to ensure settings stick
-            // With new state change logging, we'll be able to see what's resetting the values
+            // Re-apply multiple times to ensure settings stick even if state gets reset
+            // Production logs showed state resets to initial values between 800ms-1000ms
+            // So we extend re-applications past that window
 
-            // Apply at 150ms (after initial render)
+            // Early applications
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying settings at 150ms...');
+              console.log('[AutoLoad] 🔄 Re-applying at 150ms...');
               reapplySettings();
             }, 150);
 
-            // Apply at 400ms (after chart initialization)
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying settings at 400ms...');
+              console.log('[AutoLoad] 🔄 Re-applying at 400ms...');
               reapplySettings();
             }, 400);
 
-            // Apply at 800ms (final safety net)
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Final re-application at 800ms...');
+              console.log('[AutoLoad] 🔄 Re-applying at 800ms...');
               reapplySettings();
             }, 800);
 
-            // Diagnostic verification at 1000ms
+            // CRITICAL: Re-apply AFTER the 800-1000ms window where state resets
             setTimeout(() => {
-              console.log('[AutoLoad] 📋 Diagnostic check at 1000ms:');
+              console.log('[AutoLoad] 🔄 Re-applying at 1200ms (after reset window)...');
+              reapplySettings();
+            }, 1200);
+
+            setTimeout(() => {
+              console.log('[AutoLoad] 🔄 Re-applying at 1500ms (safety net)...');
+              reapplySettings();
+            }, 1500);
+
+            setTimeout(() => {
+              console.log('[AutoLoad] 🔄 Final re-application at 2000ms...');
+              reapplySettings();
+            }, 2000);
+
+            // Diagnostic verification at 2500ms
+            setTimeout(() => {
+              console.log('[AutoLoad] ✅ Final diagnostic check at 2500ms:');
               console.log('  - emphasizedBars:', styleSettings.emphasizedBars);
               console.log('  - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
               console.log('  - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-              console.log('  ℹ️ Check STATE CHANGED logs above to see if value was reset after this');
-            }, 1000);
+              if (styleSettings.percentChangeEnabled && styleSettings.emphasizedBars.length >= 2) {
+                console.log('  ✅ SUCCESS! Values have persisted!');
+              } else {
+                console.log('  ❌ Values still not sticking - check STATE CHANGED logs above');
+              }
+            }, 2500);
           }
 
           // Flag is already set to true above (before async call)
