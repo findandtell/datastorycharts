@@ -4,6 +4,20 @@
  */
 
 import * as d3 from 'd3';
+// Import color schemes directly to ensure they're included in production bundle
+import {
+  schemeObservable10,
+  schemeCategory10,
+  schemeAccent,
+  schemeDark2,
+  schemePaired,
+  schemePastel1,
+  schemePastel2,
+  schemeSet1,
+  schemeSet2,
+  schemeSet3,
+  schemeTableau10,
+} from 'd3-scale-chromatic';
 
 /**
  * Single color presets for monochrome charts
@@ -31,52 +45,52 @@ export const comparisonPalettes = {
   observable10: {
     name: "Observable10",
     description: "Observable's 10-color palette",
-    colors: d3.schemeObservable10,
+    colors: schemeObservable10,
   },
   category10: {
     name: "Category10",
     description: "D3's classic 10-color palette",
-    colors: d3.schemeCategory10,
+    colors: schemeCategory10,
   },
   accent: {
     name: "Accent",
     description: "ColorBrewer Accent palette (max 8 colors)",
-    colors: d3.schemeAccent,
+    colors: schemeAccent,
   },
   dark2: {
     name: "Dark2",
     description: "ColorBrewer Dark2 palette (max 8 colors)",
-    colors: d3.schemeDark2,
+    colors: schemeDark2,
   },
   paired: {
     name: "Paired",
     description: "ColorBrewer Paired palette (12 colors)",
-    colors: d3.schemePaired,
+    colors: schemePaired,
   },
   pastel1: {
     name: "Pastel1",
     description: "ColorBrewer Pastel1 palette (max 9 colors)",
-    colors: d3.schemePastel1,
+    colors: schemePastel1,
   },
   pastel2: {
     name: "Pastel2",
     description: "ColorBrewer Pastel2 palette (max 8 colors)",
-    colors: d3.schemePastel2,
+    colors: schemePastel2,
   },
   set1: {
     name: "Set1",
     description: "ColorBrewer Set1 palette (max 9 colors)",
-    colors: d3.schemeSet1,
+    colors: schemeSet1,
   },
   set2: {
     name: "Set2",
     description: "ColorBrewer Set2 palette (max 8 colors)",
-    colors: d3.schemeSet2,
+    colors: schemeSet2,
   },
   set3: {
     name: "Set3",
     description: "ColorBrewer Set3 palette (12 colors)",
-    colors: d3.schemeSet3,
+    colors: schemeSet3,
   },
   monochrome: {
     name: "Monochrome Grey",
