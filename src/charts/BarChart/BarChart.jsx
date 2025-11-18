@@ -1973,8 +1973,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       console.log('[BarChart] emphasizedBars:', emphasizedBars);
       console.log('[BarChart] renderedBarsData keys:', Object.keys(renderedBarsDataRef.current));
 
+      // Include ALL emphasized bars (not just first 2) to support multiple bracket pairs
+      // Every 2 bars = 1 bracket, so 4 bars = 2 brackets, 6 bars = 3 brackets, etc.
       const barsWithCoordinates = emphasizedBars
-        .slice(0, 2)
         .map(barId => renderedBarsDataRef.current[barId])
         .filter(Boolean);
 
