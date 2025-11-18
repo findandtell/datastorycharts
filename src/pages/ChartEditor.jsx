@@ -158,6 +158,9 @@ export default function ChartEditor() {
 
   // Auto-load default configuration on mount (if available)
   useEffect(() => {
+    console.log('[AutoLoad useEffect] 🎬 STARTED for chartType:', chartType);
+    console.log('[AutoLoad useEffect] Timestamp:', new Date().toISOString());
+
     // Only try to load defaults if we're not loading from other sources
     const urlParams = new URLSearchParams(window.location.search);
     const hasSheetsUrl = urlParams.has('sheetsUrl');
@@ -165,6 +168,7 @@ export default function ChartEditor() {
 
     if (hasSheetsUrl || hasImportedChart) {
       // Not loading from defaults, allow sample data to load
+      console.log('[AutoLoad useEffect] ⏭️ Skipping - has sheets URL or imported chart');
       hasLoadedDefaultFromDB.current = false;
       return;
     }
@@ -172,6 +176,7 @@ export default function ChartEditor() {
     // Set flag IMMEDIATELY (before async call) to block sample data loading
     // We'll clear it if no default is found
     hasLoadedDefaultFromDB.current = true;
+    console.log('[AutoLoad useEffect] ✅ Set hasLoadedDefaultFromDB.current = true');
 
     const loadDefaultOnMount = async () => {
       try {
@@ -262,14 +267,17 @@ export default function ChartEditor() {
 
           // Flag is already set to true above (before async call)
           // Keep it true to prevent sample data from loading
+          console.log('[AutoLoad useEffect] ✅ COMPLETED - keeping hasLoadedDefaultFromDB.current = true');
         } else {
           // No configuration found, clear flag to allow sample data loading
-          console.log('[ChartEditor] No default configuration found for', chartType);
+          console.log('[AutoLoad useEffect] ⚠️ No default configuration found for', chartType);
+          console.log('[AutoLoad useEffect] Setting hasLoadedDefaultFromDB.current = false');
           hasLoadedDefaultFromDB.current = false;
         }
       } catch (error) {
         // Silently fail - defaults are optional
-        console.log('[ChartEditor] Error loading default for', chartType, error);
+        console.log('[AutoLoad useEffect] ❌ Error loading default for', chartType, error);
+        console.log('[AutoLoad useEffect] Setting hasLoadedDefaultFromDB.current = false');
         // No default found, so allow sample data loading to proceed
         hasLoadedDefaultFromDB.current = false;
       }
@@ -621,6 +629,9 @@ export default function ChartEditor() {
    * - Slope Chart default: tufteSlope dataset with PT Serif font and classic Tufte styling
    */
   useEffect(() => {
+    console.log('[SampleData useEffect] 🎬 STARTED for chartType:', chartType);
+    console.log('[SampleData useEffect] Timestamp:', new Date().toISOString());
+
     // Check if current data is compatible with the chart type
     let needsNewData = !chartData.hasData;
 
@@ -651,15 +662,16 @@ export default function ChartEditor() {
 
     // IMPORTANT: Don't load sample data if we've loaded (or are loading) a default from the database
     // This prevents the sample data from overwriting the admin-saved defaults
-    console.log('[SampleData] 🔍 Checking hasLoadedDefaultFromDB.current:', hasLoadedDefaultFromDB.current);
-    console.log('[SampleData] 🔍 needsNewData:', needsNewData);
+    console.log('[SampleData useEffect] 🔍 Checking hasLoadedDefaultFromDB.current:', hasLoadedDefaultFromDB.current);
+    console.log('[SampleData useEffect] 🔍 needsNewData:', needsNewData);
     if (hasLoadedDefaultFromDB.current) {
-      console.log('[SampleData] ⏭️ Skipping sample data load - default loaded from database');
+      console.log('[SampleData useEffect] ⏭️ SKIPPING - default loaded from database');
+      console.log('[SampleData useEffect] This useEffect will NOT load sample data or reset style settings');
       return;
     }
 
     if (needsNewData) {
-      console.log('[SampleData] 📊 Loading sample data for chartType:', chartType);
+      console.log('[SampleData useEffect] 📊 Loading sample data for chartType:', chartType);
       // Load appropriate sample data based on chart type from registry
       const chartConfig = getChart(chartType);
       const sampleDataKey = chartConfig?.defaultDataset || 'abTest'; // Fallback to abTest if no default
@@ -725,6 +737,7 @@ export default function ChartEditor() {
       // Update previous chart type tracker
       setPreviousChartType(chartType);
 
+      console.log('[SampleData useEffect] ⚙️ Resetting chart-independent settings to defaults');
       // Reset chart-independent settings to defaults when switching charts
       // This prevents settings from one chart type bleeding into another
       styleSettings.setBackgroundColor('#ffffff');
@@ -732,6 +745,7 @@ export default function ChartEditor() {
 
       // Apply default settings from registry
       if (chartConfig?.defaultSettings) {
+        console.log('[SampleData useEffect] ⚙️ Applying default settings from registry');
         const settings = chartConfig.defaultSettings;
         if (settings.orientation) styleSettings.setOrientation(settings.orientation);
         if (settings.barMode) styleSettings.setBarMode(settings.barMode);
