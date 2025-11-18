@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import theme from "../design-system/theme";
 import { defaultUserColors } from "../design-system/colorPalettes";
 
@@ -123,6 +123,13 @@ export const useStyleSettings = (initialTheme = theme) => {
     console.trace('[setPercentChangeEnabled] Stack trace:');
     _setPercentChangeEnabled(value);
   }, []);
+
+  // Track EVERY state change of percentChangeEnabled (catches changes that bypass the setter)
+  useEffect(() => {
+    console.log('[percentChangeEnabled STATE CHANGED] 📊 New value:', percentChangeEnabled);
+    console.log('[percentChangeEnabled STATE CHANGED] Timestamp:', new Date().toISOString());
+    console.trace('[percentChangeEnabled STATE CHANGED] Stack trace:');
+  }, [percentChangeEnabled]);
   const [axisMajorUnit, setAxisMajorUnit] = useState(10000);
   const [axisMajorUnitAuto, setAxisMajorUnitAuto] = useState(true);
   const [axisMinorUnit, setAxisMinorUnit] = useState(5);

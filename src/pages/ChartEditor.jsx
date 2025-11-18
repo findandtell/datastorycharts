@@ -202,37 +202,35 @@ export default function ChartEditor() {
               }
             };
 
-            // Apply at 100ms
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying settings at 100ms...');
-              reapplySettings();
-            }, 100);
+            // Re-apply at strategic intervals to ensure settings stick
+            // With new state change logging, we'll be able to see what's resetting the values
 
-            // Apply at 200ms
+            // Apply at 150ms (after initial render)
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying settings at 200ms...');
+              console.log('[AutoLoad] 🔄 Re-applying settings at 150ms...');
               reapplySettings();
-            }, 200);
+            }, 150);
 
-            // Apply at 300ms
+            // Apply at 400ms (after chart initialization)
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying settings at 300ms...');
+              console.log('[AutoLoad] 🔄 Re-applying settings at 400ms...');
               reapplySettings();
-            }, 300);
+            }, 400);
 
-            // Apply at 500ms
+            // Apply at 800ms (final safety net)
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying settings at 500ms...');
+              console.log('[AutoLoad] 🔄 Final re-application at 800ms...');
               reapplySettings();
-            }, 500);
+            }, 800);
 
-            // Final verification at 600ms
+            // Diagnostic verification at 1000ms
             setTimeout(() => {
-              console.log('[AutoLoad] ✅ Final verification at 600ms:');
+              console.log('[AutoLoad] 📋 Diagnostic check at 1000ms:');
               console.log('  - emphasizedBars:', styleSettings.emphasizedBars);
               console.log('  - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
               console.log('  - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-            }, 600);
+              console.log('  ℹ️ Check STATE CHANGED logs above to see if value was reset after this');
+            }, 1000);
           }
 
           // Flag is already set to true above (before async call)
