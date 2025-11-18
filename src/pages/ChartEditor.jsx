@@ -188,34 +188,51 @@ export default function ChartEditor() {
             // Import settings immediately
             styleSettings.importSettings(configuration.styleSettings, chartType);
 
-            // CRITICAL FIX: Re-apply critical bar settings after a delay to ensure they stick
-            // This works around timing issues where sample data loading or other initialization
-            // code might reset these values before the chart renders
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying critical settings to ensure they stick...');
-
+            // CRITICAL FIX: Re-apply critical bar settings multiple times at different delays
+            // This aggressively ensures the values stick even if something tries to reset them
+            const reapplySettings = () => {
               if (configuration.styleSettings.display?.percentChangeEnabled !== undefined) {
-                console.log('[AutoLoad] Re-setting percentChangeEnabled to:', configuration.styleSettings.display.percentChangeEnabled);
                 styleSettings.setPercentChangeEnabled(configuration.styleSettings.display.percentChangeEnabled);
               }
-
               if (configuration.styleSettings.chartSpecific?.bar?.emphasizedBars !== undefined) {
-                console.log('[AutoLoad] Re-setting emphasizedBars to:', configuration.styleSettings.chartSpecific.bar.emphasizedBars);
                 styleSettings.setEmphasizedBars(configuration.styleSettings.chartSpecific.bar.emphasizedBars);
               }
-
               if (configuration.styleSettings.chartSpecific?.bar?.percentChangeBracketDistance !== undefined) {
-                console.log('[AutoLoad] Re-setting percentChangeBracketDistance to:', configuration.styleSettings.chartSpecific.bar.percentChangeBracketDistance);
                 styleSettings.setPercentChangeBracketDistance(configuration.styleSettings.chartSpecific.bar.percentChangeBracketDistance);
               }
+            };
 
-              // Debug: Verify values stuck
-              setTimeout(() => {
-                console.log('[AutoLoad] ✅ Final verification - emphasizedBars:', styleSettings.emphasizedBars);
-                console.log('[AutoLoad] ✅ Final verification - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
-                console.log('[AutoLoad] ✅ Final verification - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-              }, 100);
-            }, 150);
+            // Apply at 100ms
+            setTimeout(() => {
+              console.log('[AutoLoad] 🔄 Re-applying settings at 100ms...');
+              reapplySettings();
+            }, 100);
+
+            // Apply at 200ms
+            setTimeout(() => {
+              console.log('[AutoLoad] 🔄 Re-applying settings at 200ms...');
+              reapplySettings();
+            }, 200);
+
+            // Apply at 300ms
+            setTimeout(() => {
+              console.log('[AutoLoad] 🔄 Re-applying settings at 300ms...');
+              reapplySettings();
+            }, 300);
+
+            // Apply at 500ms
+            setTimeout(() => {
+              console.log('[AutoLoad] 🔄 Re-applying settings at 500ms...');
+              reapplySettings();
+            }, 500);
+
+            // Final verification at 600ms
+            setTimeout(() => {
+              console.log('[AutoLoad] ✅ Final verification at 600ms:');
+              console.log('  - emphasizedBars:', styleSettings.emphasizedBars);
+              console.log('  - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
+              console.log('  - percentChangeEnabled:', styleSettings.percentChangeEnabled);
+            }, 600);
           }
 
           // Flag is already set to true above (before async call)
