@@ -220,6 +220,10 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       return;
     }
 
+    // Clear previous bar data to ensure fresh coordinates on each render
+    renderedBarsDataRef.current = {};
+    console.log('[BarChart] 🧹 Cleared renderedBarsDataRef for fresh render');
+
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
@@ -1695,7 +1699,23 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
       }
 
       pairs.forEach(pair => {
-        const { first, second } = pair;
+        // Get bar data from selectedBarsForComparison (might have stale coordinates)
+        const { first: firstStale, second: secondStale } = pair;
+
+        // Look up FRESH coordinates from renderedBarsDataRef (just rendered this frame)
+        // Fall back to stale data if barId not found (shouldn't happen)
+        const first = renderedBarsDataRef.current[firstStale.barId] || firstStale;
+        const second = renderedBarsDataRef.current[secondStale.barId] || secondStale;
+
+        console.log('[BarChart RENDER] 📍 Using coordinates:', {
+          firstBarId: first.barId,
+          firstLabelX: first.labelX,
+          firstLabelY: first.labelY,
+          secondBarId: second.barId,
+          secondLabelX: second.labelX,
+          secondLabelY: second.labelY
+        });
+
         const percentChange = ((second.value - first.value) / first.value) * 100;
         const isDecrease = percentChange < 0;
 
