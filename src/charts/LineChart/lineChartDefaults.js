@@ -170,6 +170,9 @@ export const getLineColor = (metricName, index, styleSettings, palettes) => {
 
     case 'category':
     default: {
+      // Defensive: ensure palettes exists before accessing
+      if (!palettes) return '#1e40af';
+
       const palette = palettes[styleSettings.comparisonPalette];
       if (!palette) return '#1e40af';
       const colors = styleSettings.comparisonPalette === 'user'
