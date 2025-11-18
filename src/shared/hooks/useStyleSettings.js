@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import theme from "../design-system/theme";
-import { defaultUserColors } from "../design-system/colorPalettes";
+import { defaultUserColors, comparisonPalettes } from "../design-system/colorPalettes";
 
 /**
  * Custom hook for managing chart style settings
@@ -570,7 +570,19 @@ export const useStyleSettings = (initialTheme = theme) => {
     if (settings.colors) {
       if (settings.colors.barColor !== undefined) setBarColor(settings.colors.barColor);
       if (settings.colors.colorTransition !== undefined) setColorTransition(settings.colors.colorTransition);
-      if (settings.colors.comparisonPalette !== undefined) setComparisonPalette(settings.colors.comparisonPalette);
+
+      // Validate comparisonPalette before setting
+      if (settings.colors.comparisonPalette !== undefined) {
+        const paletteValue = settings.colors.comparisonPalette;
+        // Allow 'user' or any palette that exists in comparisonPalettes
+        if (paletteValue === 'user' || comparisonPalettes[paletteValue]) {
+          setComparisonPalette(paletteValue);
+        } else {
+          console.warn(`[importSettings] Invalid palette "${paletteValue}", using default "observable10"`);
+          setComparisonPalette('observable10');
+        }
+      }
+
       if (settings.colors.userCustomColors !== undefined) setUserCustomColors(settings.colors.userCustomColors);
     }
 
