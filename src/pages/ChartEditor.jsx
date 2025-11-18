@@ -2021,6 +2021,11 @@ export default function ChartEditor() {
     backgroundColor: styleSettings.backgroundColor,
     showTotalLabels: styleSettings.showTotalLabels,
     boldTotal: styleSettings.boldTotal,
+    // Dynamic margins: increase marginRight for horizontal bars with brackets
+    marginTop: 60,
+    marginRight: (styleSettings.orientation === 'horizontal' && styleSettings.percentChangeEnabled) ? 200 : 60,
+    marginBottom: 80,
+    marginLeft: styleSettings.orientation === 'horizontal' ? 180 : 60,
   } : {};
 
   // Line Chart specific settings
