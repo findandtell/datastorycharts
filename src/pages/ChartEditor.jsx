@@ -196,73 +196,32 @@ export default function ChartEditor() {
           }
 
           if (configuration.styleSettings) {
-            console.log('[AutoLoad] Before import - emphasizedBars:', styleSettings.emphasizedBars);
+            console.log('[AutoLoad] Importing settings...');
 
-            // Import settings immediately
+            // Import all settings from admin defaults
+            // The chartStyleSettings useMemo will automatically recalculate because
+            // we've added individual state values (percentChangeEnabled, emphasizedBars, etc.)
+            // to its dependency array. No setTimeout workarounds needed!
             styleSettings.importSettings(configuration.styleSettings, chartType);
 
-            // CRITICAL FIX: Re-apply critical bar settings multiple times at different delays
-            // This aggressively ensures the values stick even if something tries to reset them
-            const reapplySettings = () => {
-              if (configuration.styleSettings.display?.percentChangeEnabled !== undefined) {
-                styleSettings.setPercentChangeEnabled(configuration.styleSettings.display.percentChangeEnabled);
-              }
-              if (configuration.styleSettings.chartSpecific?.bar?.emphasizedBars !== undefined) {
-                styleSettings.setEmphasizedBars(configuration.styleSettings.chartSpecific.bar.emphasizedBars);
-              }
-              if (configuration.styleSettings.chartSpecific?.bar?.percentChangeBracketDistance !== undefined) {
-                styleSettings.setPercentChangeBracketDistance(configuration.styleSettings.chartSpecific.bar.percentChangeBracketDistance);
-              }
-            };
+            console.log('[AutoLoad] ✅ Settings imported successfully');
+            console.log('[AutoLoad] Loaded values:', {
+              percentChangeEnabled: configuration.styleSettings.display?.percentChangeEnabled,
+              emphasizedBars: configuration.styleSettings.chartSpecific?.bar?.emphasizedBars,
+              percentChangeBracketDistance: configuration.styleSettings.chartSpecific?.bar?.percentChangeBracketDistance,
+            });
 
-            // Re-apply multiple times to ensure settings stick even if state gets reset
-            // Production logs showed state resets to initial values between 800ms-1000ms
-            // So we extend re-applications past that window
-
-            // Early applications
+            // Optional: Verify settings loaded correctly after next render
             setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying at 150ms...');
-              reapplySettings();
-            }, 150);
-
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying at 400ms...');
-              reapplySettings();
-            }, 400);
-
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying at 800ms...');
-              reapplySettings();
-            }, 800);
-
-            // CRITICAL: Re-apply AFTER the 800-1000ms window where state resets
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying at 1200ms (after reset window)...');
-              reapplySettings();
-            }, 1200);
-
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Re-applying at 1500ms (safety net)...');
-              reapplySettings();
-            }, 1500);
-
-            setTimeout(() => {
-              console.log('[AutoLoad] 🔄 Final re-application at 2000ms...');
-              reapplySettings();
-            }, 2000);
-
-            // Diagnostic verification at 2500ms
-            setTimeout(() => {
-              console.log('[AutoLoad] ✅ Final diagnostic check at 2500ms:');
+              console.log('[AutoLoad] 🔍 Verification (after render):');
+              console.log('  - percentChangeEnabled:', styleSettings.percentChangeEnabled);
               console.log('  - emphasizedBars:', styleSettings.emphasizedBars);
               console.log('  - percentChangeBracketDistance:', styleSettings.percentChangeBracketDistance);
-              console.log('  - percentChangeEnabled:', styleSettings.percentChangeEnabled);
-              if (styleSettings.percentChangeEnabled && styleSettings.emphasizedBars.length >= 2) {
-                console.log('  ✅ SUCCESS! Values have persisted!');
-              } else {
-                console.log('  ❌ Values still not sticking - check STATE CHANGED logs above');
+
+              if (styleSettings.percentChangeEnabled && styleSettings.emphasizedBars?.length >= 2) {
+                console.log('  ✅ Admin defaults loaded successfully!');
               }
-            }, 2500);
+            }, 100);
           }
 
           // Flag is already set to true above (before async call)
@@ -1861,6 +1820,23 @@ export default function ChartEditor() {
   // on every render, causing React.memo-wrapped chart components to re-render unnecessarily.
   // This optimization works in conjunction with the throttled setters above (line 113) to ensure
   // smooth interactions even with hundreds of data points.
+  //
+  // ⚠️ CRITICAL DEPENDENCY PITFALL:
+  // The styleSettings object reference NEVER changes, even when individual state values update.
+  // React's useMemo uses === comparison, so it won't detect changes inside the object.
+  //
+  // ❌ WRONG:  }, [styleSettings]);
+  //    → useMemo won't recalculate when percentChangeEnabled changes from false to true
+  //    → Chart receives stale values (percentChangeEnabled: false)
+  //    → Admin defaults fail to load properly
+  //
+  // ✅ CORRECT: }, [styleSettings, styleSettings.percentChangeEnabled, ...]);
+  //    → useMemo recalculates when individual values change
+  //    → Chart receives fresh values immediately
+  //    → Admin defaults load correctly
+  //
+  // MUST explicitly list any individual values that change frequently (percentChangeEnabled,
+  // emphasizedBars, etc.) in the dependency array. See dependencies at the end of this useMemo.
   const chartStyleSettings = useMemo(() => {
     // Common settings for all chart types
     const commonSettings = {
