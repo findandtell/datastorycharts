@@ -1769,75 +1769,34 @@ export default function ChartEditor() {
     styleSettings.setChartWidth(finalChartWidth);
   }, [styleSettings, chartType]);
 
-  // Handle Reset View
-  const handleResetView = async () => {
-    // Clear all emphasis
+  // Handle Reset View - Simple reset without reloading
+  const handleResetView = () => {
+    console.log('[Reset View] Starting reset...');
+
+    // Clear all emphasis and selection states
     clearEmphasis();
 
     // Reset zoom and pan
     setZoom(1);
     setPan({ x: 0, y: 0 });
 
-    // Reload the current sample dataset to reset everything to defaults
-    if (currentSampleDatasetKey) {
-      // Get the dataset
-      const dataset = getSampleDataset(currentSampleDatasetKey);
+    // Reset percentage change features (bar chart specific)
+    styleSettings.setPercentChangeEnabled(false);
+    styleSettings.setEmphasizedBars([]);
 
-      // Check if we should load data from the stylePreset JSON file
-      if (dataset?.loadDataFromPreset && dataset?.stylePreset) {
-        // Load both data and styles from the preset JSON file
-        try {
-          const response = await fetch(dataset.stylePreset);
-          if (response.ok) {
-            const presetData = await response.json();
+    // Reset emphasis features (line/area chart specific)
+    styleSettings.setEmphasizedPoints([]);
+    styleSettings.setEmphasizedMetric(null);
 
-            // Load the CSV data from the preset
-            if (presetData.data?.csv) {
-              await chartData.loadCSVText(presetData.data.csv);
-            }
+    // Reset comparison palette to safe default
+    styleSettings.setComparisonPalette('observable10');
 
-            // Apply the style settings
-            styleSettings.importSettings(presetData, chartType);
+    // Restore viewport-based sizing
+    setTimeout(() => {
+      applyViewportBasedSizing();
+    }, 0);
 
-            // Restore viewport-based sizing
-            setTimeout(() => {
-              applyViewportBasedSizing();
-            }, 100);
-          } else {
-            console.error('Failed to load preset:', dataset.stylePreset);
-            // Fallback to default sample data
-            chartData.loadSampleData(currentSampleDatasetKey);
-          }
-        } catch (error) {
-          console.error('Error loading preset:', error);
-          // Fallback to default sample data
-          chartData.loadSampleData(currentSampleDatasetKey);
-        }
-      } else {
-        // Reload the same dataset (original behavior)
-        chartData.loadSampleData(currentSampleDatasetKey);
-
-        if (dataset) {
-          if (dataset.title) styleSettings.setTitle(dataset.title);
-          if (dataset.subtitle) styleSettings.setSubtitle(dataset.subtitle);
-
-          // Apply the default style preset after a brief delay to ensure data is loaded
-          setTimeout(() => {
-            if (dataset.stylePreset) {
-              applyStylePreset(dataset.stylePreset);
-            }
-            // Restore viewport-based sizing
-            applyViewportBasedSizing();
-          }, 100);
-        }
-      }
-    } else {
-      // If no sample dataset is loaded, just reset settings
-      styleSettings.resetToDefaults();
-      setTimeout(() => {
-        applyViewportBasedSizing();
-      }, 0);
-    }
+    console.log('[Reset View] Reset complete');
   };
 
   // Create settings object for chart component
