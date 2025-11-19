@@ -1779,7 +1779,7 @@ export default function ChartEditor() {
 
     try {
       // Try to load the admin default for this chart type
-      const defaultConfig = await loadDefault(chartType);
+      const defaultConfig = await admin.loadDefault(chartType);
 
       if (defaultConfig) {
         console.log('[Reset View] ✓ Admin default loaded, applying configuration');
