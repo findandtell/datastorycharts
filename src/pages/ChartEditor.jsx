@@ -1773,9 +1773,6 @@ export default function ChartEditor() {
   const handleResetView = async () => {
     console.log('[Reset View] Starting reset - reloading admin default for:', chartType);
 
-    // Clear all emphasis and selection states
-    clearEmphasis();
-
     // Reset zoom and pan
     setZoom(1);
     setPan({ x: 0, y: 0 });
@@ -1787,40 +1784,54 @@ export default function ChartEditor() {
       if (defaultConfig) {
         console.log('[Reset View] ✓ Admin default loaded, applying configuration');
 
+        // DON'T clear emphasis - let importSettings replace everything
+        // This preserves emphasized bars, brackets, etc. from admin default
+
         // Apply the data if present
         if (defaultConfig.data?.csv) {
           await chartData.loadCSVText(defaultConfig.data.csv);
         }
 
-        // Apply the style settings with validation
+        // Apply ALL the style settings with validation
+        // This will completely replace current settings with admin default
         if (defaultConfig.styleSettings) {
           styleSettings.importSettings(defaultConfig.styleSettings, chartType);
         }
+
+        // Give the chart time to re-render with new settings before sizing
+        setTimeout(() => {
+          applyViewportBasedSizing();
+        }, 150);
 
         console.log('[Reset View] ✓ Admin default applied successfully');
       } else {
         console.log('[Reset View] ⚠️ No admin default found, using basic reset');
 
-        // No admin default exists - just clear emphasis states
+        // No admin default exists - clear everything
+        clearEmphasis();
         styleSettings.setPercentChangeEnabled(false);
         styleSettings.setEmphasizedBars([]);
         styleSettings.setEmphasizedPoints([]);
         styleSettings.setEmphasizedMetric(null);
+
+        setTimeout(() => {
+          applyViewportBasedSizing();
+        }, 100);
       }
     } catch (error) {
       console.error('[Reset View] ❌ Error loading admin default:', error);
 
       // On error, just clear emphasis states
+      clearEmphasis();
       styleSettings.setPercentChangeEnabled(false);
       styleSettings.setEmphasizedBars([]);
       styleSettings.setEmphasizedPoints([]);
       styleSettings.setEmphasizedMetric(null);
-    }
 
-    // Restore viewport-based sizing
-    setTimeout(() => {
-      applyViewportBasedSizing();
-    }, 100);
+      setTimeout(() => {
+        applyViewportBasedSizing();
+      }, 100);
+    }
 
     console.log('[Reset View] Reset complete');
   };
