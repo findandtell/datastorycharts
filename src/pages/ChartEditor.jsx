@@ -1794,14 +1794,13 @@ export default function ChartEditor() {
 
         // Apply ALL the style settings with validation
         // This will completely replace current settings with admin default
+        // This includes canvas size, so DON'T call applyViewportBasedSizing() after
         if (defaultConfig.styleSettings) {
           styleSettings.importSettings(defaultConfig.styleSettings, chartType);
         }
 
-        // Give the chart time to re-render with new settings before sizing
-        setTimeout(() => {
-          applyViewportBasedSizing();
-        }, 150);
+        // DON'T resize - admin default includes the correct canvas size
+        // applyViewportBasedSizing() would override the saved canvas dimensions
 
         console.log('[Reset View] ✓ Admin default applied successfully');
       } else {
