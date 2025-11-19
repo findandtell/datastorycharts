@@ -1769,9 +1769,9 @@ export default function ChartEditor() {
     styleSettings.setChartWidth(finalChartWidth);
   }, [styleSettings, chartType]);
 
-  // Handle Reset View - Simple reset without reloading
-  const handleResetView = () => {
-    console.log('[Reset View] Starting reset...');
+  // Handle Reset View - Reload admin default for this chart type
+  const handleResetView = async () => {
+    console.log('[Reset View] Starting reset - reloading admin default for:', chartType);
 
     // Clear all emphasis and selection states
     clearEmphasis();
@@ -1780,21 +1780,47 @@ export default function ChartEditor() {
     setZoom(1);
     setPan({ x: 0, y: 0 });
 
-    // Reset percentage change features (bar chart specific)
-    styleSettings.setPercentChangeEnabled(false);
-    styleSettings.setEmphasizedBars([]);
+    try {
+      // Try to load the admin default for this chart type
+      const defaultConfig = await loadDefault(chartType);
 
-    // Reset emphasis features (line/area chart specific)
-    styleSettings.setEmphasizedPoints([]);
-    styleSettings.setEmphasizedMetric(null);
+      if (defaultConfig) {
+        console.log('[Reset View] ✓ Admin default loaded, applying configuration');
 
-    // Reset comparison palette to safe default
-    styleSettings.setComparisonPalette('observable10');
+        // Apply the data if present
+        if (defaultConfig.data?.csv) {
+          await chartData.loadCSVText(defaultConfig.data.csv);
+        }
+
+        // Apply the style settings with validation
+        if (defaultConfig.styleSettings) {
+          styleSettings.importSettings(defaultConfig.styleSettings, chartType);
+        }
+
+        console.log('[Reset View] ✓ Admin default applied successfully');
+      } else {
+        console.log('[Reset View] ⚠️ No admin default found, using basic reset');
+
+        // No admin default exists - just clear emphasis states
+        styleSettings.setPercentChangeEnabled(false);
+        styleSettings.setEmphasizedBars([]);
+        styleSettings.setEmphasizedPoints([]);
+        styleSettings.setEmphasizedMetric(null);
+      }
+    } catch (error) {
+      console.error('[Reset View] ❌ Error loading admin default:', error);
+
+      // On error, just clear emphasis states
+      styleSettings.setPercentChangeEnabled(false);
+      styleSettings.setEmphasizedBars([]);
+      styleSettings.setEmphasizedPoints([]);
+      styleSettings.setEmphasizedMetric(null);
+    }
 
     // Restore viewport-based sizing
     setTimeout(() => {
       applyViewportBasedSizing();
-    }, 0);
+    }, 100);
 
     console.log('[Reset View] Reset complete');
   };
