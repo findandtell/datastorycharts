@@ -1,9 +1,12 @@
-# Funnel Viz - Project Memory
+# DataStory Charts - Project Memory
 
-**Project:** Funnel Viz - Data Visualization Framework
-**Type:** React + D3.js + Vite Application
+**Project:** DataStory Charts - Professional Data Visualization Platform
+**Type:** React + D3.js + Vite Application + Figma Plugin
 **Purpose:** Production-ready chart visualization library with reusable patterns
 **Status:** ✅ Production-ready with 100 tests passing
+**Deployment:**
+- 🌐 **Standalone Web App**: https://charts.findandtell.co
+- 🎨 **Figma Plugin**: Embeds full web app in Figma (see [FIGMA_PLUGIN.md](FIGMA_PLUGIN.md))
 
 ---
 
@@ -19,12 +22,20 @@ npm run test:ui      # Vitest UI
 npm run build        # Production build
 ```
 
+**Figma Plugin Development:**
+```bash
+cd figma-plugin      # Navigate to plugin directory
+npm run build        # Build plugin (code.ts → code.js)
+npm run watch        # Watch mode for development
+```
+
 **Key Directories:**
 - `src/charts/` - Chart implementations (FunnelChart, BarChart, LineChart, SlopeChart)
-- `src/shared/hooks/` - Reusable hooks (useChartData, useStyleSettings)
+- `src/shared/hooks/` - Reusable hooks (useChartData, useStyleSettings, useFigmaMode)
 - `src/shared/utils/` - Utility functions (dataFormatters, colorUtils, csvUtils)
 - `src/shared/data/` - Sample datasets
 - `src/test/` - Test files and templates
+- `figma-plugin/` - Figma plugin code (manifest, UI, main thread)
 
 ---
 
@@ -244,6 +255,87 @@ const saved = JSON.parse(localStorage.getItem('chart'));
 chartData.loadSnapshotData(saved.data, saved.periodNames);
 styleSettings.importSettings(saved.settings, chartType);
 ```
+
+---
+
+## Figma Plugin Integration
+
+### Overview
+
+DataStory Charts is available as a **Figma plugin** that embeds the full web application inside Figma. Users can create charts and insert them as native, editable vector nodes.
+
+**Key files:**
+- `figma-plugin/` - Plugin code and configuration
+- `src/shared/hooks/useFigmaMode.js` - Detection and communication hook
+
+### How It Works
+
+**Architecture:**
+1. **Plugin loads web app in iframe** (`ui.html` → `https://charts.findandtell.co?mode=figma`)
+2. **App detects Figma mode** via `?mode=figma` URL parameter
+3. **User creates chart** in embedded React app
+4. **App sends SVG** to plugin via `postMessage` API
+5. **Plugin creates Figma nodes** from SVG using `figma.createNodeFromSvg()`
+6. **Chart appears** on canvas as editable vectors
+
+### Using useFigmaMode Hook
+
+```javascript
+import { useFigmaMode } from '@shared/hooks/useFigmaMode';
+
+const ChartEditor = () => {
+  const figma = useFigmaMode();
+
+  // Check if running in Figma
+  if (figma.isFigmaMode) {
+    console.log('Running in Figma plugin');
+  }
+
+  // Send chart to Figma
+  const handleInsertToFigma = () => {
+    const svgElement = svgRef.current?.querySelector('svg');
+    const svgString = new XMLSerializer().serializeToString(svgElement);
+    const success = figma.sendToFigma(svgString, styleSettings.title);
+
+    if (success) {
+      figma.notifyFigma('Chart inserted! ✅');
+    }
+  };
+
+  return (
+    <>
+      {figma.isFigmaMode && (
+        <button onClick={handleInsertToFigma}>
+          Insert to Figma
+        </button>
+      )}
+    </>
+  );
+};
+```
+
+### Plugin Development
+
+**Build plugin:**
+```bash
+cd figma-plugin
+npm run build        # Compiles code.ts → code.js
+npm run watch        # Watch mode
+```
+
+**Load in Figma Desktop:**
+1. `Figma → Plugins → Development → Import plugin from manifest...`
+2. Select `figma-plugin/manifest.json`
+3. Run: `Plugins → Development → Find&Tell Charts`
+
+**Test with local app:**
+```javascript
+// Edit ui.html line 99
+src="http://localhost:5173?mode=figma"  // Local
+src="https://charts.findandtell.co?mode=figma"  // Production
+```
+
+**See [@FIGMA_PLUGIN.md](FIGMA_PLUGIN.md) for complete documentation.**
 
 ---
 

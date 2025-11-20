@@ -1,10 +1,20 @@
-# Funnel Visualization Platform - Refactored Architecture
+# DataStory Charts - Professional Data Visualization Platform
 
-A scalable, maintainable React-based data visualization platform for creating professional funnel charts and other visualizations.
+A scalable, maintainable React-based data visualization platform for creating professional, publication-quality charts.
 
-## 🚀 Live Demo
+## 🚀 Available As
 
+### 🌐 Standalone Web App
 **Production URL**: [https://charts.findandtell.co](https://charts.findandtell.co)
+
+Create and customize charts in your browser. Export as PNG/SVG, save configurations, or load data from Google Sheets.
+
+### 🎨 Figma Plugin
+**Install from Figma Community** (coming soon)
+
+Create charts directly in Figma! The full chart editor embedded in your design workflow. Charts insert as native, editable vector nodes.
+
+👉 **[See Figma Plugin Documentation](FIGMA_PLUGIN.md)**
 
 ## ✨ Latest Features (v3.0)
 
