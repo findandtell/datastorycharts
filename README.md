@@ -606,8 +606,210 @@ import ChartRenderer from './ChartRenderer';
 - API integrations
 - Embedded widget mode
 
-## 📚 Additional Resources
+## 🔍 Troubleshooting
 
+### Common Issues and Solutions
+
+#### Issue: Charts crash with "Cannot read properties of undefined (reading 'colors')"
+
+**Symptoms**: Chart works in development but crashes in production with palette-related errors.
+
+**Root Cause**: D3 color schemes being tree-shaken in production builds when accessed via namespace (`d3.schemeObservable10`).
+
+**Solution**: Import color schemes directly from `d3-scale-chromatic`:
+```javascript
+// ❌ WRONG - Gets tree-shaken in production
+import * as d3 from 'd3';
+const colors = d3.schemeObservable10;
+
+// ✅ CORRECT - Always available
+import { schemeObservable10 } from 'd3-scale-chromatic';
+const colors = schemeObservable10;
+```
+
+**See**: [PATTERNS.md - Production Gotchas](PATTERNS.md#gotcha-vite-tree-shaking-d3-schemes)
+
+---
+
+#### Issue: Admin defaults not loading correctly (brackets, emphasized bars missing)
+
+**Symptoms**: When loading chart, brackets and emphasized bars don't appear even though they're saved in admin default.
+
+**Root Causes**:
+1. **Calling clearEmphasis() before importSettings()**: This clears the emphasis states that importSettings() is trying to restore.
+2. **useMemo not detecting state changes**: Object reference stays the same even when properties change.
+3. **Canvas size being overridden**: applyViewportBasedSizing() runs after import, overwriting saved dimensions.
+
+**Solutions**:
+```javascript
+// 1. Don't clear emphasis when loading admin defaults
+if (adminDefaultExists) {
+  // DON'T call clearEmphasis() here
+  styleSettings.importSettings(config.styleSettings);
+} else {
+  clearEmphasis(); // Only clear in fallback mode
+}
+
+// 2. Explicitly list changing values in useMemo dependencies
+const chartProps = useMemo(() => ({
+  percentChangeEnabled: styleSettings.percentChangeEnabled,
+  emphasizedBars: styleSettings.emphasizedBars,
+}), [
+  styleSettings,
+  styleSettings.percentChangeEnabled,  // Must list explicitly!
+  styleSettings.emphasizedBars,        // Must list explicitly!
+]);
+
+// 3. Don't resize when loading admin defaults
+if (adminDefaultExists) {
+  styleSettings.importSettings(config.styleSettings);
+  // DON'T call applyViewportBasedSizing() - preserves saved canvas size
+}
+```
+
+**See**: [PATTERNS.md - Anti-Patterns](PATTERNS.md#anti-patterns-to-avoid)
+
+---
+
+#### Issue: Brackets appearing at wrong coordinates or not at all
+
+**Symptoms**: Percentage change brackets auto-populate but appear at (0, 0) or second bracket pair is missing.
+
+**Root Cause**: Auto-population runs before D3 has rendered bars and populated coordinates.
+
+**Solution**: Separate auto-population into POST-RENDER effect:
+```javascript
+// D3 rendering effect (populates coordinates)
+useEffect(() => {
+  // ... D3 rendering code ...
+  renderedBarsDataRef.current = { /* bar coordinates */ };
+}, [data, styleSettings]);
+
+// Auto-population effect (runs AFTER rendering)
+useEffect(() => {
+  // Guard: Wait for bars to be rendered
+  if (Object.keys(renderedBarsDataRef.current).length === 0) {
+    return;
+  }
+
+  // Guard: Only auto-populate once
+  if (hasAutoPopulatedRef.current) {
+    return;
+  }
+
+  if (percentChangeEnabled && emphasizedBars.length >= 2) {
+    autopopulateBrackets(); // NOW coordinates are available
+    hasAutoPopulatedRef.current = true;
+  }
+}, [percentChangeEnabled, emphasizedBars]);
+```
+
+**See**: [PATTERNS.md - POST-RENDER Population](PATTERNS.md#pattern-post-render-population)
+
+---
+
+#### Issue: Chart showing old data after deploy
+
+**Symptoms**: Deployed fixes to Vercel but production still shows old behavior or crashes.
+
+**Root Cause**: CDN caching at custom domain level (`charts.findandtell.co`).
+
+**Solution**:
+1. Test on direct Vercel URL first: `https://[deployment-id].vercel.app`
+2. If direct URL works, force fresh deployment:
+   ```bash
+   npx vercel --prod --force
+   ```
+3. Wait 5-10 minutes for CDN propagation
+4. Hard refresh browser (Ctrl+Shift+R / Cmd+Shift+R)
+5. Verify bundle hash changed in Network tab
+
+**See**: [PATTERNS.md - Production Gotchas](PATTERNS.md#gotcha-cdn-caching-at-custom-domain)
+
+---
+
+#### Issue: Reset View not reloading admin default
+
+**Symptoms**: Reset View button crashes or doesn't restore saved configuration.
+
+**Root Cause**: Incorrect order of operations or missing admin default handling.
+
+**Solution**: Proper Reset View implementation:
+```javascript
+const handleResetView = async () => {
+  setZoom(1);
+  setPan({ x: 0, y: 0 });
+
+  try {
+    const defaultConfig = await admin.loadDefault(chartType);
+
+    if (defaultConfig) {
+      // Apply admin default
+      if (defaultConfig.data?.csv) {
+        await chartData.loadCSVText(defaultConfig.data.csv);
+      }
+      if (defaultConfig.styleSettings) {
+        styleSettings.importSettings(defaultConfig.styleSettings, chartType);
+      }
+      // DON'T resize - preserves admin default canvas size
+    } else {
+      // Fallback: no admin default
+      clearEmphasis();
+      styleSettings.setPercentChangeEnabled(false);
+      applyViewportBasedSizing();
+    }
+  } catch (error) {
+    console.error('[Reset View] Error:', error);
+    clearEmphasis();
+  }
+};
+```
+
+**See**: [ARCHITECTURE.md - Reset View Flow](ARCHITECTURE.md#4-reset-view-flow)
+
+---
+
+### Debug Mode
+
+Enable detailed logging for state changes:
+
+1. **Wrapped setters** automatically log in development (see `useStyleSettings.js:120-131`)
+2. **Check browser console** for trace logs showing who called setState
+3. **Look for patterns** in timing (mount, unmount, admin default loading)
+
+---
+
+### Getting Help
+
+For issues not covered here:
+
+1. Check [ARCHITECTURE.md](ARCHITECTURE.md) for system overview
+2. Review [PATTERNS.md](PATTERNS.md) for common patterns and gotchas
+3. Search [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed error guides (coming soon)
+4. Open an issue with:
+   - Browser console logs
+   - Steps to reproduce
+   - Expected vs actual behavior
+
+---
+
+## 📚 Documentation
+
+### Architecture & Patterns
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Complete system architecture, data flow, state management, and integration points
+- **[PATTERNS.md](PATTERNS.md)** - Production-proven patterns, anti-patterns, and gotchas
+- **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** - High-level project overview and refactoring summary
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide with examples
+
+### Guides (Coming Soon)
+- **[STATE-MANAGEMENT.md](STATE-MANAGEMENT.md)** - Deep dive into state architecture
+- **[ADDING-CHARTS.md](ADDING-CHARTS.md)** - Complete guide to adding new chart types
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Comprehensive troubleshooting guide
+- **[API-REFERENCE.md](API-REFERENCE.md)** - Complete API documentation
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Developer onboarding guide
+- **[TESTING.md](TESTING.md)** - Testing guide and best practices
+
+### External Resources
 - [D3.js Documentation](https://d3js.org/)
 - [React Hooks Guide](https://react.dev/reference/react)
 - [Tailwind CSS](https://tailwindcss.com/)

@@ -2518,7 +2518,7 @@ export default function ChartEditor() {
                 {/* Chart Gallery Button */}
                 <button
                   onClick={() => navigate('/')}
-                  className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+                  className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium transition-colors"
                 >
                   Chart Gallery
                 </button>

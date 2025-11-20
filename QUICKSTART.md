@@ -394,40 +394,354 @@ function ResponsiveChart() {
 }
 ```
 
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in UI mode (recommended for development)
+npm run test:ui
+
+# Run tests once (CI mode)
+npm run test:run
+
+# Run with coverage report
+npm run test:coverage
+
+# Run specific test file
+npm test -- BarChart
+
+# Run tests matching pattern
+npm test -- -t "should render"
+```
+
+### Writing Tests
+
+**Test a utility function:**
+```javascript
+import { describe, it, expect } from 'vitest';
+import { formatCompactNumber } from '@shared/utils/dataFormatters';
+
+describe('formatCompactNumber', () => {
+  it('should format thousands with K', () => {
+    expect(formatCompactNumber(1000)).toBe('1.0K');
+    expect(formatCompactNumber(1500)).toBe('1.5K');
+  });
+
+  it('should handle edge cases', () => {
+    expect(formatCompactNumber(0)).toBe('0');
+    expect(formatCompactNumber(999)).toBe('999');
+  });
+});
+```
+
+**Test a hook:**
+```javascript
+import { renderHook, act } from '@testing-library/react';
+import { useChartData } from '@shared/hooks/useChartData';
+
+describe('useChartData', () => {
+  it('should load sample data', () => {
+    const { result } = renderHook(() => useChartData('funnel'));
+
+    act(() => {
+      result.current.loadSampleData('generic');
+    });
+
+    expect(result.current.data).toBeTruthy();
+    expect(result.current.data.length).toBeGreaterThan(0);
+  });
+});
+```
+
+**Test a component:**
+```javascript
+import { render } from '@testing-library/react';
+import MyChart from './MyChart';
+
+describe('MyChart', () => {
+  it('should render without crashing', () => {
+    const { container } = render(
+      <MyChart data={mockData} settings={mockSettings} />
+    );
+
+    expect(container.querySelector('svg')).toBeTruthy();
+  });
+});
+```
+
+### Test Templates
+
+Copy templates from `src/test/templates/`:
+- `utility.test.template.js` - For pure functions
+- `hook.test.template.jsx` - For React hooks
+- `component.test.template.jsx` - For React components
+
+See [TESTING.md](TESTING.md) for complete testing guide.
+
+---
+
+## Debugging
+
+### Enable Console Logging
+
+**Debug data flow:**
+```javascript
+const { data, loadSampleData } = useChartData();
+
+useEffect(() => {
+  console.log('Data updated:', data);
+  console.log('Data length:', data?.length);
+  console.log('First item:', data?.[0]);
+}, [data]);
+```
+
+**Debug useEffect execution:**
+```javascript
+useEffect(() => {
+  console.log('Effect running with:', { data, width, height });
+
+  // Your logic
+
+  return () => {
+    console.log('Effect cleanup');
+  };
+}, [data, width, height]);
+```
+
+### Use React DevTools
+
+1. Install React DevTools browser extension
+2. Open DevTools → **Components** tab
+3. Inspect props and state in real-time
+4. Track re-renders with **Profiler** tab
+
+### Debug D3 Rendering
+
+**Check if elements are rendering:**
+```javascript
+useEffect(() => {
+  if (!svgRef.current) {
+    console.log('❌ SVG ref not available');
+    return;
+  }
+
+  const svg = d3.select(svgRef.current);
+  console.log('✅ SVG selected');
+
+  const bars = svg.selectAll('.bar');
+  console.log('Bars found:', bars.size());
+  console.log('Bar data:', bars.data());
+}, [data]);
+```
+
+**Debug coordinates:**
+```javascript
+useEffect(() => {
+  // Wait for render
+  const bars = d3.selectAll('.bar').nodes();
+
+  if (bars.length === 0) {
+    console.log('⚠️ No bars rendered yet');
+    return;
+  }
+
+  bars.forEach((bar, i) => {
+    const bbox = bar.getBBox();
+    console.log(`Bar ${i}:`, { x: bbox.x, y: bbox.y, width: bbox.width });
+  });
+}, [data, styleSettings]);
+```
+
+### Common Debug Patterns
+
+**Check data structure:**
+```javascript
+console.log('Data structure:', {
+  hasData: !!data,
+  length: data?.length,
+  firstRow: data?.[0],
+  keys: data?.[0] ? Object.keys(data[0]) : [],
+});
+```
+
+**Verify settings applied:**
+```javascript
+console.log('Style settings:', {
+  colorPalette,
+  barColor,
+  width,
+  height,
+  orientation,
+});
+```
+
+**Track state changes:**
+```javascript
+const [count, setCount] = useState(0);
+
+const setCountWithLog = (newValue) => {
+  console.log('Count changing:', { from: count, to: newValue });
+  setCount(newValue);
+};
+```
+
+### Browser DevTools Tips
+
+**Check network requests:**
+- Open DevTools → **Network** tab
+- Filter by XHR to see data requests
+- Check if CSV uploads complete successfully
+
+**Inspect DOM:**
+- Right-click element → **Inspect**
+- Check if SVG elements exist
+- Verify element positions and dimensions
+
+**Performance profiling:**
+- DevTools → **Performance** tab
+- Record interaction
+- Find slow renders or heavy computations
+
+### Debug Production Issues
+
+**Test production build locally:**
+```bash
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Test in browser at http://localhost:4173
+```
+
+**Check for tree-shaking issues:**
+```javascript
+// ❌ This gets tree-shaken in production
+import * as d3 from 'd3';
+const colors = d3.schemeTableau10; // undefined!
+
+// ✅ Import directly
+import { schemeTableau10 } from 'd3-scale-chromatic';
+const colors = schemeTableau10; // works!
+```
+
+See [PATTERNS.md#gotcha-vite-tree-shaking-d3-schemes](PATTERNS.md#gotcha-vite-tree-shaking-d3-schemes).
+
+---
+
 ## Troubleshooting
 
-### Data not loading?
+### Quick Fixes
+
+**Data not loading?**
 - Check CSV format matches requirements
 - Verify numeric columns contain only numbers
 - Ensure at least 2 stages present
+- Check browser console for errors
 
-### Colors not updating?
+**Colors not updating?**
 - Verify color format is hex (#rrggbb)
 - Check if comparison mode is enabled for multi-color
 - Ensure colorTransition is between 0-100
 
-### Export not working?
+**Chart not rendering?**
+- Verify data is not null or empty
+- Check SVG ref is connected
+- Look for errors in console
+- Add `console.log` statements to debug
+
+**Export not working?**
 - Check if SVG ref is properly connected
 - Verify browser supports clipboard API
 - Try PNG export instead of SVG
 
+**Tests failing?**
+- Run `npm run test -- --reporter=verbose` for details
+- Check if dependencies are installed
+- Verify test data matches expected structure
+
+### Common Errors
+
+**"Cannot read properties of undefined (reading 'colors')"**
+→ D3 color scheme tree-shaking issue. Import directly from `d3-scale-chromatic`.
+
+**"Maximum update depth exceeded"**
+→ Infinite loop in useEffect. Check dependencies array.
+
+**"Objects are not valid as a React child"**
+→ Trying to render object directly. Render specific property instead.
+
+For detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
 ## Next Steps
 
+**For New Users:**
 1. ✅ Run the example app (`npm run dev`)
 2. ✅ Load sample data
 3. ✅ Customize styles
 4. ✅ Upload your own CSV
 5. ✅ Export your chart
-6. 📖 Read the full [README.md](./README.md)
-7. 🔧 Check [MIGRATION.md](./MIGRATION.md) for advanced patterns
+
+**Learn the System:**
+6. 📖 Read [ARCHITECTURE.md](ARCHITECTURE.md) - Understand the architecture
+7. 📖 Read [PATTERNS.md](PATTERNS.md) - Learn production-proven patterns
+8. 🧪 Review [TESTING.md](TESTING.md) - Write tests for your code
+
+**Start Building:**
+9. 🔧 Follow [ADDING-CHARTS.md](ADDING-CHARTS.md) - Add new chart types
+10. 🤝 Read [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution workflow
+11. 🐛 Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Debug issues
 
 ## Getting Help
 
-- Check console for errors
-- Review example in `src/App.jsx`
-- Read inline code comments
-- Review utility function documentation
+### Before Asking
+
+1. **Check documentation**
+   - [QUICKSTART.md](QUICKSTART.md) (this file) - Quick examples
+   - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
+   - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
+   - [PATTERNS.md](PATTERNS.md) - Best practices
+
+2. **Check examples**
+   - Review example in `src/App.jsx`
+   - Look at existing charts in `src/charts/`
+   - Check test files for usage examples
+
+3. **Debug yourself**
+   - Check browser console for errors
+   - Add `console.log` statements
+   - Use React DevTools
+   - Test with sample data first
+
+### Where to Ask
+
+- **GitHub Discussions** - General questions, ideas
+- **GitHub Issues** - Bug reports, feature requests
+- **Documentation** - Most questions already answered!
+
+### Useful Resources
+
+**Documentation:**
+- [README.md](README.md) - Project overview
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [PATTERNS.md](PATTERNS.md) - Production patterns
+- [ADDING-CHARTS.md](ADDING-CHARTS.md) - Add new charts
+- [TESTING.md](TESTING.md) - Testing guide
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Debug guide
+- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
+
+**Code:**
+- `src/charts/_ChartTemplate/` - Chart template to copy
+- `src/test/templates/` - Test templates
+- `src/shared/` - Shared utilities and hooks
 
 ---
 
 **Ready to build amazing visualizations!** 🚀
+
+**Questions?** Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md) or ask in GitHub Discussions!
