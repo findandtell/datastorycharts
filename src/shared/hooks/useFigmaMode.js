@@ -5,15 +5,33 @@ import { useState, useEffect, useCallback } from 'react';
  * and provide function to send charts to Figma
  */
 export function useFigmaMode() {
-  const [isFigmaMode, setIsFigmaMode] = useState(false);
+  const [isFigmaMode, setIsFigmaMode] = useState(() => {
+    // Check sessionStorage first (persisted across navigation)
+    const stored = sessionStorage.getItem('figmaMode');
+    return stored === 'true';
+  });
 
   useEffect(() => {
     // Check if app is loaded from Figma plugin
     const urlParams = new URLSearchParams(window.location.search);
     const mode = urlParams.get('mode');
-    setIsFigmaMode(mode === 'figma');
+    const isFigma = mode === 'figma';
 
-    console.log('[useFigmaMode] Is Figma mode:', mode === 'figma');
+    // If URL has mode=figma, persist it in sessionStorage
+    if (isFigma) {
+      sessionStorage.setItem('figmaMode', 'true');
+      setIsFigmaMode(true);
+      console.log('[useFigmaMode] Figma mode detected and persisted');
+    }
+
+    // If already in Figma mode from sessionStorage, keep it
+    const stored = sessionStorage.getItem('figmaMode');
+    if (stored === 'true') {
+      setIsFigmaMode(true);
+      console.log('[useFigmaMode] Figma mode restored from session');
+    }
+
+    console.log('[useFigmaMode] Is Figma mode:', isFigma || stored === 'true');
   }, []);
 
   /**
