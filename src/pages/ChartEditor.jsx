@@ -879,7 +879,7 @@ export default function ChartEditor() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Chart Not Found</h1>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(`/${window.location.search}`)}
             className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
           >
             Back to Gallery
@@ -2517,7 +2517,7 @@ export default function ChartEditor() {
 
                 {/* Chart Gallery Button */}
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate(`/${window.location.search}`)}
                   className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium transition-colors"
                 >
                   Chart Gallery
