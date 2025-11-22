@@ -8920,17 +8920,17 @@ function DataTabContent({
         <div className="flex justify-between items-center mb-2">
           <h3 className="font-medium text-gray-900">Data Summary</h3>
           {chartData.hasData && (
-            <div className="flex gap-2">
+            <div className="flex gap-3 text-sm">
               <button
                 onClick={onExportCSV}
-                className="px-4 py-2 bg-green-600 text-white font-medium text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                className="text-green-600 hover:text-green-700 font-medium underline"
                 title="Export current data as CSV"
               >
-                <span>⬇</span> Export CSV
+                Export CSV
               </button>
               <button
                 onClick={onEditData}
-                className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors"
+                className="text-cyan-600 hover:text-cyan-700 font-medium underline"
               >
                 Edit Data
               </button>
