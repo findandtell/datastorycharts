@@ -228,7 +228,11 @@ function SpreadsheetDataTable({ chartData, chartType, onClose }) {
     const selectedRows = gridRef.current.api.getSelectedRows();
     if (selectedRows.length > 0) {
       if (confirm(`Delete ${selectedRows.length} row(s)?`)) {
-        selectedRows.forEach(row => {
+        // Sort rows by index in REVERSE order (highest to lowest)
+        // This prevents index shifting issues when deleting multiple rows
+        const sortedRows = [...selectedRows].sort((a, b) => b._id - a._id);
+
+        sortedRows.forEach(row => {
           chartData.removeStage(row._id);
         });
       }
