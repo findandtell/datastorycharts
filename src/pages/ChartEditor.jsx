@@ -3057,6 +3057,8 @@ export default function ChartEditor() {
                   clearEmphasis={clearEmphasis}
                   throttledSetters={throttledSetters}
                   license={license}
+                  isFigmaMode={isFigmaMode}
+                  onReloadFromFigma={handleReloadFromFigma}
                 />
               )}
 
@@ -3232,13 +3234,27 @@ export default function ChartEditor() {
 /**
  * Style Tab Component
  */
-function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, clearEmphasisRef, clearEmphasis, throttledSetters, license }) {
+function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, clearEmphasisRef, clearEmphasis, throttledSetters, license, isFigmaMode, onReloadFromFigma }) {
   const isSlopeChart = chartType === 'slope';
   const isBarChart = chartType?.startsWith('bar-');
   const isLineChart = chartType === 'line' || chartType === 'area' || chartType === 'area-stacked';
 
   return (
     <div className="space-y-3">
+      {/* Reload from Figma - Show at top of Style tab when in Figma mode */}
+      {isFigmaMode && (
+        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+          <button
+            onClick={onReloadFromFigma}
+            className="w-full px-4 py-2 bg-purple-600 text-white font-medium text-sm rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            🔄 Reload from Figma
+          </button>
+          <p className="text-xs text-gray-600 mt-2">
+            Select a Find&Tell chart in Figma and click to reload its data and settings
+          </p>
+        </div>
+      )}
       {/* 1. THEME - Only for Funnel Chart (Slope, Bar Chart, and Line Chart have their own) */}
       {!isSlopeChart && !isBarChart && !isLineChart && (
         <CollapsibleSection
