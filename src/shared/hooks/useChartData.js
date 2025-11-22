@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import Papa from "papaparse";
 import { getSampleDataset, isComparisonDataset } from "../data/sampleDatasets";
 import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtils";
 
@@ -523,6 +524,18 @@ export const useChartData = (chartType = 'funnel') => {
     // Filter out rows where hidden is true
     const visibleData = editableData.filter(row => !row.hidden);
     setData(structuredClone(visibleData));
+
+    // Regenerate CSV from current data so it's saved correctly to Figma
+    // Remove internal fields like 'hidden' and '_id' before converting to CSV
+    const cleanedData = visibleData.map(row => {
+      const { hidden, _id, ...cleanRow } = row;
+      return cleanRow;
+    });
+
+    // Convert data back to CSV format
+    const csvString = Papa.unparse(cleanedData);
+    setRawCSV(csvString);
+    console.log('[applyEdits] Regenerated CSV from current data');
   }, [editableData]);
 
   /**
