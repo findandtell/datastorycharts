@@ -1145,6 +1145,29 @@ export const sampleDatasets = {
     },
   },
 
+  barUSAFacts: {
+    name: "Federal Spending (USAfacts Style)",
+    description: "Government data visualization with professional USAfacts.org styling",
+    chartType: "bar-vertical",
+    title: "Federal Spending by Category",
+    subtitle: "Fiscal Year 2024 Budget Allocation (in billions)",
+    stylePreset: "/Examples/usafacts-bar-style.json",
+    data: [
+      { Category: "Social Security", "FY 2024": 1350 },
+      { Category: "Medicare", "FY 2024": 1100 },
+      { Category: "Medicaid", "FY 2024": 750 },
+      { Category: "Defense", "FY 2024": 850 },
+      { Category: "Interest on Debt", "FY 2024": 640 },
+      { Category: "Veterans Benefits", "FY 2024": 280 },
+      { Category: "Education", "FY 2024": 180 },
+      { Category: "Transportation", "FY 2024": 120 },
+    ],
+    defaultSettings: {
+      orientation: "vertical",
+      barMode: "grouped",
+    },
+  },
+
   // ==================== AREA CHART DATASETS ====================
 
   areaChartDefault: {

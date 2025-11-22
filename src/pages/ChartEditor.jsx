@@ -5,7 +5,6 @@ import { useStyleSettings } from '../shared/hooks/useStyleSettings';
 import { getChart, chartRegistry } from '../charts/registry';
 import { colorPresets, comparisonPalettes } from '../shared/design-system/colorPalettes';
 import { exportAsPNG, exportAsSVG } from '../shared/utils/exportHelpers';
-import { downloadStyleFile, uploadStyleFile, generateStyleName, loadStyleFromURL } from '../shared/utils/styleUtils';
 import { getSampleDataset } from '../shared/data/sampleDatasets';
 import { getAllTemplates, applyTemplate } from '../shared/design-system/styleTemplates';
 import { throttle } from '../shared/utils/performanceUtils';
@@ -146,7 +145,6 @@ export default function ChartEditor() {
   const svgRef = useRef(null);
   const exportMenuRef = useRef(null);
   const hamburgerMenuRef = useRef(null);
-  const styleFileInputRef = useRef(null);
   const chartImportFileInputRef = useRef(null);
   const clearEmphasisRef = useRef(null);
 
@@ -193,10 +191,13 @@ export default function ChartEditor() {
           console.log('[AutoLoad] emphasizedBars from config:', configuration.styleSettings?.chartSpecific?.bar?.emphasizedBars);
           console.log('[AutoLoad] percentChangeBracketDistance from config:', configuration.styleSettings?.chartSpecific?.bar?.percentChangeBracketDistance);
           console.log('[AutoLoad] percentChangeEnabled from config:', configuration.styleSettings?.display?.percentChangeEnabled);
+          console.log('[AutoLoad] isComparisonMode from config:', configuration.isComparisonMode);
+          console.log('[AutoLoad] orientation from config:', configuration.styleSettings?.layout?.orientation);
+          console.log('[AutoLoad] emphasis from config:', configuration.styleSettings?.display?.emphasis);
 
           // Apply loaded configuration
           if (configuration.data && configuration.periodNames) {
-            chartData.loadSnapshotData(configuration.data, configuration.periodNames);
+            chartData.loadSnapshotData(configuration.data, configuration.periodNames, configuration.isComparisonMode);
           }
 
           if (configuration.styleSettings) {
@@ -388,9 +389,6 @@ export default function ChartEditor() {
     setColorTransition: throttle((value) => styleSettings.setColorTransition(value), 100),
   }), [styleSettings]);
 
-  // Save Style modal state
-  const [showSaveStyleModal, setShowSaveStyleModal] = useState(false);
-  const [styleName, setStyleName] = useState('');
 
   // Snapshot Gallery state
   const [snapshots, setSnapshots] = useState([]);
@@ -905,11 +903,11 @@ export default function ChartEditor() {
     setShowExportMenu(false);
   };
 
-  const handleExportSVG = () => {
+  const handleExportSVG = async () => {
     // Use svgRef to get the actual chart SVG, not UI icons
     const svgElement = svgRef.current?.querySelector('svg');
     if (svgElement) {
-      exportAsSVG(svgElement, `${styleSettings.title}.svg`);
+      await exportAsSVG(svgElement, `${styleSettings.title}.svg`);
     }
     setShowExportMenu(false);
   };
@@ -997,11 +995,15 @@ export default function ChartEditor() {
       const configuration = {
         data: chartData.editableData,
         periodNames: chartData.periodNames,
+        isComparisonMode: chartData.isComparisonMode, // Save Data Mode (Time Series vs Comparison)
         styleSettings: styleSettings.exportSettings(), // Use exportSettings() method to get complete config
       };
 
-      // Debug logging for bar chart settings
+      // Debug logging for chart settings
       console.log('[SaveDefault] Saving configuration for', chartType);
+      console.log('[SaveDefault] isComparisonMode:', configuration.isComparisonMode);
+      console.log('[SaveDefault] orientation:', configuration.styleSettings.layout?.orientation);
+      console.log('[SaveDefault] emphasis:', configuration.styleSettings.display?.emphasis);
       console.log('[SaveDefault] emphasizedBars:', configuration.styleSettings.chartSpecific?.bar?.emphasizedBars);
       console.log('[SaveDefault] percentChangeBracketDistance:', configuration.styleSettings.chartSpecific?.bar?.percentChangeBracketDistance);
       console.log('[SaveDefault] percentChangeEnabled:', configuration.styleSettings.display?.percentChangeEnabled);
@@ -1264,49 +1266,6 @@ export default function ChartEditor() {
     }
   };
 
-  // Handle Save Style
-  const handleSaveStyle = () => {
-    // Generate suggested name and open modal
-    const suggestedName = generateStyleName(styleSettings.title, chartType);
-    setStyleName(suggestedName);
-    setShowSaveStyleModal(true);
-  };
-
-  // Handle Save Style confirmation from modal
-  const handleConfirmSaveStyle = () => {
-    const settings = styleSettings.exportSettings();
-    const metadata = {
-      name: styleName,
-      description: "",
-      chartType: chartType,
-    };
-    downloadStyleFile(settings, metadata);
-    setShowSaveStyleModal(false);
-  };
-
-  // Handle Import Style
-  const handleImportStyle = () => {
-    styleFileInputRef.current?.click();
-  };
-
-  // Handle file selection for import
-  const handleStyleFileSelect = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const styleFile = await uploadStyleFile(file);
-      styleSettings.importSettings(styleFile, chartType);
-      alert('Style imported successfully!');
-    } catch (error) {
-      alert('Failed to import style: ' + error.message);
-    }
-
-    // Reset file input
-    if (styleFileInputRef.current) {
-      styleFileInputRef.current.value = '';
-    }
-  };
 
   // Handle paste CSV data
   const handlePasteCSV = async () => {
@@ -2582,14 +2541,24 @@ export default function ChartEditor() {
                 </button>
               )}
 
-              {/* Import Chart Button */}
+              {/* Load Chart Button */}
               <button
                 onClick={handleImportChart}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
-                title="Import chart from file"
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2"
+                title="Load saved chart"
               >
                 <CloudArrowUpIcon className="w-4 h-4" />
-                Import
+                Load Chart
+              </button>
+
+              {/* Save Chart Button */}
+              <button
+                onClick={handleSaveChart}
+                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
+                title="Save complete chart (data + style)"
+              >
+                <ArrowDownTrayIcon className="w-4 h-4" />
+                Save Chart
               </button>
 
               {/* Hidden file input for chart import */}
@@ -2601,44 +2570,6 @@ export default function ChartEditor() {
                 className="hidden"
               />
 
-              {/* Export - In Figma mode: direct button, otherwise dropdown */}
-              {figma.isFigmaMode ? (
-                /* Direct Insert to Figma button - no dropdown needed */
-                <button
-                  onClick={handleInsertToFigma}
-                  className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
-                >
-                  <span>🎨</span> Insert to Figma
-                </button>
-              ) : (
-                /* Export dropdown for non-Figma mode */
-                <div className="relative" ref={exportMenuRef}>
-                  <button
-                    onClick={() => setShowExportMenu(!showExportMenu)}
-                    className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
-                  >
-                    Export
-                    <span className="text-sm">▼</span>
-                  </button>
-
-                  {showExportMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                      <button
-                        onClick={handleExportPNG}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
-                      >
-                        <span>📷</span> Export as PNG
-                      </button>
-                      <button
-                        onClick={handleExportSVG}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
-                      >
-                        <span>📐</span> Export as SVG
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
             </div>
           )}
@@ -2718,19 +2649,72 @@ export default function ChartEditor() {
               }}
             >
               {/* Action Buttons - Fixed above chart */}
-              <div className="flex justify-center gap-4 flex-shrink-0">
-                <button
-                  onClick={handleResetView}
-                  className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
-                >
-                  Reset View
-                </button>
-                <button
-                  onClick={() => setShowDataTable(!showDataTable)}
-                  className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700"
-                >
-                  {showDataTable ? '← Back to Chart' : 'Edit Data'}
-                </button>
+              <div className="flex justify-between items-center gap-4 flex-shrink-0" style={{ width: chartStyleSettings.canvasWidth + 30 }}>
+                {/* Left side: Reset View & Edit Data */}
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleResetView}
+                    className="text-cyan-600 hover:text-cyan-700 font-medium text-sm underline"
+                  >
+                    Reset View
+                  </button>
+                  <button
+                    onClick={() => setShowDataTable(!showDataTable)}
+                    className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700"
+                  >
+                    {showDataTable ? '← Back to Chart' : 'Edit Data'}
+                  </button>
+                </div>
+
+                {/* Right side: Snapshot & Download */}
+                <div className="flex gap-2">
+                  {/* Snapshot Button */}
+                  <button
+                    onClick={handleCaptureSnapshot}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2"
+                    title="Add current chart to gallery"
+                  >
+                    <CameraIcon className="w-4 h-4" />
+                    Snapshot
+                  </button>
+
+                  {/* Download Dropdown - In Figma mode: Insert to Figma, otherwise Download */}
+                  {figma.isFigmaMode ? (
+                    <button
+                      onClick={handleInsertToFigma}
+                      className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
+                    >
+                      <span>🎨</span> Insert to Figma
+                    </button>
+                  ) : (
+                    <div className="relative" ref={exportMenuRef}>
+                      <button
+                        onClick={() => setShowExportMenu(!showExportMenu)}
+                        className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
+                      >
+                        Download
+                        <span className="text-sm">▼</span>
+                      </button>
+
+                      {showExportMenu && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                          <button
+                            onClick={handleExportPNG}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+                          >
+                            <span>📷</span> PNG
+                          </button>
+                          <button
+                            onClick={handleExportSVG}
+                            className="w-full px-4 py-2 text-left hover:bg-gray-50 text-gray-700 flex items-center gap-2"
+                          >
+                            <span>📐</span> SVG
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Chart/Data Table Card with Flip Animation */}
@@ -2807,34 +2791,16 @@ export default function ChartEditor() {
                 )}
               </div>
 
-              {/* Capture Snapshot and Save Chart Buttons */}
-              {!showDataTable && (
-                <div className="flex items-center gap-3">
-                  {/* Insert to Sheet button - only in add-on mode */}
-                  {addon.isAddonMode && (
-                    <button
-                      onClick={handleInsertToSheet}
-                      className="px-6 py-2 bg-purple-600 text-white font-medium text-sm rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
-                      title="Insert chart into Google Sheets"
-                    >
-                      <ArrowDownTrayIcon className="w-4 h-4" />
-                      Insert to Sheet
-                    </button>
-                  )}
+              {/* Insert to Sheet button - only in add-on mode */}
+              {!showDataTable && addon.isAddonMode && (
+                <div className="flex items-center justify-center gap-3">
                   <button
-                    onClick={handleCaptureSnapshot}
-                    className="px-6 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
-                  >
-                    <CameraIcon className="w-4 h-4" />
-                    Capture Snapshot
-                  </button>
-                  <button
-                    onClick={handleSaveChart}
-                    className="px-6 py-2 bg-green-600 text-white font-medium text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
-                    title="Save complete chart with data and styling"
+                    onClick={handleInsertToSheet}
+                    className="px-6 py-2 bg-purple-600 text-white font-medium text-sm rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
+                    title="Insert chart into Google Sheets"
                   >
                     <ArrowDownTrayIcon className="w-4 h-4" />
-                    Save Chart
+                    Insert to Sheet
                   </button>
                 </div>
               )}
@@ -2910,8 +2876,6 @@ export default function ChartEditor() {
                   chartType={chartType}
                   clearEmphasisRef={clearEmphasisRef}
                   clearEmphasis={clearEmphasis}
-                  onSaveStyle={handleSaveStyle}
-                  onImportStyle={handleImportStyle}
                   throttledSetters={throttledSetters}
                   license={license}
                 />
@@ -2952,49 +2916,6 @@ export default function ChartEditor() {
       </div>
       )}
 
-      {/* Save Style Modal */}
-      {showSaveStyleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Save Style</h2>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Style Name
-              </label>
-              <input
-                type="text"
-                value={styleName}
-                onChange={(e) => setStyleName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="Enter style name"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowSaveStyleModal(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmSaveStyle}
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hidden File Input for Style Import */}
-      <input
-        ref={styleFileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleStyleFileSelect}
-        className="hidden"
-      />
 
       {/* Snapshot Modal */}
       {showSnapshotModal && selectedSnapshot && (
@@ -3131,7 +3052,7 @@ export default function ChartEditor() {
 /**
  * Style Tab Component
  */
-function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, clearEmphasisRef, clearEmphasis, onSaveStyle, onImportStyle, throttledSetters, license }) {
+function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, clearEmphasisRef, clearEmphasis, throttledSetters, license }) {
   const isSlopeChart = chartType === 'slope';
   const isBarChart = chartType?.startsWith('bar-');
   const isLineChart = chartType === 'line' || chartType === 'area' || chartType === 'area-stacked';
@@ -3652,9 +3573,13 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 >
                   <optgroup label="Sans-Serif">
                     <option value="Inter">Inter</option>
+                    <option value="Libre Franklin">Libre Franklin</option>
                     <option value="Montserrat">Montserrat</option>
-                    <option value="Roboto">Roboto</option>
                     <option value="Open Sans">Open Sans</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Source Sans 3">Source Sans 3</option>
                     <option value="Lato">Lato</option>
                   </optgroup>
                   <optgroup label="Condensed">
@@ -4635,9 +4560,13 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 >
                   <optgroup label="Sans-Serif">
                     <option value="Inter">Inter</option>
+                    <option value="Libre Franklin">Libre Franklin</option>
                     <option value="Montserrat">Montserrat</option>
-                    <option value="Roboto">Roboto</option>
                     <option value="Open Sans">Open Sans</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Source Sans 3">Source Sans 3</option>
                     <option value="Lato">Lato</option>
                   </optgroup>
                   <optgroup label="Condensed">
@@ -5931,20 +5860,26 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             >
               <optgroup label="Sans-Serif">
                 <option value="Inter">Inter</option>
+                <option value="Libre Franklin">Libre Franklin</option>
                 <option value="Montserrat">Montserrat</option>
-                <option value="Roboto">Roboto</option>
                 <option value="Open Sans">Open Sans</option>
+                <option value="Poppins">Poppins</option>
+                <option value="Raleway">Raleway</option>
+                <option value="Roboto">Roboto</option>
+                <option value="Source Sans 3">Source Sans 3</option>
                 <option value="Lato">Lato</option>
               </optgroup>
               <optgroup label="Condensed">
                 <option value="Roboto Condensed">Roboto Condensed</option>
                 <option value="Open Sans Condensed">Open Sans Condensed</option>
+                <option value="Economica">Economica</option>
               </optgroup>
               <optgroup label="Serif">
                 <option value="Merriweather">Merriweather</option>
                 <option value="Playfair Display">Playfair Display</option>
                 <option value="Lora">Lora</option>
                 <option value="PT Serif">PT Serif</option>
+                <option value="Newsreader">Newsreader</option>
                 <option value="Georgia">Georgia</option>
               </optgroup>
             </select>
@@ -6664,9 +6599,13 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                 >
                   <optgroup label="Sans-Serif">
                     <option value="Inter">Inter</option>
+                    <option value="Libre Franklin">Libre Franklin</option>
                     <option value="Montserrat">Montserrat</option>
-                    <option value="Roboto">Roboto</option>
                     <option value="Open Sans">Open Sans</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Source Sans 3">Source Sans 3</option>
                     <option value="Lato">Lato</option>
                   </optgroup>
                   <optgroup label="Condensed">
@@ -8325,21 +8264,6 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
           </p>
         </div>
 
-        {/* Save/Import Buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={onSaveStyle}
-            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium"
-          >
-            Save Style
-          </button>
-          <button
-            onClick={onImportStyle}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium"
-          >
-            Import Style
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -8757,6 +8681,7 @@ function DataTabContent({
               <option value="barProductRevenue">Product Category Revenue</option>
               <option value="barTeamPerformance">Team Performance Metrics</option>
               <option value="barCustomerAcquisition">Customer Acquisition by Source</option>
+              <option value="barUSAFacts">Federal Spending (USAfacts Style)</option>
             </optgroup>
           ) : (chartType === 'line' || chartType === 'area' || chartType === 'area-stacked') ? (
             <>

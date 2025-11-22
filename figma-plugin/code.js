@@ -5,8 +5,8 @@
  */
 // Show the plugin UI (iframe)
 figma.showUI(__html__, {
-    width: 1400,
-    height: 900,
+    width: 1600,
+    height: 1000,
     themeColors: true,
 });
 // Listen for messages from the UI

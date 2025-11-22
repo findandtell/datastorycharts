@@ -24,25 +24,25 @@ export default function SnapshotModal({ snapshot, onClose, onLoadChart, onNext, 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasNext, hasPrevious, onNext, onPrevious, onClose]);
 
-  const handleDownloadSVG = () => {
+  const handleDownloadSVG = async () => {
     // Create a temporary container to export
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = snapshot.svgContent;
     const svgElement = tempDiv.querySelector('svg');
 
     if (svgElement) {
-      exportAsSVG(svgElement, `snapshot-${snapshot.id}`);
+      await exportAsSVG(svgElement, `snapshot-${snapshot.id}`);
     }
   };
 
-  const handleDownloadPNG = () => {
+  const handleDownloadPNG = async () => {
     // Create a temporary container to export
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = snapshot.svgContent;
     const svgElement = tempDiv.querySelector('svg');
 
     if (svgElement) {
-      exportAsPNG(svgElement, `snapshot-${snapshot.id}`);
+      await exportAsPNG(svgElement, `snapshot-${snapshot.id}`);
     }
   };
 

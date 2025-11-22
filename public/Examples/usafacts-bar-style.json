@@ -1,0 +1,95 @@
+{
+  "styleVersion": "1.0",
+  "appVersion": "2.0.0",
+  "typography": {
+    "title": "Federal Spending by Category",
+    "subtitle": "Fiscal Year 2024 Budget Allocation (in billions)",
+    "titleAlignment": "left",
+    "fontFamily": "Libre Franklin",
+    "titleFontSize": 32,
+    "subtitleFontSize": 18,
+    "segmentLabelFontSize": 16,
+    "metricLabelFontSize": 16,
+    "periodLabelFontSize": 14,
+    "legendFontSize": 14,
+    "conversionLabelFontSize": 19,
+    "inStageLabelFontSize": 13
+  },
+  "colors": {
+    "barColor": "#0f4c81",
+    "colorTransition": 60,
+    "comparisonPalette": "professional",
+    "userCustomColors": [
+      "#0f4c81",
+      "#2563eb",
+      "#3b82f6",
+      "#60a5fa"
+    ]
+  },
+  "layout": {
+    "orientation": "vertical",
+    "aspectRatio": "16:9",
+    "canvasWidth": 1600,
+    "canvasHeight": 900,
+    "chartPadding": 25,
+    "stageGap": 10,
+    "barWidth": 100,
+    "stageLabelPosition": "bottom"
+  },
+  "visual": {
+    "axisLineWidth": 2,
+    "backgroundOpacity": 100,
+    "darkMode": false,
+    "backgroundColor": "#ffffff"
+  },
+  "display": {
+    "emphasis": "throughput",
+    "metricEmphasis": "volume",
+    "normalizeToHundred": false,
+    "compactNumbers": true,
+    "showLegend": true,
+    "legendPosition": "direct",
+    "showSparklines": false,
+    "sparklineType": "volume",
+    "userTier": "free",
+    "percentChangeEnabled": false,
+    "percentChangeLabelFormat": "percent"
+  },
+  "chartSpecific": {
+    "bar": {
+      "barMode": "grouped",
+      "labelMode": "direct",
+      "directLabelContent": "metrics",
+      "emphasizedBars": [],
+      "showMetricLabels": true,
+      "metricLabelPosition": "outside",
+      "percentChangeBracketDistance": 24,
+      "xAxisFontSize": 16,
+      "yAxisFontSize": 16,
+      "axisLabel": "",
+      "axisLabelFontSize": 16,
+      "xAxisLabelRotation": 0,
+      "axisMinimum": 0,
+      "axisMinimumAuto": true,
+      "axisMaximum": 100,
+      "axisMaximumAuto": true,
+      "axisMajorUnit": 20,
+      "axisMajorUnitAuto": true,
+      "axisMinorUnit": 5,
+      "axisMinorUnitAuto": true,
+      "axisMajorTickType": "outside",
+      "axisMinorTickType": "none",
+      "showHorizontalGridlines": true,
+      "showVerticalGridlines": false,
+      "compactAxisNumbers": true
+    },
+    "funnel": {}
+  },
+  "metadata": {
+    "name": "USAfacts Style",
+    "description": "Clean, data-driven style inspired by USAfacts.org",
+    "chartType": "bar",
+    "createdDate": "2025-01-20T18:00:00.000Z",
+    "author": "Find&Tell"
+  }
+}

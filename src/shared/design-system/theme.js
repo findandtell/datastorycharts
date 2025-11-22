@@ -7,16 +7,27 @@ export const theme = {
   // Typography
   typography: {
     families: [
-      "Open Sans",
+      // Sans-Serif
       "Inter",
-      "Montserrat",
-      "Roboto",
-      "Lato",
+      "Libre Franklin",
+      "Montserrat", 
+      "Open Sans",
       "Poppins",
-      "Source Sans Pro",
       "Raleway",
+      "Roboto",
+      "Source Sans 3",
+      "Lato",
+      // Condensed
+      "Roboto Condensed",
+      "Open Sans Condensed", 
       "Economica",
+      // Serif
+      "Merriweather",
+      "Playfair Display",
+      "Lora",
+      "PT Serif",
       "Newsreader",
+      "Georgia",
     ],
     sizes: {
       title: 28,

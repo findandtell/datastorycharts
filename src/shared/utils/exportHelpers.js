@@ -3,6 +3,97 @@
  */
 
 /**
+ * Detect which font family is used in the SVG
+ */
+const detectUsedFont = (svgElement) => {
+  // Check for font-family attributes and styles
+  const allElements = svgElement.querySelectorAll('*');
+  const fontFamilies = new Set();
+
+  allElements.forEach(el => {
+    const fontFamily = el.getAttribute('font-family') ||
+                       window.getComputedStyle(el).fontFamily;
+    if (fontFamily) {
+      // Extract first font family (before comma)
+      const primaryFont = fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+      fontFamilies.add(primaryFont);
+    }
+  });
+
+  // Return the most commonly used font, or first found
+  return Array.from(fontFamilies)[0] || 'Inter';
+};
+
+/**
+ * Get Google Fonts URL for a specific font family
+ */
+const getFontUrl = (fontFamily) => {
+  const fontMap = {
+    'Inter': 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
+    'Montserrat': 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap',
+    'Open Sans': 'https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap',
+    'Roboto': 'https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap',
+    'Lato': 'https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap',
+    'Poppins': 'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap',
+    'Source Sans 3': 'https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700;800&display=swap',
+    'Raleway': 'https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&display=swap',
+    'Libre Franklin': 'https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@300;400;500;600;700;800;900&display=swap',
+    'Merriweather': 'https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&display=swap',
+    'Playfair Display': 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&display=swap',
+    'Lora': 'https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap',
+    'PT Serif': 'https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&display=swap',
+    'Economica': 'https://fonts.googleapis.com/css2?family=Economica:wght@400;700&display=swap',
+    'Newsreader': 'https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap',
+  };
+
+  return fontMap[fontFamily] || fontMap['Inter'];
+};
+
+/**
+ * Fetch Google Fonts CSS and embed font files as base64 data URIs
+ * This makes SVG files completely self-contained and portable
+ * Only embeds the specific font family used in the SVG for smaller file size
+ */
+const embedGoogleFonts = async (fontFamily) => {
+  try {
+    const fontUrl = getFontUrl(fontFamily);
+
+    // Fetch the CSS from Google Fonts
+    const cssResponse = await fetch(fontUrl);
+    const cssText = await cssResponse.text();
+
+    // Extract all font URLs from the CSS
+    const fontUrlRegex = /url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/g;
+    const fontUrls = [...cssText.matchAll(fontUrlRegex)].map(match => match[1]);
+
+    // Fetch all font files and convert to base64
+    let embeddedCss = cssText;
+    for (const url of fontUrls) {
+      try {
+        const fontResponse = await fetch(url);
+        const fontBlob = await fontResponse.blob();
+        const fontBase64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.readAsDataURL(fontBlob);
+        });
+
+        // Replace the URL with the data URI
+        embeddedCss = embeddedCss.replace(url, fontBase64);
+      } catch (err) {
+        console.warn(`Failed to embed font ${url}:`, err);
+      }
+    }
+
+    return embeddedCss;
+  } catch (err) {
+    console.error('Failed to embed fonts:', err);
+    // Fallback to @import if embedding fails
+    return `@import url('${getFontUrl(fontFamily)}');`;
+  }
+};
+
+/**
  * Export SVG element as PNG with embedded fonts
  * This approach embeds fonts in the SVG first, then converts to PNG
  */
@@ -32,11 +123,12 @@ export const exportAsPNG = async (svgElement, filename = "chart.png", scale = 2)
       defs.appendChild(style);
     }
 
-    // Import Google Fonts - embed them in the SVG
-    const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&family=Roboto+Condensed:wght@300;400;700&family=Open+Sans+Condensed:wght@300;700&family=Lato:wght@300;400;700;900&family=Merriweather:wght@300;400;700;900&family=Playfair+Display:wght@400;500;600;700;800;900&family=Lora:wght@400;500;600;700&family=PT+Serif:wght@400;700&family=Economica:wght@400;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap');`;
+    // Detect which font is used and embed only that font for smaller file size
+    const usedFont = detectUsedFont(svgElement);
+    const embeddedFonts = await embedGoogleFonts(usedFont);
 
-    // Prepend the font import to existing styles
-    style.textContent = fontImport + (style.textContent || '');
+    // Prepend the embedded fonts to existing styles
+    style.textContent = embeddedFonts + (style.textContent || '');
 
     // Serialize the SVG with embedded fonts
     const svgData = new XMLSerializer().serializeToString(svgClone);
@@ -96,7 +188,7 @@ export const exportAsPNG = async (svgElement, filename = "chart.png", scale = 2)
 /**
  * Export SVG element as SVG file with embedded fonts
  */
-export const exportAsSVG = (svgElement, filename = "chart.svg") => {
+export const exportAsSVG = async (svgElement, filename = "chart.svg") => {
   try {
     // Clone the SVG to avoid modifying the original
     const svgClone = svgElement.cloneNode(true);
@@ -133,11 +225,12 @@ export const exportAsSVG = (svgElement, filename = "chart.svg") => {
       defs.appendChild(style);
     }
 
-    // Import Google Fonts - use both @import and link for maximum compatibility
-    const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700;900&family=Roboto+Condensed:wght@300;400;700&family=Open+Sans+Condensed:wght@300;700&family=Lato:wght@300;400;700;900&family=Merriweather:wght@300;400;700;900&family=Playfair+Display:wght@400;500;600;700;800;900&family=Lora:wght@400;500;600;700&family=PT+Serif:wght@400;700&family=Economica:wght@400;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap');`;
+    // Detect which font is used and embed only that font for smaller file size
+    const usedFont = detectUsedFont(svgElement);
+    const embeddedFonts = await embedGoogleFonts(usedFont);
 
-    // Prepend the font import to existing styles
-    style.textContent = fontImport + (style.textContent || '');
+    // Prepend the embedded fonts to existing styles
+    style.textContent = embeddedFonts + (style.textContent || '');
 
     const svgData = new XMLSerializer().serializeToString(svgClone);
     const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });

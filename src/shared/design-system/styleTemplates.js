@@ -626,6 +626,53 @@ export const styleTemplates = {
       },
     },
   },
+
+  usafacts: {
+    id: "usafacts",
+    name: "USAfacts.org",
+    description: "Clean, data-driven government data visualization style with Libre Franklin typography and professional navy palette",
+    preview: "/templates/usafacts-preview.png",
+    settings: {
+      typography: {
+        fontFamily: "Libre Franklin",
+        titleFontSize: 32,
+        subtitleFontSize: 18,
+        segmentLabelFontSize: 16,
+        metricLabelFontSize: 16,
+        legendFontSize: 14,
+      },
+      visual: {
+        backgroundColor: "#ffffff",
+        darkMode: false,
+        axisLineWidth: 2,
+      },
+      layout: {
+        chartPadding: 25,
+        stageGap: 10,
+        barWidth: 100,
+      },
+      display: {
+        showLegend: true,
+        legendPosition: "direct",
+        compactNumbers: true,
+        showMetricLabels: true,
+        metricLabelPosition: "outside",
+      },
+      colors: {
+        comparisonPalette: "user",
+        userCustomColors: [
+          "#0f4c81", // USAfacts primary navy
+          "#2563eb", // Blue
+          "#3b82f6", // Light blue
+          "#60a5fa", // Lighter blue
+          "#1e3a8a", // Dark navy
+          "#1d4ed8", // Medium blue
+          "#93c5fd", // Very light blue
+        ],
+        colorTransition: 60,
+      },
+    },
+  },
 };
 
 /**
