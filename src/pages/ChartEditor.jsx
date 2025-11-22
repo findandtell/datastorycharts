@@ -927,11 +927,27 @@ export default function ChartEditor() {
       // Get SVG as string
       const svgString = new XMLSerializer().serializeToString(svgElement);
 
-      // Send to Figma
-      const success = figma.sendToFigma(svgString, styleSettings.title || 'Find&Tell Chart');
+      // Package complete chart configuration for reload functionality
+      const chartConfig = {
+        chartType: chartType,
+        data: {
+          csv: chartData.rawCSV,
+          periodNames: chartData.periodNames,
+        },
+        styleSettings: styleSettings.exportSettings(),
+        savedAt: new Date().toISOString(),
+        version: '1.0',
+      };
+
+      // Send to Figma with configuration
+      const success = figma.sendToFigma(
+        svgString,
+        styleSettings.title || 'Find&Tell Chart',
+        chartConfig
+      );
 
       if (success) {
-        figma.notifyFigma('✅ Chart inserted to Figma!', 2000);
+        figma.notifyFigma('✅ Chart inserted! (Select & reload anytime)', 3000);
       }
     } catch (error) {
       console.error('[ChartEditor] Error inserting to Figma:', error);
@@ -940,6 +956,56 @@ export default function ChartEditor() {
 
     setShowExportMenu(false);
   };
+
+  // Handle Reload from Figma
+  const handleReloadFromFigma = () => {
+    if (!figma.isFigmaMode) return;
+
+    const success = figma.requestReloadFromFigma();
+    if (!success) {
+      figma.notifyFigma('❌ Error requesting reload', 2000);
+    }
+  };
+
+  // Listen for messages from Figma plugin (chart config reload)
+  useEffect(() => {
+    if (!figma.isFigmaMode) return;
+
+    const handleFigmaMessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+
+      if (msg.type === 'load-chart-config') {
+        const config = msg.config;
+        console.log('[ChartEditor] Received chart config from Figma:', config);
+
+        try {
+          // Navigate to correct chart type if different
+          if (config.chartType && config.chartType !== chartType) {
+            navigate(`/chart/${config.chartType}?mode=figma`);
+          }
+
+          // Load data
+          if (config.data?.csv) {
+            chartData.loadCSVText(config.data.csv);
+          }
+
+          // Load style settings
+          if (config.styleSettings) {
+            styleSettings.importSettings(config.styleSettings, config.chartType || chartType);
+          }
+
+          console.log('[ChartEditor] ✅ Chart reloaded from Figma successfully');
+        } catch (error) {
+          console.error('[ChartEditor] Error loading chart config:', error);
+          figma.notifyFigma('❌ Error loading chart configuration', 3000);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleFigmaMessage);
+    return () => window.removeEventListener('message', handleFigmaMessage);
+  }, [figma.isFigmaMode, chartType, navigate, chartData, styleSettings]);
 
   // Helper function to create a properly sized thumbnail SVG
   const createThumbnailSVG = (svgElement) => {
@@ -2678,14 +2744,24 @@ export default function ChartEditor() {
                     Snapshot
                   </button>
 
-                  {/* Download Dropdown - In Figma mode: Insert to Figma, otherwise Download */}
+                  {/* Download Dropdown - In Figma mode: Insert to Figma + Reload, otherwise Download */}
                   {figma.isFigmaMode ? (
-                    <button
-                      onClick={handleInsertToFigma}
-                      className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
-                    >
-                      <span>🎨</span> Insert to Figma
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleInsertToFigma}
+                        className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium flex items-center gap-2"
+                        title="Insert chart into Figma (saves configuration for reload)"
+                      >
+                        <span>🎨</span> Insert to Figma
+                      </button>
+                      <button
+                        onClick={handleReloadFromFigma}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-2"
+                        title="Select a chart in Figma and reload its configuration"
+                      >
+                        <span>🔄</span> Reload from Figma
+                      </button>
+                    </div>
                   ) : (
                     <div className="relative" ref={exportMenuRef}>
                       <button

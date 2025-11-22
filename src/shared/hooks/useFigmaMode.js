@@ -38,8 +38,9 @@ export function useFigmaMode() {
    * Send chart SVG to Figma plugin
    * @param {string} svgString - The SVG markup as a string
    * @param {string} chartName - Name for the chart in Figma
+   * @param {Object} chartConfig - Complete chart configuration for reload
    */
-  const sendToFigma = useCallback((svgString, chartName = 'Find&Tell Chart') => {
+  const sendToFigma = useCallback((svgString, chartName = 'Find&Tell Chart', chartConfig = null) => {
     if (!isFigmaMode) {
       console.warn('[useFigmaMode] Not in Figma mode, cannot send chart');
       return false;
@@ -54,6 +55,7 @@ export function useFigmaMode() {
           type: 'insert-chart',
           svg: svgString,
           name: chartName,
+          chartConfig: chartConfig,
         }
       }, '*');
 
@@ -112,11 +114,38 @@ export function useFigmaMode() {
     }, '*');
   }, [isFigmaMode]);
 
+  /**
+   * Request to load chart configuration from selected node in Figma
+   * Triggers Figma plugin to read chart config and send it back to UI
+   */
+  const requestReloadFromFigma = useCallback(() => {
+    if (!isFigmaMode) {
+      console.warn('[useFigmaMode] Not in Figma mode, cannot reload');
+      return false;
+    }
+
+    try {
+      console.log('[useFigmaMode] Requesting chart reload from Figma selection');
+
+      parent.postMessage({
+        pluginMessage: {
+          type: 'load-from-selection',
+        }
+      }, '*');
+
+      return true;
+    } catch (error) {
+      console.error('[useFigmaMode] Error requesting reload:', error);
+      return false;
+    }
+  }, [isFigmaMode]);
+
   return {
     isFigmaMode,
     sendToFigma,
     notifyFigma,
     closeFigma,
     resizeFigma,
+    requestReloadFromFigma,
   };
 }
