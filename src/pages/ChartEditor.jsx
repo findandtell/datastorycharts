@@ -912,6 +912,66 @@ export default function ChartEditor() {
     setShowExportMenu(false);
   };
 
+  // Helper function to convert current data to CSV
+  const dataToCSV = () => {
+    if (!chartData.data || chartData.data.length === 0) {
+      return chartData.rawCSV || ''; // Fallback to original if no data
+    }
+
+    // Get all column names (first is usually 'Stage', 'Category', or 'Group')
+    const firstRow = chartData.data[0];
+    const columnNames = Object.keys(firstRow);
+
+    // Create header row
+    const headerRow = columnNames.join(',');
+
+    // Create data rows
+    const dataRows = chartData.data.map(row => {
+      return columnNames.map(col => {
+        const value = row[col];
+        // Wrap in quotes if contains comma or newline
+        if (typeof value === 'string' && (value.includes(',') || value.includes('\n'))) {
+          return `"${value}"`;
+        }
+        return value;
+      }).join(',');
+    });
+
+    return [headerRow, ...dataRows].join('\n');
+  };
+
+  // Handle Export CSV
+  const handleExportCSV = () => {
+    try {
+      const csvContent = dataToCSV();
+      if (!csvContent) {
+        alert('No data to export');
+        return;
+      }
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      // Generate filename from chart title or use default
+      const filename = styleSettings.title
+        ? `${styleSettings.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`
+        : 'chart_data.csv';
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('[ChartEditor] Error exporting CSV:', error);
+      alert('Error exporting CSV. Please try again.');
+    }
+  };
+
   // Handle Insert to Figma
   const handleInsertToFigma = () => {
     if (!figma.isFigmaMode) return;
@@ -926,34 +986,6 @@ export default function ChartEditor() {
 
       // Get SVG as string
       const svgString = new XMLSerializer().serializeToString(svgElement);
-
-      // Convert current data to CSV (to capture any edits made in the table)
-      const dataToCSV = () => {
-        if (!chartData.data || chartData.data.length === 0) {
-          return chartData.rawCSV || ''; // Fallback to original if no data
-        }
-
-        // Get all column names (first is usually 'Stage', 'Category', or 'Group')
-        const firstRow = chartData.data[0];
-        const columnNames = Object.keys(firstRow);
-
-        // Create header row
-        const headerRow = columnNames.join(',');
-
-        // Create data rows
-        const dataRows = chartData.data.map(row => {
-          return columnNames.map(col => {
-            const value = row[col];
-            // Wrap in quotes if contains comma or newline
-            if (typeof value === 'string' && (value.includes(',') || value.includes('\n'))) {
-              return `"${value}"`;
-            }
-            return value;
-          }).join(',');
-        });
-
-        return [headerRow, ...dataRows].join('\n');
-      };
 
       // Package complete chart configuration for reload functionality
       const chartConfig = {
@@ -3034,6 +3066,7 @@ export default function ChartEditor() {
                   chartData={chartData}
                   chartType={chartType}
                   onEditData={() => setShowDataTable(true)}
+                  onExportCSV={handleExportCSV}
                   styleSettings={styleSettings}
                   addon={addon}
                   setCurrentSampleDatasetKey={setCurrentSampleDatasetKey}
@@ -8423,6 +8456,7 @@ function DataTabContent({
   chartData,
   chartType,
   onEditData,
+  onExportCSV,
   styleSettings,
   addon,
   setCurrentSampleDatasetKey,
@@ -8886,12 +8920,21 @@ function DataTabContent({
         <div className="flex justify-between items-center mb-2">
           <h3 className="font-medium text-gray-900">Data Summary</h3>
           {chartData.hasData && (
-            <button
-              onClick={onEditData}
-              className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors"
-            >
-              Edit Data
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={onExportCSV}
+                className="px-4 py-2 bg-green-600 text-white font-medium text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                title="Export current data as CSV"
+              >
+                <span>⬇</span> Export CSV
+              </button>
+              <button
+                onClick={onEditData}
+                className="px-4 py-2 bg-cyan-600 text-white font-medium text-sm rounded-lg hover:bg-cyan-700 transition-colors"
+              >
+                Edit Data
+              </button>
+            </div>
           )}
         </div>
         {chartData.hasData ? (
