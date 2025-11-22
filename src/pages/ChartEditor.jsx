@@ -927,11 +927,39 @@ export default function ChartEditor() {
       // Get SVG as string
       const svgString = new XMLSerializer().serializeToString(svgElement);
 
+      // Convert current data to CSV (to capture any edits made in the table)
+      const dataToCSV = () => {
+        if (!chartData.data || chartData.data.length === 0) {
+          return chartData.rawCSV || ''; // Fallback to original if no data
+        }
+
+        // Get all column names (first is usually 'Stage', 'Category', or 'Group')
+        const firstRow = chartData.data[0];
+        const columnNames = Object.keys(firstRow);
+
+        // Create header row
+        const headerRow = columnNames.join(',');
+
+        // Create data rows
+        const dataRows = chartData.data.map(row => {
+          return columnNames.map(col => {
+            const value = row[col];
+            // Wrap in quotes if contains comma or newline
+            if (typeof value === 'string' && (value.includes(',') || value.includes('\n'))) {
+              return `"${value}"`;
+            }
+            return value;
+          }).join(',');
+        });
+
+        return [headerRow, ...dataRows].join('\n');
+      };
+
       // Package complete chart configuration for reload functionality
       const chartConfig = {
         chartType: chartType,
         data: {
-          csv: chartData.rawCSV,
+          csv: dataToCSV(), // Use current data state, not old rawCSV
           periodNames: chartData.periodNames,
         },
         styleSettings: styleSettings.exportSettings(),
