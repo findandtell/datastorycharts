@@ -167,9 +167,10 @@ export default function ChartEditor() {
     const hasSheetsUrl = urlParams.has('sheetsUrl');
     const hasImportedChart = sessionStorage.getItem('importedChart');
 
-    if (hasSheetsUrl || hasImportedChart) {
+    // Skip admin defaults in Figma mode - user will reload from Figma manually
+    if (hasSheetsUrl || hasImportedChart || figma.isFigmaMode) {
       // Not loading from defaults, allow sample data to load
-      console.log('[AutoLoad useEffect] ⏭️ Skipping - has sheets URL or imported chart');
+      console.log('[AutoLoad useEffect] ⏭️ Skipping - has sheets URL, imported chart, or Figma mode');
       hasLoadedDefaultFromDB.current = false;
       setIsLoadingInitialDefault(false); // Not loading defaults, allow chart to render
       return;
@@ -262,7 +263,7 @@ export default function ChartEditor() {
 
     // Cleanup timeout on unmount
     return () => clearTimeout(safetyTimeout);
-  }, [chartType]); // Only run when chartType changes
+  }, [chartType, figma.isFigmaMode]); // Run when chartType or Figma mode changes
 
   // Refs for resize state to avoid stale closures
   const resizeStateRef = useRef({
