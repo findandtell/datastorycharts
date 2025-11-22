@@ -967,6 +967,38 @@ export default function ChartEditor() {
     }
   };
 
+  // Check for pending Figma reload on mount
+  useEffect(() => {
+    if (!figma.isFigmaMode) return;
+
+    const pendingConfig = sessionStorage.getItem('figmaPendingReload');
+    if (pendingConfig) {
+      try {
+        const config = JSON.parse(pendingConfig);
+        console.log('[ChartEditor] Loading pending Figma config:', config);
+
+        // Clear the pending config immediately
+        sessionStorage.removeItem('figmaPendingReload');
+
+        // Load data
+        if (config.data?.csv) {
+          chartData.loadCSVText(config.data.csv);
+        }
+
+        // Load style settings
+        if (config.styleSettings) {
+          styleSettings.importSettings(config.styleSettings, config.chartType || chartType);
+        }
+
+        console.log('[ChartEditor] ✅ Chart reloaded from Figma successfully');
+        figma.notifyFigma('✅ Chart loaded from Figma!', 2000);
+      } catch (error) {
+        console.error('[ChartEditor] Error loading pending config:', error);
+        sessionStorage.removeItem('figmaPendingReload');
+      }
+    }
+  }, [figma.isFigmaMode, chartType, chartData, styleSettings, figma]);
+
   // Listen for messages from Figma plugin (chart config reload)
   useEffect(() => {
     if (!figma.isFigmaMode) return;
@@ -980,11 +1012,17 @@ export default function ChartEditor() {
         console.log('[ChartEditor] Received chart config from Figma:', config);
 
         try {
-          // Navigate to correct chart type if different
+          // Check if we need to navigate to a different chart type
           if (config.chartType && config.chartType !== chartType) {
+            console.log(`[ChartEditor] Navigating to ${config.chartType} chart type`);
+            // Store config in sessionStorage for the new chart page to pick up
+            sessionStorage.setItem('figmaPendingReload', JSON.stringify(config));
+            // Navigate to correct chart type
             navigate(`/chart/${config.chartType}?mode=figma`);
+            return; // Exit - the new chart page will load the config
           }
 
+          // Same chart type - load directly
           // Load data
           if (config.data?.csv) {
             chartData.loadCSVText(config.data.csv);
@@ -996,6 +1034,7 @@ export default function ChartEditor() {
           }
 
           console.log('[ChartEditor] ✅ Chart reloaded from Figma successfully');
+          figma.notifyFigma('✅ Chart loaded from Figma!', 2000);
         } catch (error) {
           console.error('[ChartEditor] Error loading chart config:', error);
           figma.notifyFigma('❌ Error loading chart configuration', 3000);
@@ -1005,7 +1044,7 @@ export default function ChartEditor() {
 
     window.addEventListener('message', handleFigmaMessage);
     return () => window.removeEventListener('message', handleFigmaMessage);
-  }, [figma.isFigmaMode, chartType, navigate, chartData, styleSettings]);
+  }, [figma.isFigmaMode, chartType, navigate, chartData, styleSettings, figma]);
 
   // Helper function to create a properly sized thumbnail SVG
   const createThumbnailSVG = (svgElement) => {
