@@ -3,6 +3,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { ConfirmDialog } from './Toast';
 
 // Register all AG Grid Community modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -15,6 +16,9 @@ function SpreadsheetDataTable({ chartData, chartType, onClose }) {
   const gridRef = useRef();
   const [newColumnName, setNewColumnName] = useState('');
   const [newRowName, setNewRowName] = useState('');
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   // Track focused cell for copy/paste
   const [focusedCell, setFocusedCell] = useState({
@@ -181,9 +185,14 @@ function SpreadsheetDataTable({ chartData, chartType, onClose }) {
 
   // Handle column delete
   const handleColumnDelete = (columnName) => {
-    if (confirm(`Delete column "${columnName}"?`)) {
-      chartData.removePeriod(columnName);
-    }
+    setConfirmDialog({
+      message: `Delete column "${columnName}"?`,
+      onConfirm: () => {
+        chartData.removePeriod(columnName);
+        setConfirmDialog(null);
+      },
+      onCancel: () => setConfirmDialog(null)
+    });
   };
 
   // Handle column hide/unhide toggle
@@ -227,15 +236,20 @@ function SpreadsheetDataTable({ chartData, chartType, onClose }) {
   const handleDeleteSelectedRows = () => {
     const selectedRows = gridRef.current.api.getSelectedRows();
     if (selectedRows.length > 0) {
-      if (confirm(`Delete ${selectedRows.length} row(s)?`)) {
-        // Sort rows by index in REVERSE order (highest to lowest)
-        // This prevents index shifting issues when deleting multiple rows
-        const sortedRows = [...selectedRows].sort((a, b) => b._id - a._id);
+      setConfirmDialog({
+        message: `Delete ${selectedRows.length} row(s)?`,
+        onConfirm: () => {
+          // Sort rows by index in REVERSE order (highest to lowest)
+          // This prevents index shifting issues when deleting multiple rows
+          const sortedRows = [...selectedRows].sort((a, b) => b._id - a._id);
 
-        sortedRows.forEach(row => {
-          chartData.removeStage(row._id);
-        });
-      }
+          sortedRows.forEach(row => {
+            chartData.removeStage(row._id);
+          });
+          setConfirmDialog(null);
+        },
+        onCancel: () => setConfirmDialog(null)
+      });
     }
   };
 
@@ -534,6 +548,15 @@ function SpreadsheetDataTable({ chartData, chartType, onClose }) {
           rowSelection="multiple"
         />
       </div>
+
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel}
+        />
+      )}
     </div>
   );
 }
