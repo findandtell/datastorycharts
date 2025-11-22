@@ -1004,8 +1004,11 @@ export default function ChartEditor() {
     if (!figma.isFigmaMode) return;
 
     const handleFigmaMessage = (event) => {
+      // Validate event structure before accessing pluginMessage
+      if (!event || !event.data || typeof event.data !== 'object') return;
+
       const msg = event.data.pluginMessage;
-      if (!msg) return;
+      if (!msg || typeof msg !== 'object') return;
 
       if (msg.type === 'load-chart-config') {
         const config = msg.config;
