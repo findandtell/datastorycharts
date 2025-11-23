@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Toast from '../../components/Toast';
 
 /**
  * Banner shown when app is loaded from Google Sheets
@@ -8,6 +9,7 @@ export default function GoogleSheetsBanner() {
   const [show, setShow] = useState(true);
   const [fromSheets, setFromSheets] = useState(false);
   const [sheetsUrl, setSheetsUrl] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     // Check if loaded with CSV data (indicates it came from Sheets)
@@ -88,7 +90,11 @@ export default function GoogleSheetsBanner() {
                   if (window.opener) {
                     window.opener.focus();
                   } else {
-                    alert('Open Google Sheets in another tab to update data.\n\nTip: Keep both tabs open for easy switching!');
+                    setToast({
+                      message: 'Open Google Sheets in another tab to update data. Tip: Keep both tabs open for easy switching!',
+                      type: 'info',
+                      duration: 4000
+                    });
                   }
                 }}
                 className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
@@ -109,6 +115,16 @@ export default function GoogleSheetsBanner() {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

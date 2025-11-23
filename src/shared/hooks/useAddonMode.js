@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 
 /**
  * Hook to detect and handle Google Sheets Add-on mode
+ * @param {Function} showToast - Function to show toast notifications (optional)
  * @returns {object} Add-on state and communication functions
  */
-export function useAddonMode() {
+export function useAddonMode(showToast = null) {
   const [isAddonMode, setIsAddonMode] = useState(false);
   const [addonReady, setAddonReady] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
@@ -65,7 +66,12 @@ export function useAddonMode() {
             setTimeout(checkAPI, 500);
           } else {
             console.error('[DEBUG] API not found after', maxChecks, 'attempts');
-            alert('[ERROR] Google Sheets API was not injected. Cross-origin restriction may be blocking access.');
+            const errorMsg = 'Google Sheets API was not injected. Cross-origin restriction may be blocking access.';
+            if (showToast) {
+              showToast(errorMsg, 'error', 5000);
+            } else {
+              alert('[ERROR] ' + errorMsg);
+            }
           }
         }
       };
@@ -109,9 +115,14 @@ export function useAddonMode() {
 
         case 'INSERT_SUCCESS':
           console.log('[Add-on Mode] Chart inserted successfully with ID:', message.chartId);
-          // Show alert with chart ID so user can edit it later
+          // Show notification with chart ID so user can edit it later
           if (message.chartId) {
-            alert(`Chart inserted successfully!\n\nChart ID: ${message.chartId}\n\nSave this ID to edit the chart later using "Find&Tell Charts" → "Edit Chart by ID"`);
+            const successMsg = `Chart inserted successfully! Chart ID: ${message.chartId}. Save this ID to edit the chart later using "Find&Tell Charts" → "Edit Chart by ID"`;
+            if (showToast) {
+              showToast(successMsg, 'success', 6000);
+            } else {
+              alert(successMsg);
+            }
           }
           break;
 
@@ -165,15 +176,30 @@ export function useAddonMode() {
 
         if (error) {
           console.error('[DEBUG] Error getting data:', error);
-          alert('[ERROR] Error getting data: ' + error.message);
+          const errorMsg = 'Error getting data: ' + error.message;
+          if (showToast) {
+            showToast(errorMsg, 'error');
+          } else {
+            alert('[ERROR] ' + errorMsg);
+          }
         } else if (result && result.success) {
           console.log('[DEBUG] Data received successfully via direct API');
           console.log('[DEBUG] Data:', result.data);
           setSheetData(result.data);
-          alert('[SUCCESS] Data loaded! CSV length: ' + (result.data.csv ? result.data.csv.length : 'N/A'));
+          const successMsg = 'Data loaded! CSV length: ' + (result.data.csv ? result.data.csv.length : 'N/A');
+          if (showToast) {
+            showToast(successMsg, 'success');
+          } else {
+            alert('[SUCCESS] ' + successMsg);
+          }
         } else {
           console.error('[DEBUG] Invalid data response:', result);
-          alert('[ERROR] Invalid data response from Google Sheets');
+          const errorMsg = 'Invalid data response from Google Sheets';
+          if (showToast) {
+            showToast(errorMsg, 'error');
+          } else {
+            alert('[ERROR] ' + errorMsg);
+          }
         }
       });
     } else {
@@ -205,13 +231,28 @@ export function useAddonMode() {
 
         if (error) {
           console.error('[DEBUG] Error inserting chart:', error);
-          alert('[ERROR] Error inserting chart: ' + error.message);
+          const errorMsg = 'Error inserting chart: ' + error.message;
+          if (showToast) {
+            showToast(errorMsg, 'error');
+          } else {
+            alert('[ERROR] ' + errorMsg);
+          }
         } else if (result && result.success) {
           console.log('[DEBUG] Chart inserted successfully');
-          alert(`[SUCCESS] Chart inserted!\n\nChart ID: ${result.chartId || 'N/A'}\n\nSave this ID to edit the chart later.`);
+          const successMsg = `Chart inserted! Chart ID: ${result.chartId || 'N/A'}. Save this ID to edit the chart later.`;
+          if (showToast) {
+            showToast(successMsg, 'success', 6000);
+          } else {
+            alert('[SUCCESS] ' + successMsg);
+          }
         } else {
           console.error('[DEBUG] Invalid insert response:', result);
-          alert('[ERROR] Invalid response from chart insertion');
+          const errorMsg = 'Invalid response from chart insertion';
+          if (showToast) {
+            showToast(errorMsg, 'error');
+          } else {
+            alert('[ERROR] ' + errorMsg);
+          }
         }
       });
     } else {

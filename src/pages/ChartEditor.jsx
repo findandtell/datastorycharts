@@ -21,6 +21,7 @@ import SnapshotGallery from '../components/SnapshotGallery';
 import SnapshotModal from '../components/SnapshotModal';
 import SpreadsheetDataTable from '../components/SpreadsheetDataTable';
 import AdminLogin from '../components/AdminLogin';
+import Toast from '../components/Toast';
 import { useAdmin } from '../contexts/AdminContext';
 import { getSectionOrder, getSectionMetadata } from '../config/chartStylingConfig';
 import {
@@ -94,6 +95,9 @@ export default function ChartEditor() {
   const [isAdminSaving, setIsAdminSaving] = useState(false);
   const [isAdminLoading, setIsAdminLoading] = useState(false);
 
+  // Toast notification state
+  const [toast, setToast] = useState(null);
+
   // Ref to track if we're currently loading a style preset
   const isLoadingPresetRef = useRef(false);
 
@@ -138,7 +142,7 @@ export default function ChartEditor() {
   }, []); // Empty deps = only on mount/unmount
 
   const styleSettings = useStyleSettings();
-  const addon = useAddonMode();
+  const addon = useAddonMode(showToast);
   const figma = useFigmaMode();
   const license = useLicense();
   const admin = useAdmin();
@@ -147,6 +151,11 @@ export default function ChartEditor() {
   const hamburgerMenuRef = useRef(null);
   const chartImportFileInputRef = useRef(null);
   const clearEmphasisRef = useRef(null);
+
+  // Helper function to show toast notifications
+  const showToast = useCallback((message, type = 'info', duration = 3000) => {
+    setToast({ message, type, duration });
+  }, []);
 
   // Sync license state with userTier (removes watermarks for Pro users)
   useEffect(() => {
@@ -946,7 +955,7 @@ export default function ChartEditor() {
     try {
       const csvContent = dataToCSV();
       if (!csvContent) {
-        alert('No data to export');
+        showToast('No data to export', 'error');
         return;
       }
 
@@ -967,9 +976,10 @@ export default function ChartEditor() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      showToast('CSV exported successfully', 'success');
     } catch (error) {
       console.error('[ChartEditor] Error exporting CSV:', error);
-      alert('Error exporting CSV. Please try again.');
+      showToast('Error exporting CSV. Please try again.', 'error');
     }
   };
 
@@ -1286,14 +1296,14 @@ export default function ChartEditor() {
   // Handle License Activation
   const handleActivateLicense = async () => {
     if (!licenseKeyInput.trim()) {
-      alert('Please enter a license key');
+      showToast('Please enter a license key', 'warning');
       return;
     }
 
     const result = await license.activateLicense(licenseKeyInput.trim());
 
     if (result.success) {
-      alert('✅ License activated successfully!');
+      showToast('License activated successfully!', 'success');
       setShowActivateLicenseModal(false);
       setLicenseKeyInput('');
 
@@ -1303,7 +1313,7 @@ export default function ChartEditor() {
         setShowHamburgerMenu(true);
       }, 100);
     } else {
-      alert(`❌ Activation failed: ${result.error}`);
+      showToast(`Activation failed: ${result.error}`, 'error');
     }
   };
 
@@ -1329,7 +1339,7 @@ export default function ChartEditor() {
       // Get the chart SVG element
       const svgElement = svgRef.current?.querySelector('svg');
       if (!svgElement) {
-        alert('Chart not found. Please try again.');
+        showToast('Chart not found. Please try again.', 'error');
         return;
       }
 
@@ -1354,7 +1364,7 @@ export default function ChartEditor() {
       // Success alert is now handled in useAddonMode hook with Chart ID
     } catch (error) {
       console.error('Error inserting chart:', error);
-      alert('Error inserting chart. Please try again.');
+      showToast('Error inserting chart. Please try again.', 'error');
     }
   };
 
@@ -1382,9 +1392,10 @@ export default function ChartEditor() {
       URL.revokeObjectURL(url);
 
       console.log('Chart saved successfully');
+      showToast('Chart saved successfully', 'success');
     } catch (error) {
       console.error('Failed to save chart:', error);
-      alert('Failed to save chart: ' + error.message);
+      showToast('Failed to save chart: ' + error.message, 'error');
     }
   };
 
@@ -1425,12 +1436,13 @@ export default function ChartEditor() {
 
       if (result.success) {
         console.log('Chart loaded successfully');
+        showToast('Chart imported successfully', 'success');
       } else {
         throw new Error(result.message);
       }
     } catch (error) {
       console.error('Failed to import chart:', error);
-      alert('Failed to import chart: ' + error.message);
+      showToast('Failed to import chart: ' + error.message, 'error');
     } finally {
       event.target.value = ''; // Reset file input
     }
@@ -1440,7 +1452,7 @@ export default function ChartEditor() {
   // Handle paste CSV data
   const handlePasteCSV = async () => {
     if (!pastedCSV.trim()) {
-      alert('Please paste CSV data first');
+      showToast('Please paste CSV data first', 'warning');
       return;
     }
 
@@ -1448,7 +1460,7 @@ export default function ChartEditor() {
       // Auto-detect delimiter
       const lines = pastedCSV.trim().split('\n');
       if (lines.length < 2) {
-        alert('CSV data must have at least a header row and one data row');
+        showToast('CSV data must have at least a header row and one data row', 'error');
         return;
       }
 
@@ -1479,14 +1491,14 @@ export default function ChartEditor() {
         // Close the paste area
         setShowPasteCSV(false);
         setPastedCSV('');
-        alert('CSV data loaded successfully!');
+        showToast('CSV data loaded successfully!', 'success');
       } else {
         // Error message is already set in chartData.error
-        alert('Error loading CSV data: ' + (chartData.error || 'Unknown error'));
+        showToast('Error loading CSV data: ' + (chartData.error || 'Unknown error'), 'error');
       }
     } catch (error) {
       console.error('Error parsing CSV:', error);
-      alert('Error parsing CSV data: ' + error.message);
+      showToast('Error parsing CSV data: ' + error.message, 'error');
     }
   };
 
@@ -1642,9 +1654,10 @@ export default function ChartEditor() {
       URL.revokeObjectURL(url);
 
       console.log('Chart saved from snapshot successfully');
+      showToast('Chart saved from snapshot successfully', 'success');
     } catch (error) {
       console.error('Failed to save chart from snapshot:', error);
-      alert('Failed to save chart from snapshot: ' + error.message);
+      showToast('Failed to save chart from snapshot: ' + error.message, 'error');
     }
   };
 
@@ -8161,8 +8174,8 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
                         if (secondaryLevel > primaryLevel) {
                           styleSettings.setXAxisSecondaryLabel(newSecondary);
                         } else {
-                          // Invalid selection - show alert and don't change
-                          alert('Secondary label must be less granular than primary label.\nFor example: Primary = Day, Secondary = Month or Year');
+                          // Invalid selection - show toast and don't change
+                          showToast('Secondary label must be less granular than primary label. For example: Primary = Day, Secondary = Month or Year', 'warning', 4000);
                         }
                       } else {
                         // Auto or none, always allowed
@@ -9013,6 +9026,17 @@ function DataTabContent({
             </div>
           </div>
         </div>
+      )}
+    </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
