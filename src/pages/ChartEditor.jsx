@@ -281,7 +281,10 @@ export default function ChartEditor() {
     startX: 0,
     startY: 0,
     startWidth: 1400,
-    startHeight: 900
+    startHeight: 900,
+    lastResizeTime: 0,
+    pendingWidth: 1400,
+    pendingHeight: 900
   });
 
   // Toggle Dock Mode for Figma
@@ -303,6 +306,7 @@ export default function ChartEditor() {
   };
 
   // Resize handlers for Figma window - using refs to avoid stale closures
+  // Throttled to prevent jerky behavior when sending too many resize messages
   const handleWindowResizeStart = useCallback((e) => {
     if (!figma.isFigmaMode || isDockMode) return;
     e.preventDefault();
@@ -313,7 +317,10 @@ export default function ChartEditor() {
       startX: e.clientX,
       startY: e.clientY,
       startWidth: windowSize.width,
-      startHeight: windowSize.height
+      startHeight: windowSize.height,
+      lastResizeTime: 0,
+      pendingWidth: windowSize.width,
+      pendingHeight: windowSize.height
     };
     setIsResizingWindow(true);
   }, [figma.isFigmaMode, isDockMode, windowSize]);
@@ -330,16 +337,30 @@ export default function ChartEditor() {
     const newWidth = Math.max(500, resizeState.startWidth + deltaX);
     const newHeight = Math.max(400, resizeState.startHeight + deltaY);
 
+    // Always update React state for smooth visual feedback
     setWindowSize({ width: newWidth, height: newHeight });
-    figma.resizeFigma(newWidth, newHeight);
+
+    // Store pending size for final resize
+    resizeState.pendingWidth = newWidth;
+    resizeState.pendingHeight = newHeight;
+
+    // Throttle Figma resize calls to every 50ms to prevent jerky behavior
+    const now = Date.now();
+    if (now - resizeState.lastResizeTime >= 50) {
+      resizeState.lastResizeTime = now;
+      figma.resizeFigma(newWidth, newHeight);
+    }
   }, [figma]);
 
   const handleWindowResizeEnd = useCallback(() => {
-    if (resizeStateRef.current.isResizing) {
-      resizeStateRef.current.isResizing = false;
+    const resizeState = resizeStateRef.current;
+    if (resizeState.isResizing) {
+      // Send final size to Figma to ensure exact dimensions
+      figma.resizeFigma(resizeState.pendingWidth, resizeState.pendingHeight);
+      resizeState.isResizing = false;
       setIsResizingWindow(false);
     }
-  }, []);
+  }, [figma]);
 
   // Add global mouse event listeners for window resize
   useEffect(() => {
