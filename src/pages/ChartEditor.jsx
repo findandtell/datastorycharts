@@ -370,17 +370,15 @@ export default function ChartEditor() {
       document.body.style.cursor = 'nwse-resize';
 
       // Use capture phase to ensure we get events even if other handlers stopPropagation
+      // Note: Do NOT use mouseleave - in Figma plugins, the iframe boundary triggers it when dragging
       document.addEventListener('mousemove', handleWindowResizeMove, { passive: false, capture: true });
       document.addEventListener('mouseup', handleWindowResizeEnd, { capture: true });
-      // Also handle mouse leaving the window
-      document.addEventListener('mouseleave', handleWindowResizeEnd, { capture: true });
 
       return () => {
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
         document.removeEventListener('mousemove', handleWindowResizeMove, { capture: true });
         document.removeEventListener('mouseup', handleWindowResizeEnd, { capture: true });
-        document.removeEventListener('mouseleave', handleWindowResizeEnd, { capture: true });
       };
     }
   }, [isResizingWindow, handleWindowResizeMove, handleWindowResizeEnd]);
