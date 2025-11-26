@@ -3312,6 +3312,30 @@ export default function ChartEditor() {
 }
 
 /**
+ * Collapsible Section Component
+ */
+function CollapsibleSection({ title, isExpanded, onToggle, children }) {
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-medium text-sm text-gray-900"
+      >
+        <span>{title}</span>
+        <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+          ▼
+        </span>
+      </button>
+      {isExpanded && (
+        <div className="px-3 py-3 bg-white">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Style Tab Component
  */
 function StyleTabContent({ styleSettings, expandedSections, toggleSection, chartData, chartType, clearEmphasisRef, clearEmphasis, throttledSetters, license }) {
@@ -9227,30 +9251,6 @@ function EditDataTable({ chartData, chartType, onClose }) {
           + {stageLabel}
         </button>
       </div>
-    </div>
-  );
-}
-
-/**
- * Collapsible Section Component
- */
-function CollapsibleSection({ title, isExpanded, onToggle, children }) {
-  return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full px-3 py-2 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-left font-medium text-sm text-gray-900"
-      >
-        <span>{title}</span>
-        <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-          ▼
-        </span>
-      </button>
-      {isExpanded && (
-        <div className="px-3 py-3 bg-white">
-          {children}
-        </div>
-      )}
     </div>
   );
 }
