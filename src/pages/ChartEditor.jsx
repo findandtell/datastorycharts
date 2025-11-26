@@ -3307,6 +3307,16 @@ export default function ChartEditor() {
           </div>
         </div>
       )}
+
+      {/* Toast Notification - Global for all tabs */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }
@@ -8962,15 +8972,6 @@ function DataTabContent({
         </div>
       )}
 
-      {/* Toast Notification */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration}
-          onClose={() => setToast(null)}
-        />
-      )}
     </div>
   );
 }
