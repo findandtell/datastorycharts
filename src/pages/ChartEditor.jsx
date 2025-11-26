@@ -312,18 +312,24 @@ export default function ChartEditor() {
     e.preventDefault();
     e.stopPropagation();
 
+    // Use actual window dimensions instead of React state to avoid stale closures
+    // In Figma plugin iframe, window.innerWidth/Height reflects the plugin window size
+    const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
+
     resizeStateRef.current = {
       isResizing: true,
       startX: e.clientX,
       startY: e.clientY,
-      startWidth: windowSize.width,
-      startHeight: windowSize.height,
+      startWidth: currentWidth,
+      startHeight: currentHeight,
       lastResizeTime: 0,
-      pendingWidth: windowSize.width,
-      pendingHeight: windowSize.height
+      pendingWidth: currentWidth,
+      pendingHeight: currentHeight
     };
+    setWindowSize({ width: currentWidth, height: currentHeight });
     setIsResizingWindow(true);
-  }, [figma.isFigmaMode, isDockMode, windowSize]);
+  }, [figma.isFigmaMode, isDockMode]);
 
   const handleWindowResizeMove = useCallback((e) => {
     const resizeState = resizeStateRef.current;
