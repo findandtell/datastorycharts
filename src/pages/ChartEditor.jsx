@@ -922,15 +922,15 @@ export default function ChartEditor() {
     setShowExportMenu(false);
   };
 
-  // Helper function to convert current data to CSV
+  // Helper function to convert current data to CSV (visible data only - for export)
   const dataToCSV = () => {
     if (!chartData.data || chartData.data.length === 0) {
       return chartData.rawCSV || ''; // Fallback to original if no data
     }
 
-    // Get all column names (first is usually 'Stage', 'Category', or 'Group')
+    // Get all column names (excluding internal properties like 'hidden')
     const firstRow = chartData.data[0];
-    const columnNames = Object.keys(firstRow);
+    const columnNames = Object.keys(firstRow).filter(col => col !== 'hidden' && col !== '_id');
 
     // Create header row
     const headerRow = columnNames.join(',');
@@ -948,6 +948,43 @@ export default function ChartEditor() {
     });
 
     return [headerRow, ...dataRows].join('\n');
+  };
+
+  // Helper function to convert ALL data to CSV (including hidden rows - for Figma save/reload)
+  const dataToCSVWithHidden = () => {
+    const sourceData = chartData.editableData || chartData.data;
+    if (!sourceData || sourceData.length === 0) {
+      return chartData.rawCSV || '';
+    }
+
+    const firstRow = sourceData[0];
+    const columnNames = Object.keys(firstRow).filter(col => col !== 'hidden' && col !== '_id');
+
+    const headerRow = columnNames.join(',');
+
+    const dataRows = sourceData.map(row => {
+      return columnNames.map(col => {
+        const value = row[col];
+        if (typeof value === 'string' && (value.includes(',') || value.includes('\n'))) {
+          return `"${value}"`;
+        }
+        return value;
+      }).join(',');
+    });
+
+    return [headerRow, ...dataRows].join('\n');
+  };
+
+  // Helper function to get indices of hidden rows
+  const getHiddenRowIndices = () => {
+    const sourceData = chartData.editableData || [];
+    const hiddenIndices = [];
+    sourceData.forEach((row, index) => {
+      if (row.hidden) {
+        hiddenIndices.push(index);
+      }
+    });
+    return hiddenIndices;
   };
 
   // Handle Export CSV
@@ -999,15 +1036,18 @@ export default function ChartEditor() {
       const svgString = new XMLSerializer().serializeToString(svgElement);
 
       // Package complete chart configuration for reload functionality
+      // Use dataToCSVWithHidden to preserve ALL data including hidden rows
       const chartConfig = {
         chartType: chartType,
         data: {
-          csv: dataToCSV(), // Use current data state, not old rawCSV
+          csv: dataToCSVWithHidden(), // Use ALL data including hidden rows
           periodNames: chartData.periodNames,
+          hiddenRowIndices: getHiddenRowIndices(), // Track which rows are hidden
+          hiddenPeriods: Array.from(chartData.hiddenPeriods || []), // Track hidden columns
         },
         styleSettings: styleSettings.exportSettings(),
         savedAt: new Date().toISOString(),
-        version: '1.0',
+        version: '1.1', // Bump version to indicate hidden state support
       };
 
       // Send to Figma with configuration
@@ -1054,6 +1094,22 @@ export default function ChartEditor() {
         // Load data
         if (config.data?.csv) {
           chartData.loadCSVText(config.data.csv);
+
+          // Restore hidden row states (after data is loaded)
+          setTimeout(() => {
+            if (config.data?.hiddenRowIndices && Array.isArray(config.data.hiddenRowIndices)) {
+              config.data.hiddenRowIndices.forEach(index => {
+                chartData.toggleStageHidden(index, true);
+              });
+              console.log('[ChartEditor] Restored hidden rows:', config.data.hiddenRowIndices);
+            }
+
+            // Restore hidden periods/columns
+            if (config.data?.hiddenPeriods && Array.isArray(config.data.hiddenPeriods)) {
+              chartData.setHiddenPeriods(new Set(config.data.hiddenPeriods));
+              console.log('[ChartEditor] Restored hidden periods:', config.data.hiddenPeriods);
+            }
+          }, 100);
         }
 
         // Load style settings
@@ -1101,6 +1157,23 @@ export default function ChartEditor() {
           // Load data
           if (config.data?.csv) {
             chartData.loadCSVText(config.data.csv);
+
+            // Restore hidden row states (after data is loaded)
+            // Use setTimeout to ensure data is loaded first
+            setTimeout(() => {
+              if (config.data?.hiddenRowIndices && Array.isArray(config.data.hiddenRowIndices)) {
+                config.data.hiddenRowIndices.forEach(index => {
+                  chartData.toggleStageHidden(index, true);
+                });
+                console.log('[ChartEditor] Restored hidden rows:', config.data.hiddenRowIndices);
+              }
+
+              // Restore hidden periods/columns
+              if (config.data?.hiddenPeriods && Array.isArray(config.data.hiddenPeriods)) {
+                chartData.setHiddenPeriods(new Set(config.data.hiddenPeriods));
+                console.log('[ChartEditor] Restored hidden periods:', config.data.hiddenPeriods);
+              }
+            }, 100);
           }
 
           // Load style settings
@@ -9027,7 +9100,6 @@ function DataTabContent({
           </div>
         </div>
       )}
-    </div>
 
       {/* Toast Notification */}
       {toast && (
