@@ -369,14 +369,18 @@ export default function ChartEditor() {
       document.body.style.userSelect = 'none';
       document.body.style.cursor = 'nwse-resize';
 
-      document.addEventListener('mousemove', handleWindowResizeMove, { passive: false });
-      document.addEventListener('mouseup', handleWindowResizeEnd);
+      // Use capture phase to ensure we get events even if other handlers stopPropagation
+      document.addEventListener('mousemove', handleWindowResizeMove, { passive: false, capture: true });
+      document.addEventListener('mouseup', handleWindowResizeEnd, { capture: true });
+      // Also handle mouse leaving the window
+      document.addEventListener('mouseleave', handleWindowResizeEnd, { capture: true });
 
       return () => {
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-        document.removeEventListener('mousemove', handleWindowResizeMove);
-        document.removeEventListener('mouseup', handleWindowResizeEnd);
+        document.removeEventListener('mousemove', handleWindowResizeMove, { capture: true });
+        document.removeEventListener('mouseup', handleWindowResizeEnd, { capture: true });
+        document.removeEventListener('mouseleave', handleWindowResizeEnd, { capture: true });
       };
     }
   }, [isResizingWindow, handleWindowResizeMove, handleWindowResizeEnd]);
@@ -3219,7 +3223,7 @@ export default function ChartEditor() {
       {/* Admin Login Modal */}
       <AdminLogin isOpen={showAdminLoginModal} onClose={() => setShowAdminLoginModal(false)} />
 
-      {/* Transparent Overlay During Resize - Captures all mouse events */}
+      {/* Transparent Overlay During Resize - Prevents interaction with other elements */}
       {isResizingWindow && (
         <div
           className="fixed inset-0 z-[60]"
@@ -3227,8 +3231,7 @@ export default function ChartEditor() {
             cursor: 'nwse-resize',
             userSelect: 'none',
           }}
-          onMouseMove={handleWindowResizeMove}
-          onMouseUp={handleWindowResizeEnd}
+          // Note: Mouse events handled by document listeners in useEffect for reliability
         />
       )}
 
@@ -3236,20 +3239,21 @@ export default function ChartEditor() {
       {figma.isFigmaMode && !isDockMode && (
         <div
           onMouseDown={handleWindowResizeStart}
-          className="fixed bottom-1 right-1 cursor-nwse-resize z-50"
+          className="fixed bottom-0 right-0 cursor-nwse-resize z-50 flex items-center justify-center"
           style={{
-            cursor: isResizingWindow ? 'nwse-resize' : 'nwse-resize',
+            width: '24px',
+            height: '24px',
+            touchAction: 'none', // Prevents scroll interference on touch
+            userSelect: 'none',
           }}
         >
-          {/* Blue dot resize handle - matches chart style */}
-          <div className="relative">
-            <div
-              className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-md hover:bg-blue-600 hover:scale-110 transition-all"
-              style={{
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.2)',
-              }}
-            />
-          </div>
+          {/* Blue dot resize handle - visible indicator */}
+          <div
+            className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-md hover:bg-blue-600 hover:scale-110 transition-all pointer-events-none"
+            style={{
+              boxShadow: '0 0 0 1px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          />
         </div>
       )}
 
