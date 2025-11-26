@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import * as d3 from 'd3';
 import { comparisonPalettes } from '../../shared/design-system/colorPalettes';
 import { getContrastTextColor, generateColorGradient } from '../../shared/utils/colorUtils';
+import { debug } from '../../shared/utils/debug';
 
 /**
  * BarChart Component
@@ -215,7 +216,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
   // Reset auto-population flag when emphasizedBars or percentChangeEnabled changes
   useEffect(() => {
     hasAutoPopulatedRef.current = false;
-    console.log('[BarChart] 🔄 Reset hasAutoPopulatedRef due to emphasizedBars/percentChangeEnabled change');
+    debug.log('BarChart', 'Reset hasAutoPopulatedRef due to emphasizedBars/percentChangeEnabled change');
   }, [emphasizedBars, percentChangeEnabled]);
 
   // Main chart rendering
@@ -226,7 +227,7 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
 
     // Clear previous bar data to ensure fresh coordinates on each render
     renderedBarsDataRef.current = {};
-    console.log('[BarChart] 🧹 Cleared renderedBarsDataRef for fresh render');
+    debug.log('BarChart', 'Cleared renderedBarsDataRef for fresh render');
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
@@ -1267,14 +1268,15 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             const barWidth = xScale.bandwidth();
             const y = yScale(totalValue);
 
-            // Add 2px cap line
+            // Add cap line at top of stacked bar
             g.append('line')
+              .attr('class', 'stacked-bar-cap')
               .attr('x1', x)
               .attr('y1', y)
               .attr('x2', x + barWidth)
               .attr('y2', y)
-              .attr('stroke', themeColors.categoryLabelColor)
-              .attr('stroke-width', 2);
+              .attr('stroke', themeColors.emphasisColor)
+              .attr('stroke-width', 3);
 
             // Create a unique barId for the total
             const totalBarId = `${categoryValue}-Total`;
@@ -1315,14 +1317,15 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
             const barWidth = yScale.bandwidth();
             const x = xScale(totalValue);
 
-            // Add 2px cap line
+            // Add cap line at end of stacked bar
             g.append('line')
+              .attr('class', 'stacked-bar-cap')
               .attr('x1', x)
               .attr('y1', y)
               .attr('x2', x)
               .attr('y2', y + barWidth)
-              .attr('stroke', themeColors.axisLabelColor)
-              .attr('stroke-width', 2);
+              .attr('stroke', themeColors.emphasisColor)
+              .attr('stroke-width', 3);
 
             // Create a unique barId for the total
             const totalBarId = `${categoryValue}-Total`;
@@ -1685,14 +1688,13 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
     }
 
     // Render Percent Change Brackets
-    console.log('[BarChart RENDER] 🎨 About to check bracket rendering:', {
+    debug.log('BarChart', 'Checking bracket rendering', {
       percentChangeEnabled,
-      selectedBarsCount: selectedBarsForComparison.length,
-      selectedBars: selectedBarsForComparison
+      selectedBarsCount: selectedBarsForComparison.length
     });
 
     if (percentChangeEnabled && selectedBarsForComparison.length >= 2) {
-      console.log('[BarChart RENDER] ✅ RENDERING BRACKETS - conditions met!');
+      debug.log('BarChart', 'Rendering brackets - conditions met');
       // Build comparison pairs (every 2 clicks = 1 pair)
       const pairs = [];
       for (let i = 0; i < selectedBarsForComparison.length - 1; i += 2) {
@@ -1711,13 +1713,9 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         const first = renderedBarsDataRef.current[firstStale.barId] || firstStale;
         const second = renderedBarsDataRef.current[secondStale.barId] || secondStale;
 
-        console.log('[BarChart RENDER] 📍 Using coordinates:', {
+        debug.log('BarChart', 'Using bracket coordinates', {
           firstBarId: first.barId,
-          firstLabelX: first.labelX,
-          firstLabelY: first.labelY,
-          secondBarId: second.barId,
-          secondLabelX: second.labelX,
-          secondLabelY: second.labelY
+          secondBarId: second.barId
         });
 
         const percentChange = ((second.value - first.value) / first.value) * 100;
@@ -1973,9 +1971,10 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         !hasAutoPopulatedRef.current &&
         Object.keys(renderedBarsDataRef.current).length > 0) {
 
-      console.log('[BarChart] 🎯 POST-RENDER: Auto-populating from emphasizedBars with coordinates');
-      console.log('[BarChart] emphasizedBars:', emphasizedBars);
-      console.log('[BarChart] renderedBarsData keys:', Object.keys(renderedBarsDataRef.current));
+      debug.log('BarChart', 'POST-RENDER: Auto-populating from emphasizedBars', {
+        emphasizedBars,
+        renderedBarsCount: Object.keys(renderedBarsDataRef.current).length
+      });
 
       // Include ALL emphasized bars (not just first 2) to support multiple bracket pairs
       // Every 2 bars = 1 bracket, so 4 bars = 2 brackets, 6 bars = 3 brackets, etc.
@@ -1984,11 +1983,11 @@ const BarChart = ({ data, periodNames, styleSettings = {}, onBarClick, onClearEm
         .filter(Boolean);
 
       if (barsWithCoordinates.length >= 2) {
-        console.log('[BarChart] ✅ Setting selectedBarsForComparison with coordinates:', barsWithCoordinates);
+        debug.log('BarChart', 'Setting selectedBarsForComparison', barsWithCoordinates.length);
         setSelectedBarsForComparison(barsWithCoordinates);
         hasAutoPopulatedRef.current = true;
       } else {
-        console.log('[BarChart] ⚠️ Could not find rendered bar data for emphasizedBars:', emphasizedBars);
+        debug.warn('BarChart', 'Could not find rendered bar data for emphasizedBars', emphasizedBars);
       }
     }
 

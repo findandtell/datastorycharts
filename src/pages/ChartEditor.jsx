@@ -34,8 +34,8 @@ import {
   PlayCircleIcon,
   InformationCircleIcon,
   ArrowsPointingOutIcon,
-  ViewColumnsIcon,
-  Bars3Icon,
+  ArrowsPointingInIcon,
+  Bars2Icon,
   CloudArrowUpIcon,
   AdjustmentsHorizontalIcon,
   PlusIcon,
@@ -142,6 +142,12 @@ export default function ChartEditor() {
   }, []); // Empty deps = only on mount/unmount
 
   const styleSettings = useStyleSettings();
+
+  // Helper function to show toast notifications (must be defined before useAddonMode)
+  const showToast = useCallback((message, type = 'info', duration = 3000) => {
+    setToast({ message, type, duration });
+  }, []);
+
   const addon = useAddonMode(showToast);
   const figma = useFigmaMode();
   const license = useLicense();
@@ -151,11 +157,6 @@ export default function ChartEditor() {
   const hamburgerMenuRef = useRef(null);
   const chartImportFileInputRef = useRef(null);
   const clearEmphasisRef = useRef(null);
-
-  // Helper function to show toast notifications
-  const showToast = useCallback((message, type = 'info', duration = 3000) => {
-    setToast({ message, type, duration });
-  }, []);
 
   // Sync license state with userTier (removes watermarks for Pro users)
   useEffect(() => {
@@ -792,25 +793,19 @@ export default function ChartEditor() {
   }, [styleSettings.chartWidth, styleSettings.chartHeight, chartType, styleSettings]);
 
   // Auto-adjust canvas dimensions for Slope Chart
-  // Slope chart ALWAYS calculates canvas dimensions from periodSpacing and periodHeight
-  // This means presets should NOT include canvasWidth/canvasHeight - they are derived
+  // Slope chart uses chartHeight for vertical size, and periodSpacing for horizontal distance between axes
+  // Canvas dimensions are derived from these values plus margins
   useEffect(() => {
     if (chartType !== 'slope') return;
 
-    // Slope chart dimensions are based on:
-    // - periodHeight: vertical space for the chart
-    // - periodSpacing: horizontal distance between the two columns
-    // - Label space: approximately 250px on each side for category/value labels
-    // - Margins: 120 left, 60 right, 80 top, 60 bottom (from slopeChartDefaults)
-
-    const labelSpace = 250 * 2; // Space for left and right labels
-    const margins = 120 + 60; // left + right margins
-    const canvasWidth = styleSettings.periodSpacing + labelSpace + margins;
-    const canvasHeight = styleSettings.periodHeight + 140; // 80 top + 60 bottom margins
+    // Slope chart canvas width: periodSpacing (distance between axes) + label space (250px each side) + margins (120 left + 60 right)
+    const canvasWidth = styleSettings.periodSpacing + 250 + 250 + 120 + 60; // periodSpacing + labels + margins
+    // Slope chart canvas height: chartHeight + margins (80 top + 60 bottom)
+    const canvasHeight = styleSettings.chartHeight + 140;
 
     styleSettings.setCanvasWidth(Math.round(canvasWidth));
     styleSettings.setCanvasHeight(Math.round(canvasHeight));
-  }, [styleSettings.periodSpacing, styleSettings.periodHeight, chartType, styleSettings]);
+  }, [styleSettings.periodSpacing, styleSettings.chartHeight, chartType, styleSettings]);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -1826,14 +1821,13 @@ export default function ChartEditor() {
 
     // Update dimensions based on chart type
     if (chartType === 'slope') {
-      // For Slope Chart: update periodHeight and derive periodSpacing from width
-      // Canvas height = periodHeight + margins (80 top + 60 bottom = 140)
+      // For Slope Chart: update periodSpacing (horizontal) and chartHeight (vertical)
       // Canvas width = periodSpacing + label space (500) + margins (180)
-      const periodHeight = Math.max(200, newHeight - 140);
+      // Canvas height = chartHeight + margins (140)
       const periodSpacing = Math.max(100, newWidth - 680); // 680 = 500 label space + 180 margins
-
-      styleSettings.setPeriodHeight(periodHeight);
+      const chartHeight = Math.max(200, newHeight - 140);
       styleSettings.setPeriodSpacing(periodSpacing);
+      styleSettings.setChartHeight(chartHeight);
     } else if (chartType === 'funnel') {
       // For Funnel Chart: update canvasWidth and canvasHeight directly
       styleSettings.setCanvasWidth(newWidth);
@@ -2156,11 +2150,11 @@ export default function ChartEditor() {
     periodLabelPosition: styleSettings.periodLabelPosition,
     emphasizedLineThickness: 5,
     emphasizedLabelWeight: 700,
-    // Layout for Slope Chart
+    // Layout for Slope Chart - uses chartWidth/chartHeight like Bar and Line charts
     width: styleSettings.canvasWidth,
     height: styleSettings.canvasHeight,
-    // Use periodHeight directly from settings (not calculated from chartHeight)
-    periodHeight: styleSettings.periodHeight,
+    // Derive periodHeight from chartHeight (similar to how Bar/Line derive canvas from chart)
+    periodHeight: styleSettings.chartHeight,
     marginTop: 60,
     marginRight: 160,
     marginBottom: 140,
@@ -2168,6 +2162,7 @@ export default function ChartEditor() {
     // Visual for Slope Chart
     backgroundColor: styleSettings.backgroundColor,
     showAxisLines: true,
+    // Period spacing is user-controlled independently of chart width
     periodSpacing: styleSettings.periodSpacing,
     axisLineColor: styleSettings.darkMode ? '#6b7280' : styleSettings.slopeAxisLineColor,
     axisLineWidth: styleSettings.slopeAxisLineWidth,
@@ -2546,7 +2541,7 @@ export default function ChartEditor() {
                     className="px-2 py-2 text-gray-600 hover:text-gray-900 transition-colors"
                     title="Minimize window"
                   >
-                    <ViewColumnsIcon className="w-5 h-5" />
+                    <ArrowsPointingInIcon className="w-5 h-5" />
                   </button>
                 )}
 
@@ -2564,7 +2559,7 @@ export default function ChartEditor() {
                     className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                     title="Menu"
                   >
-                    <Bars3Icon className="w-6 h-6" />
+                    <Bars2Icon className="w-6 h-6" />
                   </button>
 
                   {showHamburgerMenu && (
@@ -3501,54 +3496,6 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             onToggle={() => toggleSection('layoutCanvas')}
           >
             <div className="space-y-2">
-              {/* Aspect Ratio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Aspect Ratio
-                </label>
-                <select
-                  value={styleSettings.aspectRatio}
-                  onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  <option value="16:9">16:9 (Widescreen)</option>
-                  <option value="4:3">4:3 (Standard)</option>
-                  <option value="1:1">1:1 (Square)</option>
-                  <option value="3:4">3:4 (Portrait)</option>
-                  <option value="9:16">9:16 (Mobile)</option>
-                </select>
-              </div>
-
-              {/* Canvas Width */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canvas Width: {styleSettings.canvasWidth}px
-                </label>
-                <input
-                  type="range"
-                  min="600"
-                  max="2000"
-                  value={styleSettings.canvasWidth}
-                  onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Canvas Height */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canvas Height: {styleSettings.canvasHeight}px
-                </label>
-                <input
-                  type="range"
-                  min="400"
-                  max="2000"
-                  value={styleSettings.canvasHeight}
-                  onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
               {/* Chart Width */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -4457,54 +4404,6 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             onToggle={() => toggleSection('layoutCanvas')}
           >
             <div className="space-y-2">
-              {/* Aspect Ratio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Aspect Ratio
-                </label>
-                <select
-                  value={styleSettings.aspectRatio}
-                  onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  <option value="16:9">16:9 (Widescreen)</option>
-                  <option value="4:3">4:3 (Standard)</option>
-                  <option value="1:1">1:1 (Square)</option>
-                  <option value="3:4">3:4 (Portrait)</option>
-                  <option value="9:16">9:16 (Mobile)</option>
-                </select>
-              </div>
-
-              {/* Canvas Width */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canvas Width: {styleSettings.canvasWidth}px
-                </label>
-                <input
-                  type="range"
-                  min="600"
-                  max="2000"
-                  value={styleSettings.canvasWidth}
-                  onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {/* Canvas Height */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canvas Height: {styleSettings.canvasHeight}px
-                </label>
-                <input
-                  type="range"
-                  min="400"
-                  max="2000"
-                  value={styleSettings.canvasHeight}
-                  onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
               {/* Chart Width */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -5953,51 +5852,6 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
           onToggle={() => toggleSection('layout')}
         >
         <div className="space-y-2">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Aspect Ratio
-            </label>
-            <select
-              value={styleSettings.aspectRatio}
-              onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              <option value="16:9">16:9 (Widescreen)</option>
-              <option value="4:3">4:3 (Standard)</option>
-              <option value="1:1">1:1 (Square)</option>
-              <option value="3:4">3:4 (Portrait)</option>
-              <option value="9:16">9:16 (Mobile)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Canvas Width: {styleSettings.canvasWidth}px
-            </label>
-            <input
-              type="range"
-              min="600"
-              max="2000"
-              value={styleSettings.canvasWidth}
-              onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
-              className="w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Canvas Height: {styleSettings.canvasHeight}px
-            </label>
-            <input
-              type="range"
-              min="400"
-              max="2000"
-              value={styleSettings.canvasHeight}
-              onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
-              className="w-full"
-            />
-          </div>
-
           {isBarChart && (
             <>
               <div>
@@ -6673,45 +6527,28 @@ function StyleTabContent({ styleSettings, expandedSections, toggleSection, chart
             <div className="space-y-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Aspect Ratio
-                </label>
-                <select
-                  value={styleSettings.aspectRatio}
-                  onChange={(e) => styleSettings.updateAspectRatio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                >
-                  <option value="16:9">16:9 (Widescreen)</option>
-                  <option value="4:3">4:3 (Standard)</option>
-                  <option value="1:1">1:1 (Square)</option>
-                  <option value="3:4">3:4 (Portrait)</option>
-                  <option value="9:16">9:16 (Mobile)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canvas Width: {styleSettings.canvasWidth}px
+                  Chart Width: {styleSettings.chartWidth}px
                 </label>
                 <input
                   type="range"
-                  min="600"
-                  max="2000"
-                  value={styleSettings.canvasWidth}
-                  onChange={(e) => throttledSetters.setCanvasWidth(Number(e.target.value))}
+                  min="200"
+                  max="1500"
+                  value={styleSettings.chartWidth}
+                  onChange={(e) => throttledSetters.setChartWidth(Number(e.target.value))}
                   className="w-full"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canvas Height: {styleSettings.canvasHeight}px
+                  Chart Height: {styleSettings.chartHeight}px
                 </label>
                 <input
                   type="range"
-                  min="400"
-                  max="2000"
-                  value={styleSettings.canvasHeight}
-                  onChange={(e) => throttledSetters.setCanvasHeight(Number(e.target.value))}
+                  min="200"
+                  max="1500"
+                  value={styleSettings.chartHeight}
+                  onChange={(e) => throttledSetters.setChartHeight(Number(e.target.value))}
                   className="w-full"
                 />
               </div>

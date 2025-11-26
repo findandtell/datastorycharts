@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import _ChartTemplate from './_ChartTemplate';
 
 describe('_ChartTemplate', () => {
@@ -301,7 +301,9 @@ describe('_ChartTemplate', () => {
       );
 
       const firstBar = container.querySelector('.bar');
-      firstBar.click();
+      if (firstBar) {
+        fireEvent.click(firstBar);
+      }
 
       expect(clickedData).toBeTruthy();
       expect(clickedData.category).toBe('Item 1');

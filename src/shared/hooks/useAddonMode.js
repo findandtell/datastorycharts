@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { debug } from '../utils/debug';
 
 /**
  * Hook to detect and handle Google Sheets Add-on mode
@@ -20,8 +21,8 @@ export function useAddonMode(showToast = null) {
     setIsAddonMode(mode === 'addon');
 
     if (mode === 'addon') {
-      console.log('[DEBUG] Add-on Mode Initialized');
-      console.log('[DEBUG] window object keys:', Object.keys(window).filter(k => k.includes('google')));
+      debug.log('AddonMode', 'Add-on Mode Initialized');
+      debug.log('AddonMode', 'window object keys', Object.keys(window).filter(k => k.includes('google')));
 
       // Check for injected API
       let checkCount = 0;
@@ -29,20 +30,20 @@ export function useAddonMode(showToast = null) {
 
       const checkAPI = () => {
         checkCount++;
-        console.log(`[DEBUG] Checking for API (attempt ${checkCount}/${maxChecks})...`);
-        console.log('[DEBUG] window.googleSheetsAPI exists:', !!window.googleSheetsAPI);
+        debug.log('AddonMode', `Checking for API (attempt ${checkCount}/${maxChecks})`);
+        debug.log('AddonMode', 'window.googleSheetsAPI exists', !!window.googleSheetsAPI);
 
         if (window.googleSheetsAPI) {
-          console.log('[DEBUG] Direct API detected!');
-          console.log('[DEBUG] API keys:', Object.keys(window.googleSheetsAPI));
+          debug.log('AddonMode', 'Direct API detected!');
+          debug.log('AddonMode', 'API keys', Object.keys(window.googleSheetsAPI));
 
           // Test the API
           if (window.googleSheetsAPI.test) {
             try {
               const testResult = window.googleSheetsAPI.test();
-              console.log('[DEBUG] API test result:', testResult);
+              debug.log('AddonMode', 'API test result', testResult);
             } catch (e) {
-              console.error('[DEBUG] API test failed:', e);
+              debug.error('AddonMode', 'API test failed', e);
             }
           }
 
@@ -50,22 +51,22 @@ export function useAddonMode(showToast = null) {
           setAddonReady(true);
 
           // Get user info via direct API
-          console.log('[DEBUG] Calling getUserInfo...');
+          debug.log('AddonMode', 'Calling getUserInfo...');
           window.googleSheetsAPI.getUserInfo((error, data) => {
             if (!error && data) {
-              console.log('[DEBUG] User info received:', data);
+              debug.log('AddonMode', 'User info received', data);
               setUserInfo(data.user);
               setLicense(data.license);
             } else {
-              console.error('[DEBUG] Error getting user info:', error);
+              debug.error('AddonMode', 'Error getting user info', error);
             }
           });
         } else {
-          console.log('[DEBUG] Direct API not available yet');
+          debug.log('AddonMode', 'Direct API not available yet');
           if (checkCount < maxChecks) {
             setTimeout(checkAPI, 500);
           } else {
-            console.error('[DEBUG] API not found after', maxChecks, 'attempts');
+            debug.error('AddonMode', 'API not found after max attempts', maxChecks);
             const errorMsg = 'Google Sheets API was not injected. Cross-origin restriction may be blocking access.';
             if (showToast) {
               showToast(errorMsg, 'error', 5000);
@@ -90,11 +91,11 @@ export function useAddonMode(showToast = null) {
       // if (event.origin !== 'expected-origin') return;
 
       const message = event.data;
-      console.log('[Add-on Mode] Message received:', message);
+      debug.log('AddonMode', 'Message received', message);
 
       switch (message.type) {
         case 'ADDON_READY':
-          console.log('[Add-on Mode] Add-on is ready');
+          debug.log('AddonMode', 'Add-on is ready');
           setAddonReady(true);
           // Send ready acknowledgment
           sendMessageToAddon({
@@ -103,18 +104,18 @@ export function useAddonMode(showToast = null) {
           break;
 
         case 'USER_INFO':
-          console.log('[Add-on Mode] User info received');
+          debug.log('AddonMode', 'User info received');
           setUserInfo(message.data.user);
           setLicense(message.data.license);
           break;
 
         case 'SHEET_DATA':
-          console.log('[Add-on Mode] Sheet data received:', message.data);
+          debug.log('AddonMode', 'Sheet data received', message.data);
           setSheetData(message.data);
           break;
 
         case 'INSERT_SUCCESS':
-          console.log('[Add-on Mode] Chart inserted successfully with ID:', message.chartId);
+          debug.log('AddonMode', 'Chart inserted successfully with ID', message.chartId);
           // Show notification with chart ID so user can edit it later
           if (message.chartId) {
             const successMsg = `Chart inserted successfully! Chart ID: ${message.chartId}. Save this ID to edit the chart later using "Find&Tell Charts" → "Edit Chart by ID"`;
@@ -127,7 +128,7 @@ export function useAddonMode(showToast = null) {
           break;
 
         default:
-          console.log('[Add-on Mode] Unknown message type:', message.type);
+          debug.log('AddonMode', 'Unknown message type', message.type);
       }
     };
 
@@ -141,41 +142,41 @@ export function useAddonMode(showToast = null) {
   // Send message to Apps Script
   const sendMessageToAddon = useCallback((message) => {
     if (!isAddonMode) {
-      console.warn('[Add-on Mode] Not in add-on mode, message not sent');
+      debug.warn('AddonMode', 'Not in add-on mode, message not sent');
       return;
     }
 
-    console.log('[Add-on Mode] Sending message:', message);
-    console.log('[Add-on Mode] window.parent:', window.parent);
-    console.log('[Add-on Mode] Are we in iframe?:', window !== window.parent);
+    debug.log('AddonMode', 'Sending message', message);
+    debug.log('AddonMode', 'window.parent', window.parent);
+    debug.log('AddonMode', 'Are we in iframe?', window !== window.parent);
 
     // Try multiple ways to send the message
     try {
       window.parent.postMessage(message, '*');
-      console.log('[Add-on Mode] postMessage sent successfully');
+      debug.log('AddonMode', 'postMessage sent successfully');
     } catch (error) {
-      console.error('[Add-on Mode] postMessage failed:', error);
+      debug.error('AddonMode', 'postMessage failed', error);
     }
   }, [isAddonMode]);
 
   // Request sheet data
   const requestSheetData = useCallback(() => {
-    console.log('[DEBUG] ========== REQUEST SHEET DATA CALLED ==========');
-    console.log('[DEBUG] useDirectAPI:', useDirectAPI);
-    console.log('[DEBUG] window.googleSheetsAPI exists:', !!window.googleSheetsAPI);
+    debug.log('AddonMode', '========== REQUEST SHEET DATA CALLED ==========');
+    debug.log('AddonMode', 'useDirectAPI', useDirectAPI);
+    debug.log('AddonMode', 'window.googleSheetsAPI exists', !!window.googleSheetsAPI);
 
     if (useDirectAPI && window.googleSheetsAPI) {
-      console.log('[DEBUG] Using direct API to get data');
-      console.log('[DEBUG] Calling window.googleSheetsAPI.getSelectedData...');
+      debug.log('AddonMode', 'Using direct API to get data');
+      debug.log('AddonMode', 'Calling window.googleSheetsAPI.getSelectedData...');
 
       // Use direct API
       window.googleSheetsAPI.getSelectedData((error, result) => {
-        console.log('[DEBUG] getSelectedData callback fired');
-        console.log('[DEBUG] Error:', error);
-        console.log('[DEBUG] Result:', result);
+        debug.log('AddonMode', 'getSelectedData callback fired');
+        debug.log('AddonMode', 'Error', error);
+        debug.log('AddonMode', 'Result', result);
 
         if (error) {
-          console.error('[DEBUG] Error getting data:', error);
+          debug.error('AddonMode', 'Error getting data', error);
           const errorMsg = 'Error getting data: ' + error.message;
           if (showToast) {
             showToast(errorMsg, 'error');
@@ -183,8 +184,8 @@ export function useAddonMode(showToast = null) {
             alert('[ERROR] ' + errorMsg);
           }
         } else if (result && result.success) {
-          console.log('[DEBUG] Data received successfully via direct API');
-          console.log('[DEBUG] Data:', result.data);
+          debug.log('AddonMode', 'Data received successfully via direct API');
+          debug.log('AddonMode', 'Data', result.data);
           setSheetData(result.data);
           const successMsg = 'Data loaded! CSV length: ' + (result.data.csv ? result.data.csv.length : 'N/A');
           if (showToast) {
@@ -193,7 +194,7 @@ export function useAddonMode(showToast = null) {
             alert('[SUCCESS] ' + successMsg);
           }
         } else {
-          console.error('[DEBUG] Invalid data response:', result);
+          debug.error('AddonMode', 'Invalid data response', result);
           const errorMsg = 'Invalid data response from Google Sheets';
           if (showToast) {
             showToast(errorMsg, 'error');
@@ -203,7 +204,7 @@ export function useAddonMode(showToast = null) {
         }
       });
     } else {
-      console.log('[DEBUG] Using postMessage fallback');
+      debug.log('AddonMode', 'Using postMessage fallback');
       // Fallback to postMessage
       sendMessageToAddon({
         type: 'REQUEST_DATA'
@@ -213,24 +214,24 @@ export function useAddonMode(showToast = null) {
 
   // Insert chart to sheet
   const insertChartToSheet = useCallback((imageBase64, format = 'png', chartState = null) => {
-    console.log('[DEBUG] ========== INSERT CHART CALLED ==========');
-    console.log('[DEBUG] useDirectAPI:', useDirectAPI);
-    console.log('[DEBUG] window.googleSheetsAPI exists:', !!window.googleSheetsAPI);
-    console.log('[DEBUG] format:', format);
-    console.log('[DEBUG] imageBase64 length:', imageBase64 ? imageBase64.length : 0);
+    debug.log('AddonMode', '========== INSERT CHART CALLED ==========');
+    debug.log('AddonMode', 'useDirectAPI', useDirectAPI);
+    debug.log('AddonMode', 'window.googleSheetsAPI exists', !!window.googleSheetsAPI);
+    debug.log('AddonMode', 'format', format);
+    debug.log('AddonMode', 'imageBase64 length', imageBase64 ? imageBase64.length : 0);
 
     if (useDirectAPI && window.googleSheetsAPI) {
-      console.log('[DEBUG] Using direct API to insert chart');
-      console.log('[DEBUG] Calling window.googleSheetsAPI.insertChart...');
+      debug.log('AddonMode', 'Using direct API to insert chart');
+      debug.log('AddonMode', 'Calling window.googleSheetsAPI.insertChart...');
 
       // Use direct API
       window.googleSheetsAPI.insertChart(imageBase64, format, chartState, (error, result) => {
-        console.log('[DEBUG] insertChart callback fired');
-        console.log('[DEBUG] Error:', error);
-        console.log('[DEBUG] Result:', result);
+        debug.log('AddonMode', 'insertChart callback fired');
+        debug.log('AddonMode', 'Error', error);
+        debug.log('AddonMode', 'Result', result);
 
         if (error) {
-          console.error('[DEBUG] Error inserting chart:', error);
+          debug.error('AddonMode', 'Error inserting chart', error);
           const errorMsg = 'Error inserting chart: ' + error.message;
           if (showToast) {
             showToast(errorMsg, 'error');
@@ -238,7 +239,7 @@ export function useAddonMode(showToast = null) {
             alert('[ERROR] ' + errorMsg);
           }
         } else if (result && result.success) {
-          console.log('[DEBUG] Chart inserted successfully');
+          debug.log('AddonMode', 'Chart inserted successfully');
           const successMsg = `Chart inserted! Chart ID: ${result.chartId || 'N/A'}. Save this ID to edit the chart later.`;
           if (showToast) {
             showToast(successMsg, 'success', 6000);
@@ -246,7 +247,7 @@ export function useAddonMode(showToast = null) {
             alert('[SUCCESS] ' + successMsg);
           }
         } else {
-          console.error('[DEBUG] Invalid insert response:', result);
+          debug.error('AddonMode', 'Invalid insert response', result);
           const errorMsg = 'Invalid response from chart insertion';
           if (showToast) {
             showToast(errorMsg, 'error');
@@ -256,7 +257,7 @@ export function useAddonMode(showToast = null) {
         }
       });
     } else {
-      console.log('[DEBUG] Using postMessage fallback');
+      debug.log('AddonMode', 'Using postMessage fallback');
       // Fallback to postMessage
       sendMessageToAddon({
         type: 'INSERT_CHART',

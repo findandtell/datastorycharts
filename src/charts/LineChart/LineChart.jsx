@@ -4,6 +4,7 @@ import { format as formatDate } from 'date-fns';
 import { comparisonPalettes } from '../../shared/design-system/colorPalettes';
 import { getLineColor, formatNumber, defaultStyleSettings, timeScaleFormats } from './lineChartDefaults';
 import { aggregateData, getHierarchicalLabels, getISOWeek, getQuarter } from '../../shared/utils/timeAggregation';
+import { debug } from '../../shared/utils/debug';
 
 /**
  * LineChart Component
@@ -99,7 +100,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         debouncedStyleSettings?.fiscalYearStartMonth || 1
       );
     } catch (error) {
-      console.warn('Aggregation failed, using original data:', error);
+      debug.warn('LineChart', 'Aggregation failed, using original data', error);
       return data;
     }
   }, [
@@ -371,7 +372,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
         const dateValue = d[dateField] || d.date;
 
         if (!dateValue) {
-          console.warn('Row missing date value:', d);
+          debug.warn('LineChart', 'Row missing date value', d);
           return null;
         }
 
@@ -393,7 +394,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
 
         // Validate the parsed date
         if (!parsed || isNaN(parsed.getTime())) {
-          console.warn('Could not parse date value:', dateValue);
+          debug.warn('LineChart', 'Could not parse date value', dateValue);
           return null;
         }
 
@@ -774,7 +775,7 @@ const LineChart = ({ data, metricNames, styleSettings = {}, onLineClick, onPoint
             primaryLabel = formatDate(date, dateFormat);
           } catch (error) {
             // Fallback to ISO format if custom format is invalid
-            console.warn('Invalid date format:', dateFormat, error);
+            debug.warn('LineChart', 'Invalid date format', { dateFormat, error });
             primaryLabel = formatDate(date, 'MM/dd/yy');
           }
         } else if (effectivePrimaryLabel === 'day') {

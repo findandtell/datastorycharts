@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { debug } from '../utils/debug';
 
 /**
  * Hook to detect if app is running in Figma plugin
@@ -21,17 +22,17 @@ export function useFigmaMode() {
     if (isFigma) {
       sessionStorage.setItem('figmaMode', 'true');
       setIsFigmaMode(true);
-      console.log('[useFigmaMode] Figma mode detected and persisted');
+      debug.log('FigmaMode', 'Figma mode detected and persisted');
     }
 
     // If already in Figma mode from sessionStorage, keep it
     const stored = sessionStorage.getItem('figmaMode');
     if (stored === 'true') {
       setIsFigmaMode(true);
-      console.log('[useFigmaMode] Figma mode restored from session');
+      debug.log('FigmaMode', 'Figma mode restored from session');
     }
 
-    console.log('[useFigmaMode] Is Figma mode:', isFigma || stored === 'true');
+    debug.log('FigmaMode', 'Is Figma mode', isFigma || stored === 'true');
   }, []);
 
   /**
@@ -42,12 +43,12 @@ export function useFigmaMode() {
    */
   const sendToFigma = useCallback((svgString, chartName = 'Find&Tell Chart', chartConfig = null) => {
     if (!isFigmaMode) {
-      console.warn('[useFigmaMode] Not in Figma mode, cannot send chart');
+      debug.warn('FigmaMode', 'Not in Figma mode, cannot send chart');
       return false;
     }
 
     try {
-      console.log('[useFigmaMode] Sending chart to Figma:', chartName);
+      debug.log('FigmaMode', 'Sending chart to Figma', chartName);
 
       // Send message to Figma plugin via parent window
       parent.postMessage({
@@ -59,10 +60,10 @@ export function useFigmaMode() {
         }
       }, '*');
 
-      console.log('[useFigmaMode] Chart sent successfully');
+      debug.log('FigmaMode', 'Chart sent successfully');
       return true;
     } catch (error) {
-      console.error('[useFigmaMode] Error sending chart to Figma:', error);
+      debug.error('FigmaMode', 'Error sending chart to Figma', error);
       return false;
     }
   }, [isFigmaMode]);
@@ -120,12 +121,12 @@ export function useFigmaMode() {
    */
   const requestReloadFromFigma = useCallback(() => {
     if (!isFigmaMode) {
-      console.warn('[useFigmaMode] Not in Figma mode, cannot reload');
+      debug.warn('FigmaMode', 'Not in Figma mode, cannot reload');
       return false;
     }
 
     try {
-      console.log('[useFigmaMode] Requesting chart reload from Figma selection');
+      debug.log('FigmaMode', 'Requesting chart reload from Figma selection');
 
       parent.postMessage({
         pluginMessage: {
@@ -135,7 +136,7 @@ export function useFigmaMode() {
 
       return true;
     } catch (error) {
-      console.error('[useFigmaMode] Error requesting reload:', error);
+      debug.error('FigmaMode', 'Error requesting reload', error);
       return false;
     }
   }, [isFigmaMode]);

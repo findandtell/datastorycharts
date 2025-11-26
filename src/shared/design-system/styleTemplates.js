@@ -3,6 +3,8 @@
  * Pre-configured style templates inspired by major publications and design systems
  */
 
+import { debug } from '../utils/debug';
+
 export const styleTemplates = {
   financialTimes: {
     id: "financialTimes",
@@ -704,7 +706,7 @@ export const getAllTemplates = () =>
 export const applyTemplate = (styleSettings, templateId) => {
   const template = styleTemplates[templateId];
   if (!template) {
-    console.error(`Template "${templateId}" not found`);
+    debug.error('StyleTemplates', `Template "${templateId}" not found`);
     return;
   }
 

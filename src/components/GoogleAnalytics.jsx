@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { debug } from '../shared/utils/debug';
 
 export default function GoogleAnalytics() {
   const location = useLocation();
@@ -15,7 +16,7 @@ export default function GoogleAnalytics() {
   useEffect(() => {
     // Only load GA if measurement ID is configured
     if (!GA_MEASUREMENT_ID) {
-      console.log('[GoogleAnalytics] No measurement ID configured');
+      debug.log('GoogleAnalytics', 'No measurement ID configured');
       return;
     }
 

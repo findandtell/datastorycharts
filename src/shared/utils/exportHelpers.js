@@ -2,6 +2,8 @@
  * Export helpers for chart rendering
  */
 
+import { debug } from './debug';
+
 /**
  * Detect which font family is used in the SVG
  */
@@ -81,13 +83,13 @@ const embedGoogleFonts = async (fontFamily) => {
         // Replace the URL with the data URI
         embeddedCss = embeddedCss.replace(url, fontBase64);
       } catch (err) {
-        console.warn(`Failed to embed font ${url}:`, err);
+        debug.warn('ExportHelpers', `Failed to embed font ${url}`, err);
       }
     }
 
     return embeddedCss;
   } catch (err) {
-    console.error('Failed to embed fonts:', err);
+    debug.error('ExportHelpers', 'Failed to embed fonts', err);
     // Fallback to @import if embedding fails
     return `@import url('${getFontUrl(fontFamily)}');`;
   }
@@ -180,7 +182,7 @@ export const exportAsPNG = async (svgElement, filename = "chart.png", scale = 2)
       img.src = url;
     });
   } catch (err) {
-    console.error('Export PNG failed:', err);
+    debug.error('ExportHelpers', 'Export PNG failed', err);
     throw err;
   }
 };
@@ -244,7 +246,7 @@ export const exportAsSVG = async (svgElement, filename = "chart.svg") => {
     URL.revokeObjectURL(url);
     return true;
   } catch (err) {
-    console.error("Failed to export SVG:", err);
+    debug.error('ExportHelpers', 'Failed to export SVG', err);
     return false;
   }
 };
@@ -290,7 +292,7 @@ export const copySVGToClipboard = async (svgElement) => {
       img.src = url;
     });
   } catch (err) {
-    console.error("Failed to copy to clipboard:", err);
+    debug.error('ExportHelpers', 'Failed to copy to clipboard', err);
     throw err;
   }
 };

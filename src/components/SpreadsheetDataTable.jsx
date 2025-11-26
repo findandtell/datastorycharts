@@ -4,6 +4,7 @@ import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { ConfirmDialog } from './Toast';
+import { debug } from '../shared/utils/debug';
 
 // Register all AG Grid Community modules
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -283,11 +284,11 @@ function SpreadsheetDataTable({ chartData, chartType, onClose }) {
 
   // Handle paste from clipboard (Excel support)
   const onPasteStart = useCallback((params) => {
-    console.log('Paste started', params);
+    debug.log('SpreadsheetDataTable', 'Paste started', params);
   }, []);
 
   const onPasteEnd = useCallback((params) => {
-    console.log('Paste ended', params);
+    debug.log('SpreadsheetDataTable', 'Paste ended', params);
   }, []);
 
   // Track focused cell for copy/paste

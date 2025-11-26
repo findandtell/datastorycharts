@@ -3,6 +3,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { debug } from '../shared/utils/debug';
 
 const AdminContext = createContext();
 
@@ -77,29 +78,49 @@ export const AdminProvider = ({ children }) => {
    * Load default chart configuration
    */
   const loadDefault = useCallback(async (chartType) => {
-    console.log('[AdminContext loadDefault] 🔍 Fetching default for chartType:', chartType);
-    const response = await fetch(`/api/admin/get-default?chartType=${chartType}`);
-    console.log('[AdminContext loadDefault] 📡 Response status:', response.status, response.ok);
-    const data = await response.json();
+    debug.log('AdminContext', 'Fetching default for chartType', chartType);
 
-    // Debug logging
-    console.log('[AdminContext loadDefault] 📦 Raw response data:', data);
-    console.log('[AdminContext loadDefault] data.success:', data.success);
-    console.log('[AdminContext loadDefault] configuration:', data.configuration);
-    console.log('[AdminContext loadDefault] emphasizedBars:', data.configuration?.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+    try {
+      const response = await fetch(`/api/admin/get-default?chartType=${chartType}`);
+      debug.log('AdminContext', 'Response status', { status: response.status, ok: response.ok });
 
-    if (!response.ok || !data.success) {
-      // Not found is okay - means no default is set yet
-      if (response.status === 404) {
-        console.log('[AdminContext loadDefault] ⚠️ No default found (404), returning null');
+      // Check content-type to avoid parsing non-JSON responses
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // In local dev mode, Vite returns the JS source file instead of executing it
+        // This is expected behavior - admin defaults only work when deployed to Vercel
+        debug.log('AdminContext', 'Non-JSON response (likely local dev mode), returning null');
         return null;
       }
-      console.log('[AdminContext loadDefault] ❌ Error loading default:', data.error);
-      throw new Error(data.error || 'Failed to load default configuration');
-    }
 
-    console.log('[AdminContext loadDefault] ✅ Successfully loaded configuration');
-    return data.configuration;
+      const data = await response.json();
+
+      // Debug logging
+      debug.log('AdminContext', 'Raw response data', data);
+      debug.log('AdminContext', 'data.success', data.success);
+      debug.log('AdminContext', 'configuration', data.configuration);
+      debug.log('AdminContext', 'emphasizedBars', data.configuration?.styleSettings?.chartSpecific?.bar?.emphasizedBars);
+
+      if (!response.ok || !data.success) {
+        // Not found is okay - means no default is set yet
+        if (response.status === 404) {
+          debug.log('AdminContext', 'No default found (404), returning null');
+          return null;
+        }
+        debug.log('AdminContext', 'Error loading default', data.error);
+        throw new Error(data.error || 'Failed to load default configuration');
+      }
+
+      debug.log('AdminContext', 'Successfully loaded configuration');
+      return data.configuration;
+    } catch (error) {
+      // Handle JSON parse errors gracefully (happens in local dev)
+      if (error instanceof SyntaxError) {
+        debug.log('AdminContext', 'JSON parse error (likely local dev mode), returning null');
+        return null;
+      }
+      throw error;
+    }
   }, []);
 
   const value = {

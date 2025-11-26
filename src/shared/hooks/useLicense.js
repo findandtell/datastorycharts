@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { debug } from '../utils/debug';
 
 /**
  * Hook to manage license validation and activation
@@ -81,14 +82,14 @@ export function useLicense() {
         localStorage.setItem('findtell_license', JSON.stringify(licenseData));
         setLicenseStatus(licenseData);
 
-        console.log('[useLicense] License validated successfully');
+        debug.log('License', 'License validated successfully');
         return { success: true, license: licenseData };
       } else {
         setError(data.error || 'Invalid license');
         return { success: false, error: data.error };
       }
     } catch (err) {
-      console.error('[useLicense] Validation error:', err);
+      debug.error('License', 'Validation error', err);
       setError(err.message);
       return { success: false, error: err.message };
     } finally {
@@ -140,14 +141,14 @@ export function useLicense() {
         localStorage.setItem('findtell_license', JSON.stringify(licenseData));
         setLicenseStatus(licenseData);
 
-        console.log('[useLicense] License activated and cached successfully');
+        debug.log('License', 'License activated and cached successfully');
         return { success: true, license: licenseData };
       } else {
         setError(data.error || 'Activation failed');
         return { success: false, error: data.error };
       }
     } catch (err) {
-      console.error('[useLicense] Activation error:', err);
+      debug.error('License', 'Activation error', err);
       setError(err.message);
       return { success: false, error: err.message };
     } finally {
@@ -166,7 +167,7 @@ export function useLicense() {
       // Check for cached license
       const cached = localStorage.getItem('findtell_license');
       if (!cached) {
-        console.log('[useLicense] No cached license found');
+        debug.log('License', 'No cached license found');
         setLicenseStatus(null);
         return { hasLicense: false };
       }
@@ -177,17 +178,17 @@ export function useLicense() {
 
       // Re-validate if more than 24 hours old
       if (hoursSinceValidation > 24) {
-        console.log('[useLicense] Cached license expired, re-validating...');
+        debug.log('License', 'Cached license expired, re-validating...');
         const result = await validateLicense(licenseData.licenseKey);
         return { hasLicense: result.success, license: result.license };
       }
 
       // Use cached data
-      console.log('[useLicense] Using cached license');
+      debug.log('License', 'Using cached license');
       setLicenseStatus(licenseData);
       return { hasLicense: true, license: licenseData };
     } catch (err) {
-      console.error('[useLicense] Startup check error:', err);
+      debug.error('License', 'Startup check error', err);
       setLicenseStatus(null);
       return { hasLicense: false };
     } finally {
@@ -237,7 +238,7 @@ export function useLicense() {
     localStorage.removeItem('findtell_license');
     setLicenseStatus(null);
     setError(null);
-    console.log('[useLicense] License cleared');
+    debug.log('License', 'License cleared');
   }, []);
 
   /**

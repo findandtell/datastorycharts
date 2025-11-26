@@ -4,6 +4,8 @@
  * for save/load functionality
  */
 
+import { debug } from './debug';
+
 const CHART_STATE_VERSION = '1.0';
 
 /**
@@ -103,7 +105,7 @@ export const deserializeChartState = (stateObj) => {
   }
 
   if (stateObj.version !== CHART_STATE_VERSION) {
-    console.warn(`Chart state version mismatch: expected ${CHART_STATE_VERSION}, got ${stateObj.version}`);
+    debug.warn('ChartStateManager', `Chart state version mismatch: expected ${CHART_STATE_VERSION}, got ${stateObj.version}`);
     // For now, we'll try to proceed - future versions should handle migration
   }
 
@@ -168,7 +170,7 @@ export const applyChartState = async (chartState, setChartType, chartData, style
       // Use importSettings for proper structured format handling
       styleSettings.importSettings(chartState, chartState.chartType);
     } else {
-      console.warn('Chart file missing styleVersion - may not load correctly');
+      debug.warn('ChartStateManager', 'Chart file missing styleVersion - may not load correctly');
     }
 
     // 5. Restore emphasized elements
@@ -181,7 +183,7 @@ export const applyChartState = async (chartState, setChartType, chartData, style
 
     return { success: true, message: 'Chart loaded successfully' };
   } catch (error) {
-    console.error('Error applying chart state:', error);
+    debug.error('ChartStateManager', 'Error applying chart state', error);
     return { success: false, message: error.message };
   }
 };

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import theme from "../design-system/theme";
 import { defaultUserColors, comparisonPalettes } from "../design-system/colorPalettes";
+import { debug } from "../utils/debug";
 
 /**
  * Custom hook for managing chart style settings
@@ -119,16 +120,13 @@ export const useStyleSettings = (initialTheme = theme) => {
 
   // Wrapped setter with logging to track ALL calls to setPercentChangeEnabled
   const setPercentChangeEnabled = useCallback((value) => {
-    console.log('[setPercentChangeEnabled] ⚡ CALLED with value:', value);
-    console.trace('[setPercentChangeEnabled] Stack trace:');
+    debug.trace('StyleSettings', `setPercentChangeEnabled called with: ${value}`);
     _setPercentChangeEnabled(value);
   }, []);
 
-  // Track EVERY state change of percentChangeEnabled (catches changes that bypass the setter)
+  // Track state changes of percentChangeEnabled in development
   useEffect(() => {
-    console.log('[percentChangeEnabled STATE CHANGED] 📊 New value:', percentChangeEnabled);
-    console.log('[percentChangeEnabled STATE CHANGED] Timestamp:', new Date().toISOString());
-    console.trace('[percentChangeEnabled STATE CHANGED] Stack trace:');
+    debug.log('StyleSettings', 'percentChangeEnabled changed', percentChangeEnabled);
   }, [percentChangeEnabled]);
   const [axisMajorUnit, setAxisMajorUnit] = useState(10000);
   const [axisMajorUnitAuto, setAxisMajorUnitAuto] = useState(true);
@@ -240,8 +238,7 @@ export const useStyleSettings = (initialTheme = theme) => {
    * Reset all settings to defaults
    */
   const resetToDefaults = useCallback(() => {
-    console.log('[resetToDefaults] ⚠️ CALLED - This will reset ALL settings including percentChangeEnabled to false');
-    console.trace('[resetToDefaults] Stack trace:');
+    debug.warn('StyleSettings', 'resetToDefaults called - resetting ALL settings');
 
     setTitle("Units Produced by Region");
     setSubtitle("Production units by regional location (January)");
@@ -310,10 +307,11 @@ export const useStyleSettings = (initialTheme = theme) => {
    * Export settings as JSON (complete structure for cross-chart compatibility)
    */
   const exportSettings = useCallback(() => {
-    // Debug logging
-    console.log('[exportSettings] emphasizedBars state value:', emphasizedBars);
-    console.log('[exportSettings] percentChangeBracketDistance state value:', percentChangeBracketDistance);
-    console.log('[exportSettings] percentChangeEnabled state value:', percentChangeEnabled);
+    debug.log('StyleSettings', 'exportSettings called', {
+      emphasizedBars,
+      percentChangeBracketDistance,
+      percentChangeEnabled
+    });
 
     return {
       styleVersion: "1.0",
@@ -574,27 +572,26 @@ export const useStyleSettings = (initialTheme = theme) => {
       // Validate comparisonPalette before setting
       if (settings.colors.comparisonPalette !== undefined) {
         const paletteValue = settings.colors.comparisonPalette;
-        console.log(`[importSettings] Validating palette: "${paletteValue}"`);
+        debug.log('StyleSettings', `Validating palette: "${paletteValue}"`);
 
         // Allow 'user' or validate that palette exists AND has valid colors array
         if (paletteValue === 'user') {
-          console.log(`[importSettings] ✓ Using user custom colors`);
+          debug.log('StyleSettings', 'Using user custom colors');
           setComparisonPalette(paletteValue);
         } else if (comparisonPalettes[paletteValue]) {
           const palette = comparisonPalettes[paletteValue];
-          console.log(`[importSettings] Palette object:`, palette);
-          console.log(`[importSettings] Palette.colors:`, palette.colors);
+          debug.log('StyleSettings', `Palette "${paletteValue}" found`, { colors: palette.colors });
 
           // Extra validation: ensure .colors exists and is a non-empty array
           if (palette.colors && Array.isArray(palette.colors) && palette.colors.length > 0) {
-            console.log(`[importSettings] ✓ Palette "${paletteValue}" is valid`);
+            debug.log('StyleSettings', `Palette "${paletteValue}" is valid`);
             setComparisonPalette(paletteValue);
           } else {
-            console.warn(`[importSettings] ⚠️ Palette "${paletteValue}" has invalid colors array, using default "observable10"`);
+            debug.warn('StyleSettings', `Palette "${paletteValue}" has invalid colors array, using default "observable10"`);
             setComparisonPalette('observable10');
           }
         } else {
-          console.warn(`[importSettings] ⚠️ Palette "${paletteValue}" not found, using default "observable10"`);
+          debug.warn('StyleSettings', `Palette "${paletteValue}" not found, using default "observable10"`);
           setComparisonPalette('observable10');
         }
       }
@@ -626,7 +623,9 @@ export const useStyleSettings = (initialTheme = theme) => {
 
     // Display (universal - applies to all charts)
     if (settings.display) {
-      console.log('[importSettings] display.percentChangeEnabled value:', settings.display.percentChangeEnabled);
+      debug.log('StyleSettings', 'Importing display settings', {
+        percentChangeEnabled: settings.display.percentChangeEnabled
+      });
 
       if (settings.display.emphasis !== undefined) setEmphasis(settings.display.emphasis);
       if (settings.display.metricEmphasis !== undefined) setMetricEmphasis(settings.display.metricEmphasis);
@@ -639,10 +638,8 @@ export const useStyleSettings = (initialTheme = theme) => {
       if (settings.display.userTier !== undefined) setUserTier(settings.display.userTier);
 
       if (settings.display.percentChangeEnabled !== undefined) {
-        console.log('[importSettings] Calling setPercentChangeEnabled with:', settings.display.percentChangeEnabled);
+        debug.log('StyleSettings', 'Setting percentChangeEnabled', settings.display.percentChangeEnabled);
         setPercentChangeEnabled(settings.display.percentChangeEnabled);
-      } else {
-        console.log('[importSettings] percentChangeEnabled is undefined, not setting');
       }
 
       if (settings.display.percentChangeLabelFormat !== undefined) setPercentChangeLabelFormat(settings.display.percentChangeLabelFormat);
@@ -679,18 +676,18 @@ export const useStyleSettings = (initialTheme = theme) => {
       // Check for bar charts (all variants: bar-horizontal, bar-vertical, bar-grouped-horizontal, bar-grouped-vertical)
       else if (currentChartType.startsWith('bar') && settings.chartSpecific.bar) {
         const barSettings = settings.chartSpecific.bar;
-        console.log('[importSettings] bar.emphasizedBars value:', barSettings.emphasizedBars);
-        console.log('[importSettings] bar.percentChangeBracketDistance value:', barSettings.percentChangeBracketDistance);
+        debug.log('StyleSettings', 'Importing bar settings', {
+          emphasizedBars: barSettings.emphasizedBars,
+          percentChangeBracketDistance: barSettings.percentChangeBracketDistance
+        });
 
         if (barSettings.barMode !== undefined) setBarMode(barSettings.barMode);
         if (barSettings.labelMode !== undefined) setLabelMode(barSettings.labelMode);
         if (barSettings.directLabelContent !== undefined) setDirectLabelContent(barSettings.directLabelContent);
 
         if (barSettings.emphasizedBars !== undefined) {
-          console.log('[importSettings] Calling setEmphasizedBars with:', barSettings.emphasizedBars);
+          debug.log('StyleSettings', 'Setting emphasizedBars', barSettings.emphasizedBars);
           setEmphasizedBars(barSettings.emphasizedBars);
-        } else {
-          console.log('[importSettings] emphasizedBars is undefined, not setting');
         }
 
         if (barSettings.xAxisFontSize !== undefined) setXAxisFontSize(barSettings.xAxisFontSize);
@@ -722,10 +719,8 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.periodLabelDisplay !== undefined) setPeriodLabelDisplay(barSettings.periodLabelDisplay);
 
         if (barSettings.percentChangeBracketDistance !== undefined) {
-          console.log('[importSettings] Calling setPercentChangeBracketDistance with:', barSettings.percentChangeBracketDistance);
+          debug.log('StyleSettings', 'Setting percentChangeBracketDistance', barSettings.percentChangeBracketDistance);
           setPercentChangeBracketDistance(barSettings.percentChangeBracketDistance);
-        } else {
-          console.log('[importSettings] percentChangeBracketDistance is undefined, not setting');
         }
 
         if (barSettings.showTotalLabels !== undefined) setShowTotalLabels(barSettings.showTotalLabels);
@@ -745,7 +740,7 @@ export const useStyleSettings = (initialTheme = theme) => {
         if (barSettings.axisValueFormat !== undefined) setAxisValueFormat(barSettings.axisValueFormat);
         else if (barSettings.valueFormat !== undefined) setAxisValueFormat(barSettings.valueFormat);
 
-        console.log('[importSettings] ✅ Finished importing bar settings');
+        debug.log('StyleSettings', 'Finished importing bar settings');
       }
       // Check for line/area charts (line, area, area-stacked all use LineChart component)
       else if ((currentChartType === 'line' || currentChartType === 'area' || currentChartType === 'area-stacked') && settings.chartSpecific.line) {

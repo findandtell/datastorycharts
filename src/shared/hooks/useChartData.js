@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import Papa from "papaparse";
 import { getSampleDataset, isComparisonDataset } from "../data/sampleDatasets";
 import { parseCSV, csvToChartData, validateCSVStructure } from "../utils/csvUtils";
+import { debug } from "../utils/debug";
 
 /**
  * Get default dataset key based on chart type
@@ -535,7 +536,7 @@ export const useChartData = (chartType = 'funnel') => {
     // Convert data back to CSV format
     const csvString = Papa.unparse(cleanedData);
     setRawCSV(csvString);
-    console.log('[applyEdits] Regenerated CSV from current data');
+    debug.log('ChartData', 'Regenerated CSV from current data');
   }, [editableData]);
 
   /**

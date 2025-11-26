@@ -3,6 +3,8 @@
  * Converts Google Sheets URLs to CSV export URLs and fetches data
  */
 
+import { debug } from './debug';
+
 /**
  * Extract Sheet ID and GID from various Google Sheets URL formats
  * Supports:
@@ -107,7 +109,7 @@ export const loadGoogleSheetsData = async (sheetsUrl) => {
 
     return data;
   } catch (error) {
-    console.error('Error loading Google Sheets data:', error);
+    debug.error('GoogleSheetsLoader', 'Error loading Google Sheets data', error);
     throw error;
   }
 };

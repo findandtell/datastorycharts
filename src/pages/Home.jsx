@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { debug } from '../shared/utils/debug';
+import { useFigmaMode } from '../shared/hooks/useFigmaMode';
 
 /**
  * Chart Thumbnail Component
@@ -12,7 +14,7 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
   const [hasError, setHasError] = useState(false);
 
   const handleError = (e) => {
-    console.error(`[ChartThumbnail] Error loading thumbnail for ${chartKey}:`, {
+    debug.error('ChartThumbnail', `Error loading thumbnail for ${chartKey}`, {
       event: e,
       currentSrc: imageSrc,
       useDefault,
@@ -21,12 +23,12 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
     });
     if (useDefault) {
       // Default thumbnail not found, fall back to static image
-      console.log(`[ChartThumbnail] Falling back to static image: ${fallbackImage}`);
+      debug.log('ChartThumbnail', `Falling back to static image: ${fallbackImage}`);
 
       // Try fetching the thumbnail directly to see the actual error
       fetch(`/api/admin/get-thumbnail?chartType=${chartKey}`)
         .then(res => {
-          console.log(`[ChartThumbnail] Fetch response for ${chartKey}:`, {
+          debug.log('ChartThumbnail', `Fetch response for ${chartKey}`, {
             status: res.status,
             statusText: res.statusText,
             contentType: res.headers.get('content-type'),
@@ -35,10 +37,10 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
           return res.text();
         })
         .then(text => {
-          console.log(`[ChartThumbnail] Response body for ${chartKey} (first 500 chars):`, text.substring(0, 500));
+          debug.log('ChartThumbnail', `Response body for ${chartKey} (first 500 chars)`, text.substring(0, 500));
         })
         .catch(err => {
-          console.error(`[ChartThumbnail] Fetch error for ${chartKey}:`, err);
+          debug.error('ChartThumbnail', `Fetch error for ${chartKey}`, err);
         });
 
       setImageSrc(fallbackImage);
@@ -49,7 +51,7 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
 
   const handleLoad = () => {
     if (useDefault) {
-      console.log(`[ChartThumbnail] Successfully loaded default thumbnail for ${chartKey}`);
+      debug.log('ChartThumbnail', `Successfully loaded default thumbnail for ${chartKey}`);
     }
   };
 
@@ -79,6 +81,7 @@ const ChartThumbnail = ({ chartKey, fallbackImage, alt }) => {
  */
 export default function Home() {
   const navigate = useNavigate();
+  const { isFigmaMode } = useFigmaMode();
 
   // Check if CSV data was passed via URL (from "Open in New Tab" feature)
   useEffect(() => {
@@ -204,35 +207,95 @@ export default function Home() {
       />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-cyan-50 to-blue-50">
-        {/* Header */}
+        {/* Header - Different content for Figma vs Web */}
         <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-8 py-12">
-          <div className="flex flex-col items-center mb-6">
-            <img
-              src="/findandtell_logo.png"
-              alt="Find&Tell"
-              className="h-20 mb-4"
-            />
-            <h1 className="text-4xl font-bold text-gray-900">
-              Data Story Charts
-            </h1>
-          </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto text-center">
-            Create clean and clear data visualizations to be used in your data stories.
-          </p>
-        </div>
-      </div>
+          <div className="max-w-7xl mx-auto px-8 py-12">
+            {isFigmaMode ? (
+              /* Figma Plugin Header with 3-Step Onboarding */
+              <>
+                <div className="flex flex-col items-center mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <img
+                      src="/findandtell_logo.png"
+                      alt="Find&Tell"
+                      className="h-12"
+                    />
+                    <span className="text-gray-300 text-2xl font-light">|</span>
+                    <span className="text-2xl font-semibold text-gray-700">Figma</span>
+                  </div>
+                  <h1 className="text-4xl font-bold text-gray-900">
+                    Charts for Figma
+                  </h1>
+                </div>
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto text-center mb-8">
+                  Publication-ready data visualizations for your designs.
+                  <br />
+                  <span className="text-base text-gray-500">Insert as fully editable vector shapes.</span>
+                </p>
 
-      {/* Chart Gallery */}
-      <div className="max-w-7xl mx-auto px-8 py-16">
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">
-            Select a Chart Type
-          </h2>
-          <p className="text-lg text-gray-600">
-            Choose from our collection of professional chart types to get started
-          </p>
+                {/* 3-Step Visual Onboarding */}
+                <div className="flex items-center justify-center gap-4 max-w-2xl mx-auto">
+                  {/* Step 1: Choose */}
+                  <div className="flex-1 text-center p-4 bg-cyan-50 rounded-lg border border-cyan-100">
+                    <div className="text-3xl mb-2">1</div>
+                    <div className="font-semibold text-gray-800 mb-1">Choose</div>
+                    <div className="text-sm text-gray-500">Select a chart type</div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="text-cyan-400 text-2xl font-light">&rarr;</div>
+
+                  {/* Step 2: Design */}
+                  <div className="flex-1 text-center p-4 bg-cyan-50 rounded-lg border border-cyan-100">
+                    <div className="text-3xl mb-2">2</div>
+                    <div className="font-semibold text-gray-800 mb-1">Design</div>
+                    <div className="text-sm text-gray-500">Add data & customize</div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="text-cyan-400 text-2xl font-light">&rarr;</div>
+
+                  {/* Step 3: Insert */}
+                  <div className="flex-1 text-center p-4 bg-cyan-50 rounded-lg border border-cyan-100">
+                    <div className="text-3xl mb-2">3</div>
+                    <div className="font-semibold text-gray-800 mb-1">Insert</div>
+                    <div className="text-sm text-gray-500">Add to your Figma file</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Standard Web Header */
+              <>
+                <div className="flex flex-col items-center mb-6">
+                  <img
+                    src="/findandtell_logo.png"
+                    alt="Find&Tell"
+                    className="h-20 mb-4"
+                  />
+                  <h1 className="text-4xl font-bold text-gray-900">
+                    Data Story Charts
+                  </h1>
+                </div>
+                <p className="text-xl text-gray-600 max-w-3xl mx-auto text-center">
+                  Create clean and clear data visualizations to be used in your data stories.
+                </p>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Chart Gallery */}
+        <div className="max-w-7xl mx-auto px-8 py-16">
+          <div className="mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">
+              {isFigmaMode ? 'Step 1: Choose a Chart Type' : 'Select a Chart Type'}
+            </h2>
+            <p className="text-lg text-gray-600">
+              {isFigmaMode
+                ? 'Click on a chart to start customizing with your data'
+                : 'Choose from our collection of professional chart types to get started'}
+            </p>
+          </div>
 
         {/* Bar Charts Row */}
         <div className="mb-8">
@@ -263,27 +326,47 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-6 py-8 text-center">
-          {/* Watermark/Attribution */}
-          <p className="text-sm font-medium text-blue-900 mb-3">
-            <a
-              href="https://findandtell.co"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-cyan-600 transition-colors"
-            >
-              Made with Find&Tell | Charts for Data Stories™ | FindandTell.co
-            </a>
-          </p>
-          {/* Tech stack */}
-          <p className="text-gray-500 text-xs">
-            Built with React, D3.js, and Tailwind CSS • Export to PNG, SVG, or D3 code
-          </p>
+        {/* Footer */}
+        <div className="bg-white border-t border-gray-200 mt-16">
+          <div className="max-w-7xl mx-auto px-6 py-8 text-center">
+            {isFigmaMode ? (
+              /* Figma Plugin Footer */
+              <>
+                <p className="text-sm font-medium text-blue-900 mb-3">
+                  <a
+                    href="https://findandtell.co"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-cyan-600 transition-colors"
+                  >
+                    Charts for Figma by Find&Tell
+                  </a>
+                </p>
+                <p className="text-gray-500 text-xs">
+                  All charts insert as editable vector shapes
+                </p>
+              </>
+            ) : (
+              /* Standard Web Footer */
+              <>
+                <p className="text-sm font-medium text-blue-900 mb-3">
+                  <a
+                    href="https://findandtell.co"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-cyan-600 transition-colors"
+                  >
+                    Made with Find&Tell | Charts for Data Stories™ | FindandTell.co
+                  </a>
+                </p>
+                <p className="text-gray-500 text-xs">
+                  Built with React, D3.js, and Tailwind CSS • Export to PNG, SVG, or D3 code
+                </p>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
     </>
   );
 }

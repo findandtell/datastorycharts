@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { comparisonPalettes } from '../../shared/design-system/colorPalettes';
 import { getLineColor, calculatePercentageChange, formatLabel, defaultStyleSettings } from './slopeChartDefaults';
+import { debug } from '../../shared/utils/debug';
 
 /**
  * Convert a color to a pastel/desaturated version (for emphasis)
@@ -178,7 +179,7 @@ const SlopeChart = ({ data, periodNames, styleSettings = {}, onLineClick }) => {
     // Extract periods (should be exactly 2)
     const periods = periodNames.slice(0, 2);
     if (periods.length < 2) {
-      console.error('Slope chart requires exactly 2 periods');
+      debug.error('SlopeChart', 'Slope chart requires exactly 2 periods');
       return;
     }
 
