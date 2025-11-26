@@ -323,9 +323,9 @@ export default function ChartEditor() {
       startY: e.clientY,
       startWidth: currentWidth,
       startHeight: currentHeight,
-      lastResizeTime: 0,
       pendingWidth: currentWidth,
-      pendingHeight: currentHeight
+      pendingHeight: currentHeight,
+      rafPending: false
     };
     setWindowSize({ width: currentWidth, height: currentHeight });
     setIsResizingWindow(true);
@@ -343,18 +343,20 @@ export default function ChartEditor() {
     const newWidth = Math.max(500, resizeState.startWidth + deltaX);
     const newHeight = Math.max(400, resizeState.startHeight + deltaY);
 
-    // Always update React state for smooth visual feedback
-    setWindowSize({ width: newWidth, height: newHeight });
-
     // Store pending size for final resize
     resizeState.pendingWidth = newWidth;
     resizeState.pendingHeight = newHeight;
 
-    // Throttle Figma resize calls to every 50ms to prevent jerky behavior
-    const now = Date.now();
-    if (now - resizeState.lastResizeTime >= 50) {
-      resizeState.lastResizeTime = now;
-      figma.resizeFigma(newWidth, newHeight);
+    // Use requestAnimationFrame for smooth 60fps updates
+    // This batches resize calls with the browser's render cycle
+    if (!resizeState.rafPending) {
+      resizeState.rafPending = true;
+      requestAnimationFrame(() => {
+        resizeState.rafPending = false;
+        if (resizeState.isResizing) {
+          figma.resizeFigma(resizeState.pendingWidth, resizeState.pendingHeight);
+        }
+      });
     }
   }, [figma]);
 
